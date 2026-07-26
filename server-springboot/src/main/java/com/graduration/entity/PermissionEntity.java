@@ -1,5 +1,6 @@
 package com.graduration.entity;
 
+import com.graduration.Constain.PermissionConstain;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -18,7 +19,8 @@ import java.util.Set;
 public class PermissionEntity {
     @Id
     @Column(name = "Permission_id", columnDefinition = "VARCHAR(100)")
-    String permissionId;
+    @Enumerated(EnumType.STRING)
+    PermissionConstain permissionId;
 
     @Column(name = "permission_name", unique = true, columnDefinition = "VARCHAR(155)")
     String permissionName;

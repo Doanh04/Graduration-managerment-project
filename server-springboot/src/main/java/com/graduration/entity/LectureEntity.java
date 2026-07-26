@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.ArrayList;
+import java.util.List;
+
 //Entity giảng viên
 @Entity
 @Getter
@@ -37,4 +40,10 @@ public class LectureEntity {
     @OneToOne
     @JoinColumn(name = "user_id", referencedColumnName = "user_id")
     UserEntity user;
+
+    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    List<CommentEntity> comment = new ArrayList<>();
+
+    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    List<TopicSuperVisorEntity> topicSuperVisor = new ArrayList<>();
 }

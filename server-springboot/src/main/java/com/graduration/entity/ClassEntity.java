@@ -19,7 +19,7 @@ public class ClassEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "class_id")
-    Integer classId;
+    Long classId;
 
     @Column(name = "class_name", unique = true)
     String className;

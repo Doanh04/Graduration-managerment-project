@@ -14,19 +14,19 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Table(name = "major")
-public class MajorEntity {
+@Table(name = "academic_year")
+public class AcademicYearEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "major_id")
-    LongLong majorId;
+    @Column(name = "academic_id")
+    Integer academicId;
 
-    @Column(name = "major_name", unique = true)
-    String majorName;
+    @Column(name = "academic_year", nullable = false, unique = true)
+    String academicYear;
 
     @Column(name = "description")
     String description;
 
-    @OneToMany(mappedBy = "major", cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<ClassEntity> classEntity = new HashSet<>();
+    @OneToMany(mappedBy = "academicYear", cascade = CascadeType.ALL, orphanRemoval = true)
+    Set<DefensePeriodEntity> defensePeriod = new HashSet<>();
 }

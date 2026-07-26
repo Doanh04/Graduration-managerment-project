@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.util.HashSet;
-import java.util.Set;
-
 @Entity
 @Getter
 @Setter
@@ -14,19 +11,22 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Table(name = "major")
-public class MajorEntity {
+@Table(name = "library_topic")
+public class LibraryTopicEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "major_id")
-    LongLong majorId;
+    @Column(name = "id_library_topic")
+    Long idLibraryTopic;
 
-    @Column(name = "major_name", unique = true)
-    String majorName;
+    @Column(name = "title")
+    String title;
 
     @Column(name = "description")
     String description;
 
-    @OneToMany(mappedBy = "major", cascade = CascadeType.ALL, orphanRemoval = true)
-    Set<ClassEntity> classEntity = new HashSet<>();
+    @Column(name = "objective")
+    String objective;
+
+    @Column(name = "technology")
+    String technology;
 }
