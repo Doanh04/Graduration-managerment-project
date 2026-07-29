@@ -1,12 +1,14 @@
 package com.graduration.entity;
 
-import com.graduration.Constain.PermissionConstain;
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.persistence.*;
+
+import com.graduration.Constain.PermissionConstain;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
@@ -29,6 +31,6 @@ public class PermissionEntity {
     String description;
 
     @ManyToMany(mappedBy = "permission")
+    @Builder.Default
     Set<Roles> roles = new HashSet<>();
-
 }

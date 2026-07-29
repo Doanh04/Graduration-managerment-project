@@ -1,11 +1,12 @@
 package com.graduration.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import java.util.Date;
+
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.Date;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Document(collection = "notification")
 @Getter
@@ -17,6 +18,7 @@ import java.util.Date;
 public class NotificationDocument {
     @Id
     String idNotification;
+
     String userId;
     String title;
     String content;

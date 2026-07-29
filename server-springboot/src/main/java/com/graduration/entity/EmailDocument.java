@@ -1,11 +1,12 @@
 package com.graduration.entity;
 
-import jakarta.persistence.Id;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import java.util.Date;
+
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.Date;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Document(collection = "email")
 @Getter
@@ -17,6 +18,7 @@ import java.util.Date;
 public class EmailDocument {
     @Id
     String idEmailLog;
+
     String userId;
     String email;
     String subject;

@@ -1,4 +1,3 @@
 package com.graduration.Constain;
 
-public enum PermissionConstain {
-}
+public enum PermissionConstain {}

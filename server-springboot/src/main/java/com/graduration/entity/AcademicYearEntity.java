@@ -1,11 +1,14 @@
 package com.graduration.entity;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import jakarta.persistence.*;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Getter
@@ -28,5 +31,10 @@ public class AcademicYearEntity {
     String description;
 
     @OneToMany(mappedBy = "academicYear", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     Set<DefensePeriodEntity> defensePeriod = new HashSet<>();
+
+    @OneToMany(mappedBy = "academicYear", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<DefenseCommitteesEntity> defenseCommittees = new ArrayList<>();
 }

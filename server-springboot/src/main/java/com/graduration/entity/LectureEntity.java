@@ -1,13 +1,14 @@
 package com.graduration.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.ArrayList;
 import java.util.List;
 
-//Entity giảng viên
+import jakarta.persistence.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
+// Entity giảng viên
 @Entity
 @Getter
 @Setter
@@ -22,7 +23,7 @@ public class LectureEntity {
     @Column(name = "lecture_id")
     String lectureId;
 
-    @Column(name = "lecture_code", nullable = false ,columnDefinition = "VARCHAR(100)")
+    @Column(name = "lecture_code", nullable = false, columnDefinition = "VARCHAR(100)")
     String lectureCode;
 
     @Column(name = "full_name_lecture", nullable = true)
@@ -42,8 +43,22 @@ public class LectureEntity {
     UserEntity user;
 
     @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<CommentEntity> comment = new ArrayList<>();
 
     @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<TopicSuperVisorEntity> topicSuperVisor = new ArrayList<>();
+
+    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<ScoreEntity> score = new ArrayList<>();
+
+    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<ReviewAssignmentEntity> reviewAssignment = new ArrayList<>();
+
+    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<ComitteesMemberEntity> comitteesMember = new ArrayList<>();
 }

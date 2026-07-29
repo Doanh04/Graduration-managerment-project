@@ -1,11 +1,12 @@
 package com.graduration.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.persistence.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
@@ -32,5 +33,6 @@ public class ClassEntity {
     MajorEntity major;
 
     @OneToMany(mappedBy = "classEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<StudentEntity> student = new ArrayList<>();
 }

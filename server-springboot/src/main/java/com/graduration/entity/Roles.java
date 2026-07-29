@@ -1,13 +1,15 @@
 package com.graduration.entity;
 
-import com.graduration.Constain.RoleConstain;
-import com.graduration.Constain.RoleNameConstain;
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.persistence.*;
+
+import com.graduration.Constain.RoleConstain;
+import com.graduration.Constain.RoleNameConstain;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
@@ -31,13 +33,14 @@ public class Roles {
     String description;
 
     @ManyToMany(mappedBy = "roles")
+    @Builder.Default
     Set<UserEntity> user = new HashSet<>();
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "role_permission",
             joinColumns = @JoinColumn(name = "role"),
-            inverseJoinColumns = @JoinColumn(name = "Permission_id")
-    )
+            inverseJoinColumns = @JoinColumn(name = "Permission_id"))
+    @Builder.Default
     Set<PermissionEntity> permission = new HashSet<>();
 }

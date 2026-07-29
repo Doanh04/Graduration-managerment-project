@@ -12,19 +12,21 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Table(name = "topic_supervisor")
-// Xác định giảng viên hướng dẫn đề tài nào
-public class TopicSuperVisorEntity {
+@Table(name = "comittees_member")
+public class ComitteesMemberEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id_super_visor")
-    Long idSuperVisor;
+    @Column(name = "comittees_member_id")
+    Long comitteesMemberId;
+
+    @Column(name = "role")
+    String role;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lecture_id")
-    LectureEntity lecture; // giảng viên hướng dẫn nhiều đề tài
+    @JoinColumn(name = "lecture_id", nullable = false)
+    LectureEntity lecture;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_topic")
-    TopicEntity topic;
+    @JoinColumn(name = "id_Comittees", nullable = false)
+    DefenseCommitteesEntity defenseCommittees;
 }

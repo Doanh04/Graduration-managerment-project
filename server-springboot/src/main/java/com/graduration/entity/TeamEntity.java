@@ -1,12 +1,13 @@
 package com.graduration.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.persistence.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
@@ -35,6 +36,7 @@ public class TeamEntity {
     String role;
 
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<StudentEntity> studentEntities = new ArrayList<>();
 
     @OneToOne
@@ -42,5 +44,10 @@ public class TeamEntity {
     TopicEntity topic;
 
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     List<SubmistionEntity> submistion = new ArrayList<>();
+
+    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<ScoreEntity> score = new ArrayList<>();
 }

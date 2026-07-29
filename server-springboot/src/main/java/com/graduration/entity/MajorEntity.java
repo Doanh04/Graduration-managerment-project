@@ -1,11 +1,12 @@
 package com.graduration.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.persistence.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
@@ -19,7 +20,7 @@ public class MajorEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "major_id")
-    LongLong majorId;
+    Long majorId;
 
     @Column(name = "major_name", unique = true)
     String majorName;
@@ -28,5 +29,6 @@ public class MajorEntity {
     String description;
 
     @OneToMany(mappedBy = "major", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     Set<ClassEntity> classEntity = new HashSet<>();
 }

@@ -1,10 +1,11 @@
 package com.graduration.entity;
 
+import java.time.LocalDate;
+
 import jakarta.persistence.*;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -21,7 +22,7 @@ public class CommentEntity {
     Long idComment;
 
     @Column(name = "Content", nullable = false)
-    String content; //Nội dung lời nhận xét, góp ý hoặc sửa lỗi của giảng viên
+    String content; // Nội dung lời nhận xét, góp ý hoặc sửa lỗi của giảng viên
 
     @Column(name = "score", nullable = false)
     String score;
