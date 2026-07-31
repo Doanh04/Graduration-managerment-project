@@ -32,10 +32,10 @@ public class LectureEntity {
     @Column(name = "degree", nullable = true)
     String degree;
 
-    @Column(name = "email_lecture", unique = true, nullable = false)
-    String email_lecture;
+    @Column(name = "email_lecture", unique = true)
+    String emaillecture;
 
-    @Column(name = "phone_lecture", unique = true, nullable = false)
+    @Column(name = "phone_lecture", unique = true)
     String phoneLecture;
 
     @OneToOne

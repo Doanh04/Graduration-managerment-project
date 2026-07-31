@@ -23,7 +23,7 @@ public class StudentEntity {
     String studentCode;
 
     @Column(name = "full_name_student", nullable = false)
-    String fullNameSStudent;
+    String fullNameStudent;
 
     @Column(name = "avt_student")
     String pathAvt;

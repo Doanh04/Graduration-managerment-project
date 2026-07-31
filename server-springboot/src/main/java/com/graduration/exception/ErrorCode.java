@@ -37,7 +37,16 @@ public enum ErrorCode {
     OTP_INVALID(1023, "OTP Invalid", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED(1024, "OTP expired", HttpStatus.BAD_REQUEST),
     INVALID_USERNAME(1025, "Invalid username", HttpStatus.BAD_REQUEST),
-    ACCESS_DENIED(1026, "You do not have permission", HttpStatus.FORBIDDEN);
+    ACCESS_DENIED(1026, "You do not have permission", HttpStatus.FORBIDDEN),
+    PASSWORD_NOT_BLANK(1027, "password not blank", HttpStatus.BAD_REQUEST),
+    USERNAME_NOT_BLANK(1028, "username not blank", HttpStatus.BAD_REQUEST),
+    LECTURER_NOT_BLANK(1029, "lecture not blank", HttpStatus.BAD_REQUEST),
+    FULLNAME_NOT_BLANK(1030, "full name lecturer not blank", HttpStatus.BAD_REQUEST),
+    INVALID_PHONE(1031, "invalid phone number", HttpStatus.BAD_REQUEST),
+    PHONE_IS_EXITED(1032, "phone number is exited", HttpStatus.CONFLICT),
+    LECTURER_CODE_IS_EXITED(1033, "lecturer code is exited", HttpStatus.CONFLICT),
+    INVALID_EXCEL_FILE(1034, "invalid or empty Excel file", HttpStatus.BAD_REQUEST),
+    EXCEL_ROW_INVALID(1035, "Excel row data is invalid", HttpStatus.BAD_REQUEST);
 
     ErrorCode(int code, String mesage, HttpStatusCode statusCode) {
         this.code = code;

@@ -1,3 +1,7 @@
 package com.graduration.Constain;
 
-public enum StatusConstain {}
+public enum StatusConstain {
+    ACTIVE,
+    INACTIVE,
+    DELETED
+}

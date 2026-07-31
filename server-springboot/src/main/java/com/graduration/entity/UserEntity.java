@@ -31,12 +31,6 @@ public class UserEntity {
     @Column(name = "password", columnDefinition = "VARCHAR(255)", nullable = false)
     String password;
 
-    @Column(name = "email", columnDefinition = "VARCHAR(255)", unique = true, nullable = false)
-    String email;
-
-    @Column(name = "phone", columnDefinition = "VARCHAR(12)", unique = true)
-    String phone;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "status", columnDefinition = "VARCHAR(100)")
     StatusConstain status;

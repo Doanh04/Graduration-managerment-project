@@ -20,9 +20,10 @@ public class SercurityConfig {
 
     private final CustomJwtDecoder customJwtDecoder;
 
-    private final String[] PUBLIC_ENPOINT_POST = {};
-    private final String[] PUBLIC_ENPOINT_GET = {};
-    private final String[] PUBLIC_ENPONT_DELETE = {};
+    private final String[] PUBLIC_ENPOINT_POST = {"/register-lecture/create-user", "/register-lecture/import"};
+    private final String[] PUBLIC_ENPOINT_PUT = {};
+    private final String[] PUBLIC_ENPOINT_GET = {"/register-lecture/get-all-lecture", "/register-lecture/username/{userName}"};
+    private final String[] PUBLIC_ENPONT_DELETE = {"/permission/{permissionId}"};
 
     public SercurityConfig(CustomJwtDecoder customJwtDecoder) {
         this.customJwtDecoder = customJwtDecoder;
@@ -35,6 +36,8 @@ public class SercurityConfig {
                 .requestMatchers(HttpMethod.GET, PUBLIC_ENPOINT_GET)
                 .permitAll()
                 .requestMatchers(HttpMethod.DELETE, PUBLIC_ENPONT_DELETE)
+                .permitAll()
+                .requestMatchers(HttpMethod.PUT, PUBLIC_ENPOINT_PUT)
                 .permitAll()
                 .anyRequest()
                 .authenticated());
