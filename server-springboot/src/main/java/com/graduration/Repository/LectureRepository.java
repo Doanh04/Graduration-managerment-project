@@ -3,10 +3,11 @@ package com.graduration.Repository;
 import java.util.List;
 import java.util.Optional;
 
-import com.graduration.entity.LectureEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import com.graduration.entity.LectureEntity;
 
 @Repository
 public interface LectureRepository extends JpaRepository<LectureEntity, String> {

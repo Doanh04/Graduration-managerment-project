@@ -1,5 +1,12 @@
 package com.graduration.Service.AuthenticationService;
 
+import java.text.ParseException;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.graduration.Repository.InvalidatedRepository;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
@@ -7,15 +14,10 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.SignedJWT;
+
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import java.text.ParseException;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
 
 @Service
 @RequiredArgsConstructor

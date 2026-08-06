@@ -136,8 +136,7 @@ class UserLecturerServiceTest {
         when(lectureRepository.existsByLectureCode(request.getLectureCode())).thenReturn(false);
         when(lectureRepository.existsByEmaillecture(request.getEmail())).thenReturn(true);
 
-        AppException exception = assertThrows(
-                AppException.class, () -> userLecturerService.registerLecturer(request));
+        AppException exception = assertThrows(AppException.class, () -> userLecturerService.registerLecturer(request));
 
         assertEquals(ErrorCode.EMAIL_VERIFIED_EXITED, exception.getErrorCode());
         verify(userRepository, never()).save(any());
@@ -152,8 +151,7 @@ class UserLecturerServiceTest {
         when(lectureRepository.existsByEmaillecture(request.getEmail())).thenReturn(false);
         when(lectureRepository.existsByPhoneLecture(request.getPhone())).thenReturn(true);
 
-        AppException exception = assertThrows(
-                AppException.class, () -> userLecturerService.registerLecturer(request));
+        AppException exception = assertThrows(AppException.class, () -> userLecturerService.registerLecturer(request));
 
         assertEquals(ErrorCode.PHONE_IS_EXITED, exception.getErrorCode());
         verify(userRepository, never()).save(any());
@@ -161,7 +159,10 @@ class UserLecturerServiceTest {
 
     @Test
     void deleteLecturerAccount_changesStatusToDeletedWithoutDeleting() {
-        UserEntity user = UserEntity.builder().userId("user-1").status(StatusConstain.ACTIVE).build();
+        UserEntity user = UserEntity.builder()
+                .userId("user-1")
+                .status(StatusConstain.ACTIVE)
+                .build();
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
 
         userLecturerService.deleteLecturerAccount("user-1");
@@ -173,7 +174,8 @@ class UserLecturerServiceTest {
 
     @Test
     void updateLecturer_preservesMissingFieldsAndDoesNotEncodeMissingPassword() {
-        UpdateLecturerRequest request = UpdateLecturerRequest.builder().fullName("Updated Name").build();
+        UpdateLecturerRequest request =
+                UpdateLecturerRequest.builder().fullName("Updated Name").build();
         UserEntity user = UserEntity.builder()
                 .userId("user-1")
                 .userName("lecturer01")
@@ -208,8 +210,10 @@ class UserLecturerServiceTest {
 
     @Test
     void updateLecturer_encodesPasswordWhenProvided() {
-        UpdateLecturerRequest request = UpdateLecturerRequest.builder().password("newPassword123").build();
-        UserEntity user = UserEntity.builder().userId("user-1").password("old-password").build();
+        UpdateLecturerRequest request =
+                UpdateLecturerRequest.builder().password("newPassword123").build();
+        UserEntity user =
+                UserEntity.builder().userId("user-1").password("old-password").build();
         LectureEntity lecturer = LectureEntity.builder().lectureId("lecturer-1").build();
 
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
@@ -255,16 +259,14 @@ class UserLecturerServiceTest {
 
     @Test
     void getAllLecturers_returnsMappedLecturerAccounts() {
-        UserEntity firstUser = UserEntity.builder().userId("user-1").userName("lecturer01").build();
-        UserEntity secondUser = UserEntity.builder().userId("user-2").userName("lecturer02").build();
-        LectureEntity firstLecturer = LectureEntity.builder()
-                .lectureId("lecturer-1")
-                .user(firstUser)
-                .build();
-        LectureEntity secondLecturer = LectureEntity.builder()
-                .lectureId("lecturer-2")
-                .user(secondUser)
-                .build();
+        UserEntity firstUser =
+                UserEntity.builder().userId("user-1").userName("lecturer01").build();
+        UserEntity secondUser =
+                UserEntity.builder().userId("user-2").userName("lecturer02").build();
+        LectureEntity firstLecturer =
+                LectureEntity.builder().lectureId("lecturer-1").user(firstUser).build();
+        LectureEntity secondLecturer =
+                LectureEntity.builder().lectureId("lecturer-2").user(secondUser).build();
         RegisterLectureResponse firstResponse =
                 RegisterLectureResponse.builder().userName("lecturer01").build();
         RegisterLectureResponse secondResponse =
@@ -283,11 +285,10 @@ class UserLecturerServiceTest {
 
     @Test
     void getLecturerByUserName_trimsUsernameAndReturnsMappedAccount() {
-        UserEntity user = UserEntity.builder().userId("user-1").userName("lecturer01").build();
-        LectureEntity lecturer = LectureEntity.builder()
-                .lectureId("lecturer-1")
-                .user(user)
-                .build();
+        UserEntity user =
+                UserEntity.builder().userId("user-1").userName("lecturer01").build();
+        LectureEntity lecturer =
+                LectureEntity.builder().lectureId("lecturer-1").user(user).build();
         RegisterLectureResponse expected =
                 RegisterLectureResponse.builder().userName("lecturer01").build();
 
@@ -304,10 +305,51 @@ class UserLecturerServiceTest {
     void getLecturerByUserName_throwsWhenUserDoesNotExist() {
         when(lectureRepository.findByUser_UserName("missing")).thenReturn(Optional.empty());
 
-        AppException exception = assertThrows(
-                AppException.class, () -> userLecturerService.getLecturerByUserName("missing"));
+        AppException exception =
+                assertThrows(AppException.class, () -> userLecturerService.getLecturerByUserName("missing"));
 
         assertEquals(ErrorCode.USER_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void resetPasswordByUserName_encodesDefaultPasswordAndSavesUser() {
+        UserEntity user = UserEntity.builder()
+                .userId("user-1")
+                .userName("lecturer01")
+                .password("old-password")
+                .build();
+        LectureEntity lecturer = LectureEntity.builder().user(user).build();
+
+        when(lectureRepository.findByUser_UserName("lecturer01")).thenReturn(Optional.of(lecturer));
+        when(passwordEncoder.encode("12345678")).thenReturn("encoded-default-password");
+
+        userLecturerService.resetPasswordByUserName(" lecturer01 ");
+
+        assertEquals("encoded-default-password", user.getPassword());
+        verify(passwordEncoder).encode("12345678");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void resetPasswordByUserName_throwsWhenUserDoesNotExist() {
+        when(lectureRepository.findByUser_UserName("missing")).thenReturn(Optional.empty());
+
+        AppException exception =
+                assertThrows(AppException.class, () -> userLecturerService.resetPasswordByUserName("missing"));
+
+        assertEquals(ErrorCode.USER_NOT_FOUND, exception.getErrorCode());
+        verify(passwordEncoder, never()).encode(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resetPasswordByUserName_rejectsBlankUsername() {
+        AppException exception =
+                assertThrows(AppException.class, () -> userLecturerService.resetPasswordByUserName("   "));
+
+        assertEquals(ErrorCode.INVALID_USERNAME, exception.getErrorCode());
+        verify(lectureRepository, never()).findByUser_UserName(any());
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -338,8 +380,7 @@ class UserLecturerServiceTest {
         assertEquals(0, response.getFailedRows());
         assertEquals("lecturer01", response.getImportedLecturers().get(0).getUserName());
 
-        ArgumentCaptor<RegisterLectureRequest> requestCaptor =
-                ArgumentCaptor.forClass(RegisterLectureRequest.class);
+        ArgumentCaptor<RegisterLectureRequest> requestCaptor = ArgumentCaptor.forClass(RegisterLectureRequest.class);
         verify(userMaper).toUserEntity(requestCaptor.capture());
         assertEquals("GV001", requestCaptor.getValue().getLectureCode());
         assertNull(requestCaptor.getValue().getEmail());
@@ -347,20 +388,15 @@ class UserLecturerServiceTest {
 
     @Test
     void importLecturers_rejectsNonXlsxFile() {
-        MockMultipartFile file =
-                new MockMultipartFile("file", "lecturers.csv", "text/csv", "invalid".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "lecturers.csv", "text/csv", "invalid".getBytes());
 
-        AppException exception =
-                assertThrows(AppException.class, () -> userLecturerService.importLecturers(file));
+        AppException exception = assertThrows(AppException.class, () -> userLecturerService.importLecturers(file));
 
         assertEquals(ErrorCode.INVALID_EXCEL_FILE, exception.getErrorCode());
     }
 
     private void stubSuccessfulRegistration(
-            RegisterLectureRequest request,
-            UserEntity user,
-            LectureEntity lecturer,
-            RegisterLectureResponse response) {
+            RegisterLectureRequest request, UserEntity user, LectureEntity lecturer, RegisterLectureResponse response) {
         when(userMaper.toUserEntity(request)).thenReturn(user);
         when(userMaper.toLecturerEntity(request)).thenReturn(lecturer);
         when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
@@ -383,12 +419,11 @@ class UserLecturerServiceTest {
     }
 
     private MockMultipartFile validExcelFile() throws Exception {
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+        try (Workbook workbook = new XSSFWorkbook();
+                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Lecturers");
             Row header = sheet.createRow(0);
-            String[] headers = {
-                "userName", "password", "lectureCode", "fullName", "degree", "email", "phone"
-            };
+            String[] headers = {"userName", "password", "lectureCode", "fullName", "degree", "email", "phone"};
             for (int index = 0; index < headers.length; index++) {
                 header.createCell(index).setCellValue(headers[index]);
             }

@@ -25,8 +25,7 @@ public class PermissionControler {
     PermissionService permissionService;
 
     @PostMapping("create-permission")
-    public ApiResponse<PermissionResponse> createPermission(
-            @Valid @RequestBody CreatePermissionRequest request) {
+    public ApiResponse<PermissionResponse> createPermission(@Valid @RequestBody CreatePermissionRequest request) {
         return ApiResponse.<PermissionResponse>builder()
                 .message("Permission created successfully")
                 .result(permissionService.createPermission(request))
@@ -35,8 +34,7 @@ public class PermissionControler {
 
     @PutMapping("/{permissionId}")
     public ApiResponse<PermissionResponse> updatePermission(
-            @PathVariable PermissionConstain permissionId,
-            @Valid @RequestBody UpdatePermissionRequest request) {
+            @PathVariable PermissionConstain permissionId, @Valid @RequestBody UpdatePermissionRequest request) {
         return ApiResponse.<PermissionResponse>builder()
                 .message("Permission updated successfully")
                 .result(permissionService.updatePermission(permissionId, request))

@@ -7,8 +7,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,21 +35,15 @@ public class RegisterLecturerControler {
     UserLecturerService userLecturerService;
 
     @PostMapping("/create-user")
-    public ApiResponse<RegisterLectureResponse> registerLecturer(
-            @Valid @RequestBody RegisterLectureRequest request) {
+    public ApiResponse<RegisterLectureResponse> registerLecturer(@Valid @RequestBody RegisterLectureRequest request) {
         return ApiResponse.<RegisterLectureResponse>builder()
                 .message("Lecturer account registered successfully")
                 .result(userLecturerService.registerLecturer(request))
                 .build();
     }
 
-    @PostMapping(
-            value = "/import",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ApiResponse<ImportLectureResponse> importLecturers(
-            @RequestPart("file") MultipartFile file
-    ) {
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<ImportLectureResponse> importLecturers(@RequestPart("file") MultipartFile file) {
         return ApiResponse.<ImportLectureResponse>builder()
                 .message("Lecturer accounts imported successfully")
                 .result(userLecturerService.importLecturers(file))
@@ -73,10 +67,17 @@ public class RegisterLecturerControler {
     }
 
     @GetMapping("/username/{userName}")
-    public ApiResponse<RegisterLectureResponse> getLecturerByUserName(
-            @PathVariable String userName) {
+    public ApiResponse<RegisterLectureResponse> getLecturerByUserName(@PathVariable String userName) {
         return ApiResponse.<RegisterLectureResponse>builder()
                 .result(userLecturerService.getLecturerByUserName(userName))
+                .build();
+    }
+
+    @PatchMapping("/reset-password/{userName}")
+    public ApiResponse<Void> resetPassword(@PathVariable String userName) {
+        userLecturerService.resetPasswordByUserName(userName);
+        return ApiResponse.<Void>builder()
+                .message("Lecturer password reset successfully")
                 .build();
     }
 

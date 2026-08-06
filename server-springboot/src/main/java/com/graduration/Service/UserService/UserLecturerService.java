@@ -47,6 +47,8 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class UserLecturerService {
+    private static final String DEFAULT_PASSWORD = "12345678";
+
     UserRepository userRepository;
     LectureRepository lectureRepository;
     RoleRepository roleRepository;
@@ -82,9 +84,7 @@ public class UserLecturerService {
 
     @Transactional
     public void deleteLecturerAccount(String userId) {
-        UserEntity user = userRepository
-                .findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         user.setStatus(StatusConstain.DELETED);
         userRepository.save(user);
@@ -95,9 +95,7 @@ public class UserLecturerService {
         normalizeUpdateRequest(request);
         validateUpdateRequest(request);
 
-        UserEntity user = userRepository
-                .findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         LectureEntity lecturer = lectureRepository
                 .findByUser_UserId(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -142,6 +140,21 @@ public class UserLecturerService {
         return userMaper.toLectureResponse(lecturer.getUser(), lecturer);
     }
 
+    @Transactional
+    public void resetPasswordByUserName(String userName) {
+        if (userName == null || userName.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_USERNAME);
+        }
+
+        UserEntity user = lectureRepository
+                .findByUser_UserName(userName.trim())
+                .map(LectureEntity::getUser)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+        userRepository.save(user);
+    }
+
     public ImportLectureResponse importLecturers(MultipartFile file) {
         validateExcelFile(file);
 
@@ -164,8 +177,7 @@ public class UserLecturerService {
                 RegisterLectureRequest request = readRequest(row, formatter);
 
                 try {
-                    RegisterLectureResponse response = transactionTemplate.execute(
-                            status -> registerLecturer(request));
+                    RegisterLectureResponse response = transactionTemplate.execute(status -> registerLecturer(request));
                     importedLecturers.add(response);
                 } catch (RuntimeException exception) {
                     errors.add(ImportLectureErrorResponse.builder()
@@ -230,25 +242,21 @@ public class UserLecturerService {
         }
     }
 
-    private void validateUpdateUniqueness(
-            String userId, String lecturerId, UpdateLecturerRequest request) {
+    private void validateUpdateUniqueness(String userId, String lecturerId, UpdateLecturerRequest request) {
         if (request.getUserName() != null
                 && userRepository.existsByUserNameAndUserIdNot(request.getUserName(), userId)) {
             throw new AppException(ErrorCode.USERNAME_IS_EXITED);
         }
         if (request.getLectureCode() != null
-                && lectureRepository.existsByLectureCodeAndLectureIdNot(
-                        request.getLectureCode(), lecturerId)) {
+                && lectureRepository.existsByLectureCodeAndLectureIdNot(request.getLectureCode(), lecturerId)) {
             throw new AppException(ErrorCode.LECTURER_CODE_IS_EXITED);
         }
         if (request.getEmail() != null
-                && lectureRepository.existsByEmaillectureAndLectureIdNot(
-                        request.getEmail(), lecturerId)) {
+                && lectureRepository.existsByEmaillectureAndLectureIdNot(request.getEmail(), lecturerId)) {
             throw new AppException(ErrorCode.EMAIL_VERIFIED_EXITED);
         }
         if (request.getPhone() != null
-                && lectureRepository.existsByPhoneLectureAndLectureIdNot(
-                        request.getPhone(), lecturerId)) {
+                && lectureRepository.existsByPhoneLectureAndLectureIdNot(request.getPhone(), lecturerId)) {
             throw new AppException(ErrorCode.PHONE_IS_EXITED);
         }
     }
@@ -289,16 +297,15 @@ public class UserLecturerService {
     }
 
     private void validateExcelHeader(Row header, DataFormatter formatter) {
-        String[] expectedHeaders = {
-            "userName", "password", "lectureCode", "fullName", "degree", "email", "phone"
-        };
+        String[] expectedHeaders = {"userName", "password", "lectureCode", "fullName", "degree", "email", "phone"};
 
         if (header == null) {
             throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
         }
 
         for (int column = 0; column < expectedHeaders.length; column++) {
-            String actualHeader = formatter.formatCellValue(header.getCell(column)).trim();
+            String actualHeader =
+                    formatter.formatCellValue(header.getCell(column)).trim();
             if (!expectedHeaders[column].equalsIgnoreCase(actualHeader)) {
                 throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
             }
@@ -329,5 +336,4 @@ public class UserLecturerService {
         }
         return true;
     }
-
 }

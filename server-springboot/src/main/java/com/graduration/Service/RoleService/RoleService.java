@@ -34,8 +34,7 @@ public class RoleService {
 
     @Transactional
     public RoleResponse createRole(CreateRoleRequest request) {
-        if (roleRepository.existsById(request.getRole())
-                || roleRepository.existsByRoleName(request.getRoleName())) {
+        if (roleRepository.existsById(request.getRole()) || roleRepository.existsByRoleName(request.getRoleName())) {
             throw new AppException(ErrorCode.ROLE_IS_EXITED);
         }
 

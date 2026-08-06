@@ -4,6 +4,12 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+
 import com.graduration.Constain.PermissionConstain;
 import com.graduration.DTO.Request.RegisterLectureRequest;
 import com.graduration.DTO.Request.UpdateLecturerRequest;
@@ -11,11 +17,6 @@ import com.graduration.DTO.Response.RegisterLectureResponse;
 import com.graduration.entity.LectureEntity;
 import com.graduration.entity.Roles;
 import com.graduration.entity.UserEntity;
-import org.mapstruct.BeanMapping;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring", uses = RoleMaper.class)
 public interface UserMaper {

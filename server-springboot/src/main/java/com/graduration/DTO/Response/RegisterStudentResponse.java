@@ -1,6 +1,6 @@
 package com.graduration.DTO.Response;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,16 +15,15 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class RegisterLectureResponse {
-    String userId;
+public class RegisterStudentResponse {
+    String idUser;
     String userName;
-    String lecturerCode;
-    String fullName;
-    String degree;
-    String email;
-    String phone;
     String status;
-    LocalDateTime createAt;
+    LocalDate createAt;
+    String studentCode;
+    String fullName;
+    String phone;
+    String email;
 
     @Builder.Default
     Set<RoleConstain> roles = new HashSet<>();

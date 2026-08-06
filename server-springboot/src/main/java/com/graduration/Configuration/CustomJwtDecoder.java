@@ -1,12 +1,12 @@
 package com.graduration.Configuration;
 
-import com.graduration.Service.AuthenticationService.AuthenticationService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 
+import com.graduration.Service.AuthenticationService.AuthenticationService;
 import com.nimbusds.jwt.SignedJWT;
 
 @Component

@@ -22,6 +22,9 @@ public class ClassEntity {
     @Column(name = "class_id")
     Long classId;
 
+    @Column(name = "class_code", unique = true)
+    String classCode;
+
     @Column(name = "class_name", unique = true)
     String className;
 

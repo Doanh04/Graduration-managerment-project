@@ -23,9 +23,8 @@ class UserMaperTest {
                 .emaillecture("old@example.com")
                 .phoneLecture("0901234567")
                 .build();
-        UpdateLecturerRequest request = UpdateLecturerRequest.builder()
-                .fullName("Updated Name")
-                .build();
+        UpdateLecturerRequest request =
+                UpdateLecturerRequest.builder().fullName("Updated Name").build();
 
         userMaper.updateUserEntity(request, user);
         userMaper.updateLecturerEntity(request, lecturer);

@@ -54,16 +54,18 @@ class RoleControlerTest {
     void createRole_returnsCreatedRole() throws Exception {
         when(roleService.createRole(any(CreateRoleRequest.class))).thenReturn(roleResponse());
 
-        mockMvc.perform(post("/role")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "role": "SUPERVISOR",
-                                  "roleName": "NAME_SUPERVISOR",
-                                  "description": "Supervisor",
-                                  "permissions": ["topic_read"]
-                                }
-                                """))
+        mockMvc.perform(
+                        post("/role")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+								{
+								"role": "SUPERVISOR",
+								"roleName": "NAME_SUPERVISOR",
+								"description": "Supervisor",
+								"permissions": ["topic_read"]
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
                 .andExpect(jsonPath("$.message").value("Role created successfully"))
@@ -76,15 +78,17 @@ class RoleControlerTest {
         when(roleService.updateRole(any(RoleConstain.class), any(UpdateRoleRequest.class)))
                 .thenReturn(roleResponse());
 
-        mockMvc.perform(put("/role/SUPERVISOR")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "roleName": "NAME_SUPERVISOR",
-                                  "description": "Updated supervisor",
-                                  "permissions": ["topic_read"]
-                                }
-                                """))
+        mockMvc.perform(
+                        put("/role/SUPERVISOR")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+								{
+								"roleName": "NAME_SUPERVISOR",
+								"description": "Updated supervisor",
+								"permissions": ["topic_read"]
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.roleName").value("NAME_SUPERVISOR"));
     }

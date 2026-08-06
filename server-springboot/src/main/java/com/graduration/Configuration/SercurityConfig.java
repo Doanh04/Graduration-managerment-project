@@ -20,10 +20,11 @@ public class SercurityConfig {
 
     private final CustomJwtDecoder customJwtDecoder;
 
-    private final String[] PUBLIC_ENPOINT_POST = {"/register-lecture/create-user", "/register-lecture/import"};
-    private final String[] PUBLIC_ENPOINT_PUT = {};
-    private final String[] PUBLIC_ENPOINT_GET = {"/register-lecture/get-all-lecture", "/register-lecture/username/{userName}"};
-    private final String[] PUBLIC_ENPONT_DELETE = {"/permission/{permissionId}"};
+    private final String[] PUBLIC_ENPOINT_POST = {"/register-student/create-user", "/register-student/import", "/role/create-role"};
+    private final String[] PUBLIC_ENPOINT_PUT = {"/class/{classId}"};
+    private final String[] PUBLIC_ENPOINT_GET = {"/register-student/get-all-student", " /register-student/{userName}", "/register-student/{userName}"};
+    private final String[] PUBLIC_ENPONT_DELETE = {"/class/{classId}"};
+    private final String[] PUBLIC_ENPONT_PATCH = {"/register-student/reset-password/{userName}"};
 
     public SercurityConfig(CustomJwtDecoder customJwtDecoder) {
         this.customJwtDecoder = customJwtDecoder;
@@ -39,6 +40,8 @@ public class SercurityConfig {
                 .permitAll()
                 .requestMatchers(HttpMethod.PUT, PUBLIC_ENPOINT_PUT)
                 .permitAll()
+                .requestMatchers(HttpMethod.PATCH, PUBLIC_ENPONT_PATCH)
+                .permitAll()
                 .anyRequest()
                 .authenticated());
 
@@ -46,8 +49,7 @@ public class SercurityConfig {
                         .decoder(customJwtDecoder)
                         .jwtAuthenticationConverter(jwtAuthenticationConverter()))
                 .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
-        httpSercurity.exceptionHandling(
-                exception -> exception.accessDeniedHandler(new JwtAccessDeniedHandler()));
+        httpSercurity.exceptionHandling(exception -> exception.accessDeniedHandler(new JwtAccessDeniedHandler()));
         httpSercurity.csrf(AbstractHttpConfigurer::disable);
 
         return httpSercurity.build();

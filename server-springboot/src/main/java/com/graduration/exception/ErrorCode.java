@@ -46,7 +46,11 @@ public enum ErrorCode {
     PHONE_IS_EXITED(1032, "phone number is exited", HttpStatus.CONFLICT),
     LECTURER_CODE_IS_EXITED(1033, "lecturer code is exited", HttpStatus.CONFLICT),
     INVALID_EXCEL_FILE(1034, "invalid or empty Excel file", HttpStatus.BAD_REQUEST),
-    EXCEL_ROW_INVALID(1035, "Excel row data is invalid", HttpStatus.BAD_REQUEST);
+    EXCEL_ROW_INVALID(1035, "Excel row data is invalid", HttpStatus.BAD_REQUEST),
+    STUDENT_NOT_BLANK(1036, "Student not blank", HttpStatus.BAD_REQUEST),
+    CLASS_CODE_NOT_BLANK(1037, "Class Code not blank", HttpStatus.BAD_REQUEST),
+    CLASS_NAME_NOT_BLANK(1038, "Class Name not blank", HttpStatus.BAD_REQUEST),
+    MAJOR_ID_NOT_BLANK(1039, "Major id not blank", HttpStatus.BAD_REQUEST);
 
     ErrorCode(int code, String mesage, HttpStatusCode statusCode) {
         this.code = code;
