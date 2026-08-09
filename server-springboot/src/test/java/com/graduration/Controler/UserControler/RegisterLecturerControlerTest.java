@@ -57,19 +57,21 @@ class RegisterLecturerControlerTest {
         when(userLecturerService.registerLecturer(any(RegisterLectureRequest.class)))
                 .thenReturn(registerResponse());
 
-        mockMvc.perform(post("/register-lecture/create-user")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "userName": "lecturer01",
-                                  "password": "password123",
-                                  "lectureCode": "GV001",
-                                  "fullName": "Nguyen Van A",
-                                  "degree": "Master",
-                                  "email": "lecturer@example.com",
-                                  "phone": "0901234567"
-                                }
-                                """))
+        mockMvc.perform(
+                        post("/register-lecture/create-user")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+								{
+								"userName": "lecturer01",
+								"password": "password123",
+								"lectureCode": "GV001",
+								"fullName": "Nguyen Van A",
+								"degree": "Master",
+								"email": "lecturer@example.com",
+								"phone": "0901234567"
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
                 .andExpect(jsonPath("$.message").value("Lecturer account registered successfully"))
@@ -81,21 +83,22 @@ class RegisterLecturerControlerTest {
 
     @Test
     void registerLecturer_rejectsInvalidRequestBeforeCallingService() throws Exception {
-        mockMvc.perform(post("/register-lecture/create-user")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "userName": "abc",
-                                  "password": "short",
-                                  "lectureCode": "",
-                                  "fullName": ""
-                                }
-                                """))
+        mockMvc.perform(
+                        post("/register-lecture/create-user")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+								{
+								"userName": "abc",
+								"password": "short",
+								"lectureCode": "",
+								"fullName": ""
+								}
+								"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").isNumber());
 
-        verify(userLecturerService, org.mockito.Mockito.never())
-                .registerLecturer(any(RegisterLectureRequest.class));
+        verify(userLecturerService, org.mockito.Mockito.never()).registerLecturer(any(RegisterLectureRequest.class));
     }
 
     @Test
@@ -133,10 +136,10 @@ class RegisterLecturerControlerTest {
         mockMvc.perform(patch("/register-lecture/user-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "fullName": "Updated Name"
-                                }
-                                """))
+								{
+								"fullName": "Updated Name"
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Lecturer account updated successfully"))
                 .andExpect(jsonPath("$.result.fullName").value("Updated Name"))
@@ -155,10 +158,10 @@ class RegisterLecturerControlerTest {
         mockMvc.perform(patch("/register-lecture/user-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "roles": ["SUPERVISOR", "REVIEWER"]
-                                }
-                                """))
+								{
+								"roles": ["SUPERVISOR", "REVIEWER"]
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.roles.length()").value(2))
                 .andExpect(jsonPath("$.result.permissions.length()").value(2));
@@ -168,7 +171,7 @@ class RegisterLecturerControlerTest {
     void getAllLecturers_returnsLecturerList() throws Exception {
         when(userLecturerService.getAllLecturers()).thenReturn(List.of(registerResponse()));
 
-        mockMvc.perform(get("/register-lecture"))
+        mockMvc.perform(get("/register-lecture/get-all-lecture"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
                 .andExpect(jsonPath("$.result.length()").value(1))
@@ -178,8 +181,7 @@ class RegisterLecturerControlerTest {
 
     @Test
     void getLecturerByUserName_returnsLecturer() throws Exception {
-        when(userLecturerService.getLecturerByUserName("lecturer01"))
-                .thenReturn(registerResponse());
+        when(userLecturerService.getLecturerByUserName("lecturer01")).thenReturn(registerResponse());
 
         mockMvc.perform(get("/register-lecture/username/lecturer01"))
                 .andExpect(status().isOk())
@@ -188,6 +190,18 @@ class RegisterLecturerControlerTest {
                 .andExpect(jsonPath("$.result.lecturerCode").value("GV001"));
 
         verify(userLecturerService).getLecturerByUserName("lecturer01");
+    }
+
+    @Test
+    void resetPassword_returnsSuccessResponse() throws Exception {
+        doNothing().when(userLecturerService).resetPasswordByUserName("lecturer01");
+
+        mockMvc.perform(patch("/register-lecture/reset-password/lecturer01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").value("Lecturer password reset successfully"));
+
+        verify(userLecturerService).resetPasswordByUserName("lecturer01");
     }
 
     @Test

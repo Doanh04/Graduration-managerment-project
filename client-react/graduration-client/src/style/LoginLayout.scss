@@ -1,0 +1,513 @@
+/* SCSS Chuyên biệt cho Trang Đăng Nhập - ĐH Công Nghiệp Việt Hưng */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+// SCSS Variables (Tone Trắng - Cyan #00afda Việt Hưng)
+$font-family-base: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+$color-cyan-vh: #00afda;
+$color-cyan-primary: #00afda;
+$color-cyan-dark: #0093b8;
+$color-cyan-deep: #007796;
+$color-cyan-navy: #0f172a;
+$color-cyan-bg: #e6f7fc;
+$color-cyan-border: #b3eaf8;
+
+$color-text-dark: #0f172a;
+$color-text-body: #334155;
+$color-text-muted: #64748b;
+$color-text-light: #94a3b8;
+
+$color-bg-body: #ffffff;
+$color-bg-card: #ffffff;
+$color-border-input: #e2e8f0;
+
+$radius-sm: 0.5rem;
+$radius-md: 0.75rem;
+$radius-lg: 1rem;
+$radius-xl: 1.5rem;
+
+$shadow-cyan: 0 10px 20px -5px rgba(0, 175, 218, 0.4);
+$shadow-cyan-hover: 0 12px 24px -5px rgba(0, 175, 218, 0.5);
+
+/* Page Background Container: Nền trắng sạch sẽ */
+.login-page-container {
+  font-family: $font-family-base;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  background-color: #ffffff;
+  color: $color-text-dark;
+  position: relative;
+  overflow: hidden;
+
+  /* Cột Trái - Form Đăng Nhập (Giữ Nền Trắng Nổi Bật Sạch Sẽ) */
+  .login-left-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2.5rem 3.5rem;
+    background: #ffffff;
+    z-index: 10;
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.04);
+
+    .login-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      img {
+        height: 3.5rem;
+        width: auto;
+        object-fit: contain;
+      }
+    }
+
+    .login-form-wrapper {
+      max-width: 440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1rem 0;
+
+      .login-system-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 9999px;
+        background: $color-cyan-bg;
+        border: 1px solid rgba(0, 175, 218, 0.3);
+        color: $color-cyan-primary;
+        font-size: 0.825rem;
+        font-weight: 600;
+        margin-bottom: 1.25rem;
+      }
+
+      .login-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: $color-text-dark;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+
+      .login-subtitle {
+        color: $color-text-muted;
+        font-size: 0.95rem;
+        margin-top: 0.5rem;
+        margin-bottom: 2rem;
+      }
+
+      /* Alert Messages */
+      .login-alert-error {
+        background-color: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        padding: 0.85rem 1rem;
+        border-radius: $radius-md;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        animation: shake 0.3s ease-in-out;
+      }
+
+      .login-alert-success {
+        background-color: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #16a34a;
+        padding: 0.85rem 1rem;
+        border-radius: $radius-md;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      /* Input Form Controls */
+      .login-input-group {
+        margin-bottom: 1.5rem;
+
+        .login-input-label {
+          display: block;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: $color-text-body;
+          margin-bottom: 0.5rem;
+        }
+
+        .login-input-container {
+          position: relative;
+          display: flex;
+          align-items: center;
+
+          .login-input-icon {
+            position: absolute;
+            left: 1rem;
+            color: $color-text-light;
+            transition: color 0.2s ease;
+          }
+
+          .login-input {
+            width: 100%;
+            padding: 0.85rem 1rem 0.85rem 2.8rem;
+            font-size: 0.95rem;
+            border: 1.5px solid $color-border-input;
+            border-radius: $radius-md;
+            background-color: #f8fafc;
+            color: $color-text-dark;
+            outline: none;
+            transition: all 0.2s ease;
+
+            &:focus {
+              border-color: $color-cyan-primary;
+              background-color: #ffffff;
+              box-shadow: 0 0 0 4px rgba(0, 175, 218, 0.18);
+
+              & + .login-input-icon {
+                color: $color-cyan-primary;
+              }
+            }
+          }
+
+          &:focus-within {
+            .login-input-icon {
+              color: $color-cyan-primary;
+            }
+          }
+
+          .login-password-toggle {
+            position: absolute;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: $color-text-light;
+            cursor: pointer;
+            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+
+            &:hover {
+              color: $color-cyan-primary;
+            }
+          }
+        }
+      }
+
+      /* Submit Button */
+      .login-submit-button {
+        width: 100%;
+        padding: 0.95rem;
+        border: none;
+        border-radius: $radius-md;
+        background: linear-gradient(135deg, $color-cyan-primary 0%, #0084a6 100%);
+        color: #ffffff;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: $shadow-cyan;
+        transition: all 0.25s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, $color-cyan-dark 0%, $color-cyan-deep 100%);
+          transform: translateY(-2px);
+          box-shadow: $shadow-cyan-hover;
+        }
+
+        &:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+      }
+    }
+
+    .login-footer {
+      font-size: 0.8rem;
+      color: $color-text-light;
+      text-align: center;
+    }
+  }
+
+  /* Cột Phải - Tone Màu Cyan #00afda & Thiết kế Mềm Mại Liên Kết với Background */
+  .login-right-panel {
+    flex: 1.35;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: clamp(2rem, 4vw, 4.5rem);
+    overflow: hidden;
+    color: #ffffff;
+    isolation: isolate;
+    background: #00afda;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      z-index: 2;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(2px);
+    }
+
+    &::before {
+      width: 26rem;
+      height: 26rem;
+      top: -10rem;
+      right: -8rem;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    &::after {
+      width: 20rem;
+      height: 20rem;
+      bottom: -9rem;
+      left: -7rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 175, 218, 0.28);
+    }
+
+    /* Background Image nghiem-thu-800x450.jpg giữ nét mượt mà */
+    .login-right-bg-image {
+      position: absolute;
+      top: -2%;
+      left: -2%;
+      width: 104%;
+      height: 104%;
+      background-size: cover;
+      background-position: center;
+      filter: blur(2px) saturate(0.9) brightness(0.9);
+      transform: scale(1.035);
+      z-index: 1;
+    }
+
+    /* Layer Phủ Màu với Tone #00afda Hòa Quyện Mềm Mại */
+    .login-right-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background:
+        radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.2), transparent 32%),
+        linear-gradient(145deg, rgba(0, 175, 218, 0.88) 0%, rgba(0, 147, 184, 0.78) 48%, rgba(0, 86, 112, 0.86) 100%);
+      z-index: 2;
+    }
+
+    /* Card Kính Mờ Liên Kết Mềm Mại với Tone #00afda & Nền Background */
+    .login-illustration-card {
+      width: 100%;
+      max-width: 590px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+      backdrop-filter: blur(20px) saturate(1.12);
+      -webkit-backdrop-filter: blur(20px) saturate(1.12);
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      border-radius: 2rem;
+      padding: clamp(1.5rem, 3vw, 2.35rem);
+      box-shadow:
+        0 28px 70px -24px rgba(0, 47, 61, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.24);
+      position: relative;
+      z-index: 3;
+      transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+
+      &:hover {
+        transform: translateY(-3px);
+        border-color: rgba(255, 255, 255, 0.48);
+        box-shadow:
+          0 34px 80px -24px rgba(0, 47, 61, 0.62),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .login-card-header-badge {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+
+        .login-badge-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.28);
+          padding: 0.35rem 0.85rem;
+          border-radius: 9999px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #ffffff;
+          box-shadow: 0 8px 24px rgba(0, 74, 94, 0.14);
+        }
+
+        .login-status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+          background: rgba(16, 185, 129, 0.25);
+          color: #6ee7b7;
+          border: 1px solid rgba(16, 185, 129, 0.45);
+          padding: 0.25rem 0.75rem;
+          border-radius: 9999px;
+
+          .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-ring 1.8s infinite;
+          }
+        }
+      }
+
+      /* Banner Trực Quan Sinh Viên & Giảng Viên với Mềm Mại Hòa Quyện Tone #00afda */
+      .login-banner-image-container {
+        width: 100%;
+        border-radius: 1.35rem;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+        box-shadow: 
+          0 15px 35px -5px rgba(0, 0, 0, 0.35),
+          0 0 20px 0 rgba(0, 175, 218, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        position: relative;
+
+        .login-banner-img {
+          width: 100%;
+          height: auto;
+          height: clamp(190px, 28vh, 255px);
+          object-fit: cover;
+          display: block;
+          transition: transform 0.4s ease;
+
+          &:hover {
+            transform: scale(1.03);
+          }
+        }
+
+        .image-caption-tag {
+          position: absolute;
+          bottom: 0.75rem;
+          left: 0.75rem;
+          background: rgba(15, 23, 42, 0.85);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(0, 175, 218, 0.42);
+          padding: 0.35rem 0.85rem;
+          border-radius: $radius-sm;
+          font-size: 0.775rem;
+          font-weight: 600;
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+        }
+      }
+
+      /* Grid Tính Năng Trực Quan Mềm Mại Tone #00afda */
+      .login-visual-feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.85rem;
+
+        .feature-card {
+          background: rgba(255, 255, 255, 0.11);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 0.85rem;
+          border-radius: 1rem;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.5rem;
+          transition: all 0.25s ease;
+
+          &:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.38);
+            box-shadow: 0 12px 28px rgba(0, 70, 89, 0.18);
+          }
+
+          .icon-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: #00afda;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+          }
+
+          .feature-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            line-height: 1.2;
+          }
+
+          .feature-sub {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.85);
+          }
+        }
+      }
+    }
+  }
+
+  /* Responsive Rules */
+  @media (max-width: 1024px) {
+    .login-right-panel {
+      display: none;
+    }
+    .login-left-panel {
+      padding: 2rem 1.5rem;
+    }
+  }
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

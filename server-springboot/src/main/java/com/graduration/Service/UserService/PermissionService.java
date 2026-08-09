@@ -22,8 +22,7 @@ import lombok.experimental.FieldDefaults;
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class
-PermissionService {
+public class PermissionService {
     PermissionRepository permissionRepository;
     PermissioMapper permissioMapper;
 
@@ -39,12 +38,10 @@ PermissionService {
     }
 
     @Transactional
-    public PermissionResponse updatePermission(
-            PermissionConstain permissionId, UpdatePermissionRequest request) {
+    public PermissionResponse updatePermission(PermissionConstain permissionId, UpdatePermissionRequest request) {
         PermissionEntity permission = findPermission(permissionId);
 
-        if (permissionRepository.existsByPermissionNameAndPermissionIdNot(
-                request.getPermissionName(), permissionId)) {
+        if (permissionRepository.existsByPermissionNameAndPermissionIdNot(request.getPermissionName(), permissionId)) {
             throw new AppException(ErrorCode.PERMISSION_IS_EXITED);
         }
 

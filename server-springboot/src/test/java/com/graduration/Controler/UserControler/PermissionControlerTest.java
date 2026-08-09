@@ -52,15 +52,17 @@ class PermissionControlerTest {
         when(permissionService.createPermission(any(CreatePermissionRequest.class)))
                 .thenReturn(permissionResponse());
 
-        mockMvc.perform(post("/permission")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "permissionId": "topic_read",
-                                  "permissionName": "Read topic",
-                                  "description": "View topics"
-                                }
-                                """))
+        mockMvc.perform(
+                        post("/permission")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+								{
+								"permissionId": "topic_read",
+								"permissionName": "Read topic",
+								"description": "View topics"
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
                 .andExpect(jsonPath("$.message").value("Permission created successfully"))
@@ -69,18 +71,19 @@ class PermissionControlerTest {
 
     @Test
     void updatePermission_returnsUpdatedPermission() throws Exception {
-        when(permissionService.updatePermission(
-                        any(PermissionConstain.class), any(UpdatePermissionRequest.class)))
+        when(permissionService.updatePermission(any(PermissionConstain.class), any(UpdatePermissionRequest.class)))
                 .thenReturn(permissionResponse());
 
-        mockMvc.perform(put("/permission/topic_read")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "permissionName": "Read topic",
-                                  "description": "Updated description"
-                                }
-                                """))
+        mockMvc.perform(
+                        put("/permission/topic_read")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+								{
+								"permissionName": "Read topic",
+								"description": "Updated description"
+								}
+								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Permission updated successfully"))
                 .andExpect(jsonPath("$.result.permissionName").value("Read topic"));
@@ -100,8 +103,7 @@ class PermissionControlerTest {
 
     @Test
     void getPermission_returnsPermission() throws Exception {
-        when(permissionService.getPermission(PermissionConstain.topic_read))
-                .thenReturn(permissionResponse());
+        when(permissionService.getPermission(PermissionConstain.topic_read)).thenReturn(permissionResponse());
 
         mockMvc.perform(get("/permission/topic_read"))
                 .andExpect(status().isOk())
