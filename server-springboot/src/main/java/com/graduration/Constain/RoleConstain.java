@@ -5,5 +5,5 @@ public enum RoleConstain {
     FACULTY, // trưởng khoa, hội đồng khoa
     SUPERVISOR, // Giảng viên hướng dẫn
     REVIEWER, // giảng viên phản biện
-    STUDENT, // Sinh
+    STUDENT, // Sinh viên
 }

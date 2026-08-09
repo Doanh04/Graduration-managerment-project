@@ -33,7 +33,7 @@ import com.graduration.entity.StudentEntity;
 import com.graduration.entity.UserEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
-import com.graduration.mapper.StudentMapper;
+import com.graduration.mapper.UserMaper;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +49,7 @@ public class UserStudentService {
     StudentRepository studentRepository;
     RoleRepository roleRepository;
     ClassRepository classRepository;
-    StudentMapper studentMapper;
+    UserMaper userMaper;
     PasswordEncoder passwordEncoder;
     TransactionTemplate transactionTemplate;
 
@@ -66,20 +66,20 @@ public class UserStudentService {
                 .findById(request.getClassId())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
 
-        UserEntity user = studentMapper.toUserEntity(request);
+        UserEntity user = userMaper.toUserEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatus(StatusConstain.ACTIVE);
         user.setCreateAt(LocalDateTime.now());
         user.setRoles(new HashSet<>(Set.of(studentRole)));
         user = userRepository.save(user);
 
-        StudentEntity student = studentMapper.toStudentEntity(request);
+        StudentEntity student = userMaper.toStudentEntity(request);
         student.setUserEntity(user);
         student.setClassEntity(studentClass);
         student = studentRepository.save(student);
 
         user.setStudent(student);
-        return studentMapper.toStudentResponse(user, student);
+        return userMaper.toStudentResponse(user, student);
     }
 
     @Transactional(readOnly = true)
@@ -96,13 +96,13 @@ public class UserStudentService {
             throw new AppException(ErrorCode.USER_NOT_FOUND);
         }
 
-        return studentMapper.toStudentResponse(user, student);
+        return userMaper.toStudentResponse(user, student);
     }
 
     @Transactional(readOnly = true)
     public List<RegisterStudentResponse> getAllStudents() {
         return studentRepository.findAll().stream()
-                .map(student -> studentMapper.toStudentResponse(student.getUserEntity(), student))
+                .map(student -> userMaper.toStudentResponse(student.getUserEntity(), student))
                 .toList();
     }
 

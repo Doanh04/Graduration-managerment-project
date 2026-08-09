@@ -18,7 +18,7 @@ import com.graduration.entity.StudentEntity;
 import com.graduration.entity.UserEntity;
 
 class StudentMapperTest {
-    private final StudentMapper studentMapper = new StudentMapperImpl();
+    private final UserMaper userMaper = new UserMaperImpl();
 
     @Test
     void mapsRegisterRequestToUserAndStudentEntities() {
@@ -32,8 +32,8 @@ class StudentMapperTest {
                 .classId(10L)
                 .build();
 
-        UserEntity user = studentMapper.toUserEntity(request);
-        StudentEntity student = studentMapper.toStudentEntity(request);
+        UserEntity user = userMaper.toUserEntity(request);
+        StudentEntity student = userMaper.toStudentEntity(request);
 
         assertEquals("student01", user.getUserName());
         assertEquals("password", user.getPassword());
@@ -67,7 +67,7 @@ class StudentMapperTest {
                 .email("student@example.com")
                 .build();
 
-        RegisterStudentResponse response = studentMapper.toStudentResponse(user, student);
+        RegisterStudentResponse response = userMaper.toStudentResponse(user, student);
 
         assertEquals("user-id", response.getIdUser());
         assertEquals("student01", response.getUserName());

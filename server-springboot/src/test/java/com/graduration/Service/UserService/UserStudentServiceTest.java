@@ -45,7 +45,7 @@ import com.graduration.entity.StudentEntity;
 import com.graduration.entity.UserEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
-import com.graduration.mapper.StudentMapper;
+import com.graduration.mapper.UserMaper;
 
 @ExtendWith(MockitoExtension.class)
 class UserStudentServiceTest {
@@ -62,7 +62,7 @@ class UserStudentServiceTest {
     ClassRepository classRepository;
 
     @Mock
-    StudentMapper studentMapper;
+    UserMaper userMaper;
 
     @Mock
     PasswordEncoder passwordEncoder;
@@ -131,7 +131,7 @@ class UserStudentServiceTest {
         RegisterStudentResponse expected =
                 RegisterStudentResponse.builder().idUser("user-1").build();
         when(userRepository.findByUserName("student01")).thenReturn(Optional.of(user));
-        when(studentMapper.toStudentResponse(user, student)).thenReturn(expected);
+        when(userMaper.toStudentResponse(user, student)).thenReturn(expected);
 
         RegisterStudentResponse response = userStudentService.getStudentByUserName(" student01 ");
 
@@ -168,8 +168,8 @@ class UserStudentServiceTest {
         RegisterStudentResponse secondResponse =
                 RegisterStudentResponse.builder().studentCode("SV002").build();
         when(studentRepository.findAll()).thenReturn(List.of(firstStudent, secondStudent));
-        when(studentMapper.toStudentResponse(firstUser, firstStudent)).thenReturn(firstResponse);
-        when(studentMapper.toStudentResponse(secondUser, secondStudent)).thenReturn(secondResponse);
+        when(userMaper.toStudentResponse(firstUser, firstStudent)).thenReturn(firstResponse);
+        when(userMaper.toStudentResponse(secondUser, secondStudent)).thenReturn(secondResponse);
 
         List<RegisterStudentResponse> responses = userStudentService.getAllStudents();
 
@@ -229,14 +229,14 @@ class UserStudentServiceTest {
             TransactionCallback<RegisterStudentResponse> callback = invocation.getArgument(0);
             return callback.doInTransaction(org.mockito.Mockito.mock(TransactionStatus.class));
         });
-        when(studentMapper.toUserEntity(any(RegisterStudentRequest.class))).thenReturn(new UserEntity());
-        when(studentMapper.toStudentEntity(any(RegisterStudentRequest.class))).thenReturn(new StudentEntity());
+        when(userMaper.toUserEntity(any(RegisterStudentRequest.class))).thenReturn(new UserEntity());
+        when(userMaper.toStudentEntity(any(RegisterStudentRequest.class))).thenReturn(new StudentEntity());
         when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
         when(roleRepository.findById(RoleConstain.STUDENT)).thenReturn(Optional.of(studentRole));
         when(classRepository.findById(10L)).thenReturn(Optional.of(studentClass));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(studentRepository.save(any(StudentEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(studentMapper.toStudentResponse(any(UserEntity.class), any(StudentEntity.class)))
+        when(userMaper.toStudentResponse(any(UserEntity.class), any(StudentEntity.class)))
                 .thenReturn(imported);
 
         ImportStudentResult result = userStudentService.importStudents(file);
@@ -263,12 +263,12 @@ class UserStudentServiceTest {
         when(studentRepository.findAll()).thenReturn(List.of());
         when(roleRepository.findById(RoleConstain.STUDENT)).thenReturn(Optional.of(studentRole));
         when(classRepository.findById(10L)).thenReturn(Optional.of(studentClass));
-        when(studentMapper.toUserEntity(request)).thenReturn(user);
-        when(studentMapper.toStudentEntity(request)).thenReturn(student);
+        when(userMaper.toUserEntity(request)).thenReturn(user);
+        when(userMaper.toStudentEntity(request)).thenReturn(student);
         when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
         when(userRepository.save(user)).thenReturn(user);
         when(studentRepository.save(student)).thenReturn(student);
-        when(studentMapper.toStudentResponse(user, student)).thenReturn(response);
+        when(userMaper.toStudentResponse(user, student)).thenReturn(response);
     }
 
     private RegisterStudentRequest validRequest() {
