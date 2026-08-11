@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -167,7 +169,8 @@ class UserStudentServiceTest {
                 RegisterStudentResponse.builder().studentCode("SV001").build();
         RegisterStudentResponse secondResponse =
                 RegisterStudentResponse.builder().studentCode("SV002").build();
-        when(studentRepository.findAll()).thenReturn(List.of(firstStudent, secondStudent));
+        when(studentRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(firstStudent, secondStudent)));
         when(userMaper.toStudentResponse(firstUser, firstStudent)).thenReturn(firstResponse);
         when(userMaper.toStudentResponse(secondUser, secondStudent)).thenReturn(secondResponse);
 
@@ -188,12 +191,12 @@ class UserStudentServiceTest {
                 .student(student)
                 .build();
         when(userRepository.findAll()).thenReturn(List.of(user));
-        when(passwordEncoder.encode("12345678")).thenReturn("encoded-default-password");
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-temporary-password");
 
         userStudentService.resetPasswordByUserName(" student01 ");
 
-        assertEquals("encoded-default-password", user.getPassword());
-        verify(passwordEncoder).encode("12345678");
+        assertEquals("encoded-temporary-password", user.getPassword());
+        verify(passwordEncoder).encode(argThat(password -> password.length() == 16 && !"12345678".equals(password)));
         verify(userRepository).save(user);
     }
 
@@ -260,7 +263,7 @@ class UserStudentServiceTest {
     private void stubSuccessfulRegistration(
             RegisterStudentRequest request, UserEntity user, StudentEntity student, RegisterStudentResponse response) {
         when(userRepository.existsByUserName("student01")).thenReturn(false);
-        when(studentRepository.findAll()).thenReturn(List.of());
+        when(studentRepository.existsByStudentCodeIgnoreCase("SV001")).thenReturn(false);
         when(roleRepository.findById(RoleConstain.STUDENT)).thenReturn(Optional.of(studentRole));
         when(classRepository.findById(10L)).thenReturn(Optional.of(studentClass));
         when(userMaper.toUserEntity(request)).thenReturn(user);

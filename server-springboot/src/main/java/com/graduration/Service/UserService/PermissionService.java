@@ -2,9 +2,11 @@ package com.graduration.Service.UserService;
 
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.PermissionConstain;
 import com.graduration.DTO.Request.CreatePermissionRequest;
 import com.graduration.DTO.Request.UpdatePermissionRequest;
@@ -26,6 +28,7 @@ public class PermissionService {
     PermissionRepository permissionRepository;
     PermissioMapper permissioMapper;
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public PermissionResponse createPermission(CreatePermissionRequest request) {
         if (permissionRepository.existsById(request.getPermissionId())
@@ -37,6 +40,7 @@ public class PermissionService {
         return permissioMapper.toPermissionResponse(permissionRepository.save(permission));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional
     public PermissionResponse updatePermission(PermissionConstain permissionId, UpdatePermissionRequest request) {
         PermissionEntity permission = findPermission(permissionId);
@@ -49,6 +53,7 @@ public class PermissionService {
         return permissioMapper.toPermissionResponse(permissionRepository.save(permission));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional
     public void deletePermission(PermissionConstain permissionId) {
         PermissionEntity permission = findPermission(permissionId);
@@ -58,14 +63,22 @@ public class PermissionService {
         permissionRepository.delete(permission);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public PermissionResponse getPermission(PermissionConstain permissionId) {
         return permissioMapper.toPermissionResponse(findPermission(permissionId));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public List<PermissionResponse> getAllPermissions() {
-        return permissionRepository.findAll().stream()
+        return getAllPermissions(0, PaginationSupport.DEFAULT_SIZE);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public List<PermissionResponse> getAllPermissions(Integer page, Integer size) {
+        return permissionRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(permissioMapper::toPermissionResponse)
                 .toList();
     }

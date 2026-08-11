@@ -35,7 +35,7 @@ public class ClassEntity {
     @JoinColumn(name = "major_id")
     MajorEntity major;
 
-    @OneToMany(mappedBy = "classEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "classEntity")
     @Builder.Default
     List<StudentEntity> student = new ArrayList<>();
 }

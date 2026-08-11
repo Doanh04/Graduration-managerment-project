@@ -13,15 +13,19 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.graduration.Configuration.PaginationSupport;
+import com.graduration.Configuration.TemporaryPasswordGenerator;
 import com.graduration.Constain.RoleConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.RegisterStudentRequest;
+import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterStudentResponse;
 import com.graduration.Repository.ClassRepository;
 import com.graduration.Repository.RoleRepository;
@@ -43,8 +47,6 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class UserStudentService {
-    private static final String DEFAULT_PASSWORD = "12345678";
-
     UserRepository userRepository;
     StudentRepository studentRepository;
     RoleRepository roleRepository;
@@ -53,6 +55,7 @@ public class UserStudentService {
     PasswordEncoder passwordEncoder;
     TransactionTemplate transactionTemplate;
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public RegisterStudentResponse registerStudent(RegisterStudentRequest request) {
         normalizeRequest(request);
@@ -82,6 +85,7 @@ public class UserStudentService {
         return userMaper.toStudentResponse(user, student);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public RegisterStudentResponse getStudentByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
@@ -99,15 +103,23 @@ public class UserStudentService {
         return userMaper.toStudentResponse(user, student);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public List<RegisterStudentResponse> getAllStudents() {
-        return studentRepository.findAll().stream()
+        return getAllStudents(0, PaginationSupport.DEFAULT_SIZE);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public List<RegisterStudentResponse> getAllStudents(Integer page, Integer size) {
+        return studentRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(student -> userMaper.toStudentResponse(student.getUserEntity(), student))
                 .toList();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
-    public void resetPasswordByUserName(String userName) {
+    public PasswordResetResponse resetPasswordByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
         }
@@ -118,10 +130,16 @@ public class UserStudentService {
                 .findFirst()
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+        String temporaryPassword = TemporaryPasswordGenerator.generate();
+        user.setPassword(passwordEncoder.encode(temporaryPassword));
         userRepository.save(user);
+        return PasswordResetResponse.builder()
+                .userName(user.getUserName())
+                .temporaryPassword(temporaryPassword)
+                .build();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public void deleteStudentAccount(String userName) {
         if (userName == null || userName.isBlank()) {
@@ -137,6 +155,7 @@ public class UserStudentService {
         userRepository.save(user);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     public ImportStudentResult importStudents(MultipartFile file) {
         validateExcelFile(file);
 
@@ -202,17 +221,15 @@ public class UserStudentService {
             throw new AppException(ErrorCode.USERNAME_IS_EXITED);
         }
 
-        studentRepository.findAll().forEach(student -> {
-            if (request.getStudentCode().equals(student.getStudentCode())) {
-                throw new AppException(ErrorCode.USER_EXITED);
-            }
-            if (request.getEmail() != null && request.getEmail().equalsIgnoreCase(student.getEmail())) {
-                throw new AppException(ErrorCode.EMAIL_VERIFIED_EXITED);
-            }
-            if (request.getPhone() != null && request.getPhone().equals(student.getPhoneStudent())) {
-                throw new AppException(ErrorCode.PHONE_IS_EXITED);
-            }
-        });
+        if (studentRepository.existsByStudentCodeIgnoreCase(request.getStudentCode())) {
+            throw new AppException(ErrorCode.USER_EXITED);
+        }
+        if (request.getEmail() != null && studentRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_VERIFIED_EXITED);
+        }
+        if (request.getPhone() != null && studentRepository.existsByPhoneStudent(request.getPhone())) {
+            throw new AppException(ErrorCode.PHONE_IS_EXITED);
+        }
     }
 
     private void normalizeRequest(RegisterStudentRequest request) {

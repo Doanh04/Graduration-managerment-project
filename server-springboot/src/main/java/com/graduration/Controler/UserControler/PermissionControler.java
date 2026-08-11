@@ -24,7 +24,7 @@ import lombok.experimental.FieldDefaults;
 public class PermissionControler {
     PermissionService permissionService;
 
-    @PostMapping("create-permission")
+    @PostMapping({"", "/create-permission"})
     public ApiResponse<PermissionResponse> createPermission(@Valid @RequestBody CreatePermissionRequest request) {
         return ApiResponse.<PermissionResponse>builder()
                 .message("Permission created successfully")
@@ -56,10 +56,14 @@ public class PermissionControler {
                 .build();
     }
 
-    @GetMapping("get-permission")
-    public ApiResponse<List<PermissionResponse>> getAllPermissions() {
+    @GetMapping({"", "/get-permission"})
+    public ApiResponse<List<PermissionResponse>> getAllPermissions(
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
         return ApiResponse.<List<PermissionResponse>>builder()
-                .result(permissionService.getAllPermissions())
+                .result(
+                        page == null && size == null
+                                ? permissionService.getAllPermissions()
+                                : permissionService.getAllPermissions(page, size))
                 .build();
     }
 }

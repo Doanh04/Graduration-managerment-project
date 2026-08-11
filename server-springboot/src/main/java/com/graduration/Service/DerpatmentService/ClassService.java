@@ -2,9 +2,11 @@ package com.graduration.Service.DerpatmentService;
 
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.graduration.Configuration.PaginationSupport;
 import com.graduration.DTO.Request.ClassRequest;
 import com.graduration.DTO.Response.ClassResponse;
 import com.graduration.Repository.ClassRepository;
@@ -27,6 +29,7 @@ public class ClassService {
     MajorRepository majorRepository;
     ClassMapper classMapper;
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public ClassResponse createClass(ClassRequest request) {
         normalizeRequest(request);
@@ -45,6 +48,7 @@ public class ClassService {
         return classMapper.toClassResponse(classRepository.save(classEntity));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
     public ClassResponse getClass(String classCode) {
         if (classCode == null || classCode.isBlank()) {
@@ -56,13 +60,21 @@ public class ClassService {
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY)));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
     public List<ClassResponse> getAllClasses() {
-        return classRepository.findAll().stream()
+        return getAllClasses(0, PaginationSupport.DEFAULT_SIZE);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional(readOnly = true)
+    public List<ClassResponse> getAllClasses(Integer page, Integer size) {
+        return classRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(classMapper::toClassResponse)
                 .toList();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public ClassResponse updateClass(Long classId, ClassRequest request) {
         ClassEntity existingClass =
@@ -86,10 +98,14 @@ public class ClassService {
         return classMapper.toClassResponse(classRepository.save(existingClass));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public void deleteClass(Long classId) {
         ClassEntity classEntity =
                 classRepository.findById(classId).orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        if (!classEntity.getStudent().isEmpty()) {
+            throw new AppException(ErrorCode.CLASS_IN_USE);
+        }
         classRepository.delete(classEntity);
     }
 

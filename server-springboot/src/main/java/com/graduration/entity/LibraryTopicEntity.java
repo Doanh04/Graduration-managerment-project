@@ -22,12 +22,15 @@ public class LibraryTopicEntity {
     @Column(name = "title")
     String title;
 
-    @Column(name = "description")
+    @Lob
+    @Column(name = "description", columnDefinition = "TEXT")
     String description;
 
-    @Column(name = "objective")
+    @Lob
+    @Column(name = "objective", columnDefinition = "TEXT")
     String objective;
 
-    @Column(name = "technology")
+    @Lob
+    @Column(name = "technology", columnDefinition = "TEXT")
     String technology;
 }

@@ -24,7 +24,7 @@ import lombok.experimental.FieldDefaults;
 public class RoleControler {
     RoleService roleService;
 
-    @PostMapping("create-role")
+    @PostMapping({"", "/create-role"})
     public ApiResponse<RoleResponse> createRole(@Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.<RoleResponse>builder()
                 .message("Role created successfully")
@@ -55,9 +55,10 @@ public class RoleControler {
     }
 
     @GetMapping
-    public ApiResponse<List<RoleResponse>> getAllRoles() {
+    public ApiResponse<List<RoleResponse>> getAllRoles(
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
         return ApiResponse.<List<RoleResponse>>builder()
-                .result(roleService.getAllRoles())
+                .result(page == null && size == null ? roleService.getAllRoles() : roleService.getAllRoles(page, size))
                 .build();
     }
 }

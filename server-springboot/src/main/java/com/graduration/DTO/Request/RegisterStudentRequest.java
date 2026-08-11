@@ -2,6 +2,7 @@ package com.graduration.DTO.Request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -23,7 +24,7 @@ public class RegisterStudentRequest {
     String password;
 
     @NotBlank(message = "STUDENT_NOT_BLANK")
-    @Size(max = 100, message = "SUTDENT_NOT_BLANK")
+    @Size(max = 100, message = "STUDENT_NOT_BLANK")
     String studentCode;
 
     @NotBlank(message = "FULLNAME_NOT_BLANK")
@@ -36,6 +37,6 @@ public class RegisterStudentRequest {
     @Pattern(regexp = "^\\+?[0-9]{9,15}$", message = "INVALID_PHONE")
     String phone;
 
-    @NotBlank(message = "CLASS_NOT_BLANK")
+    @NotNull(message = "MAJOR_ID_NOT_BLANK")
     Long classId;
 }

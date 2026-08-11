@@ -2,9 +2,11 @@ package com.graduration.Service.DerpatmentService;
 
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.graduration.Configuration.PaginationSupport;
 import com.graduration.DTO.Request.MajorRequest;
 import com.graduration.DTO.Response.MajorResponse;
 import com.graduration.Repository.MajorRepository;
@@ -24,6 +26,7 @@ public class MajorService {
     MajorRepository majorRepository;
     MajorMapper majorMapper;
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public MajorResponse createMajor(MajorRequest request) {
         validateAndNormalizeRequest(request);
@@ -35,18 +38,27 @@ public class MajorService {
         return majorMapper.toMajorResponse(majorRepository.save(major));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
     public MajorResponse getMajor(Long majorId) {
         return majorMapper.toMajorResponse(findMajor(majorId));
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     public List<MajorResponse> getAllMajors() {
-        return majorRepository.findAll().stream()
+        return getAllMajors(0, PaginationSupport.DEFAULT_SIZE);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional(readOnly = true)
+    public List<MajorResponse> getAllMajors(Integer page, Integer size) {
+        return majorRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(majorMapper::toMajorResponse)
                 .toList();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public MajorResponse updateMajor(Long majorId, MajorRequest request) {
         MajorEntity major = findMajor(majorId);
@@ -62,9 +74,14 @@ public class MajorService {
         return majorMapper.toMajorResponse(majorRepository.save(major));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public void deleteMajor(Long majorId) {
-        majorRepository.delete(findMajor(majorId));
+        MajorEntity major = findMajor(majorId);
+        if (!major.getClassEntity().isEmpty()) {
+            throw new AppException(ErrorCode.MAJOR_IN_USE);
+        }
+        majorRepository.delete(major);
     }
 
     private MajorEntity findMajor(Long majorId) {

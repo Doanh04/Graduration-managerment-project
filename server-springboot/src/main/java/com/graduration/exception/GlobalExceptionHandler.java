@@ -5,11 +5,16 @@ import java.util.Objects;
 
 import jakarta.validation.ConstraintViolation;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.graduration.DTO.Response.ApiResponse;
 
@@ -73,6 +78,42 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(errorCode.getStatusCode()).body(apiResponse);
     }
 
+    @ExceptionHandler(value = HttpMessageNotReadableException.class)
+    ResponseEntity<ApiResponse<?>> handlingHttpMessageNotReadableException(HttpMessageNotReadableException exception) {
+        log.debug("Request body cannot be read", exception);
+
+        ErrorCode errorCode = ErrorCode.INVALID_KEY;
+        ApiResponse<?> apiResponse = ApiResponse.builder()
+                .code(errorCode.getCode())
+                .message(errorCode.getMesage())
+                .build();
+
+        return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiResponse<?>> handlingMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException exception) {
+        return errorResponse(ErrorCode.INVALID_KEY);
+    }
+
+    @ExceptionHandler(value = NoHandlerFoundException.class)
+    ResponseEntity<ApiResponse<?>> handlingNoHandlerFoundException(NoHandlerFoundException exception) {
+        return errorResponse(ErrorCode.ENDPOINT_NOT_FOUND);
+    }
+
+    @ExceptionHandler(value = HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiResponse<?>> handlingMethodNotSupportedException(
+            HttpRequestMethodNotSupportedException exception) {
+        return errorResponse(ErrorCode.METHOD_NOT_ALLOWED);
+    }
+
+    @ExceptionHandler(value = DataIntegrityViolationException.class)
+    ResponseEntity<ApiResponse<?>> handlingDataIntegrityViolationException(DataIntegrityViolationException exception) {
+        log.warn("Data integrity violation", exception);
+        return errorResponse(ErrorCode.DATA_CONFLICT);
+    }
+
     @ExceptionHandler(value = Exception.class)
     ResponseEntity<ApiResponse<?>> handlingUncategorizedException(Exception exception) {
         log.error("Uncategorized exception", exception);
@@ -95,5 +136,13 @@ public class GlobalExceptionHandler {
             message = message.replace("{" + key + "}", value);
         }
         return message;
+    }
+
+    private ResponseEntity<ApiResponse<?>> errorResponse(ErrorCode errorCode) {
+        ApiResponse<?> response = ApiResponse.builder()
+                .code(errorCode.getCode())
+                .message(errorCode.getMesage())
+                .build();
+        return ResponseEntity.status(errorCode.getStatusCode()).body(response);
     }
 }

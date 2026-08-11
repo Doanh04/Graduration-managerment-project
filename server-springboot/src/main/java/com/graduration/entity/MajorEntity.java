@@ -28,7 +28,7 @@ public class MajorEntity {
     @Column(name = "description")
     String description;
 
-    @OneToMany(mappedBy = "major", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "major")
     @Builder.Default
     Set<ClassEntity> classEntity = new HashSet<>();
 }

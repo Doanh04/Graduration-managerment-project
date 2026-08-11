@@ -23,7 +23,7 @@ public class LectureEntity {
     @Column(name = "lecture_id")
     String lectureId;
 
-    @Column(name = "lecture_code", nullable = false, columnDefinition = "VARCHAR(100)")
+    @Column(name = "lecture_code", nullable = false, unique = true, columnDefinition = "VARCHAR(100)")
     String lectureCode;
 
     @Column(name = "full_name_lecture", nullable = true)

@@ -19,7 +19,7 @@ public class StudentEntity {
     @Column(name = "id_student")
     String idStudent;
 
-    @Column(name = "student_code", unique = true)
+    @Column(name = "student_code", nullable = false, unique = true)
     String studentCode;
 
     @Column(name = "full_name_student", nullable = false)
@@ -28,10 +28,10 @@ public class StudentEntity {
     @Column(name = "avt_student")
     String pathAvt;
 
-    @Column(name = "phone_student", columnDefinition = "VARCHAR(12)")
+    @Column(name = "phone_student", length = 16, unique = true)
     String phoneStudent;
 
-    @Column(name = "email_student")
+    @Column(name = "email_student", unique = true)
     String email;
 
     @OneToOne

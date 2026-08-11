@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -272,7 +274,9 @@ class UserLecturerServiceTest {
         RegisterLectureResponse secondResponse =
                 RegisterLectureResponse.builder().userName("lecturer02").build();
 
-        when(lectureRepository.findAll()).thenReturn(java.util.List.of(firstLecturer, secondLecturer));
+        when(lectureRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        java.util.List.of(firstLecturer, secondLecturer)));
         when(userMaper.toLectureResponse(firstUser, firstLecturer)).thenReturn(firstResponse);
         when(userMaper.toLectureResponse(secondUser, secondLecturer)).thenReturn(secondResponse);
 
@@ -321,12 +325,12 @@ class UserLecturerServiceTest {
         LectureEntity lecturer = LectureEntity.builder().user(user).build();
 
         when(lectureRepository.findByUser_UserName("lecturer01")).thenReturn(Optional.of(lecturer));
-        when(passwordEncoder.encode("12345678")).thenReturn("encoded-default-password");
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-temporary-password");
 
         userLecturerService.resetPasswordByUserName(" lecturer01 ");
 
-        assertEquals("encoded-default-password", user.getPassword());
-        verify(passwordEncoder).encode("12345678");
+        assertEquals("encoded-temporary-password", user.getPassword());
+        verify(passwordEncoder).encode(argThat(password -> password.length() == 16 && !"12345678".equals(password)));
         verify(userRepository).save(user);
     }
 

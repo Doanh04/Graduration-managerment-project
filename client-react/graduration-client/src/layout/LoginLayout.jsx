@@ -21,6 +21,16 @@ import bannerImg from '../img/thesis_defense_banner.jpg';
 import { useAuth } from '../context/AuthContext.jsx';
 import '../style/LoginLayout.scss';
 
+const ACCOUNT_INACTIVE_ERROR_CODE = 1073;
+
+const getLoginErrorMessage = (errorResponse) => {
+  if (errorResponse?.code === ACCOUNT_INACTIVE_ERROR_CODE) {
+    return 'Tài khoản đã dừng hoạt động';
+  }
+
+  return errorResponse?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.';
+};
+
 export default function LoginLayout() {
   const { login } = useAuth();
 
@@ -56,12 +66,11 @@ export default function LoginLayout() {
       if (response && (response.code === 1000 || response.result)) {
         setSuccess('Đăng nhập thành công!');
       } else {
-        setError(response?.message || 'Đăng nhập không thành công.');
+        setError(getLoginErrorMessage(response));
       }
     } catch (err) {
       console.error('Lỗi khi đăng nhập:', err);
-      const backendMessage = err?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.';
-      setError(backendMessage);
+      setError(getLoginErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -69,9 +78,7 @@ export default function LoginLayout() {
 
   return (
     <div className="login-page-container">
-      {/* Cột Trái - Form Đăng Nhập (Giữ Nền Trắng Sạch Sẽ & Tách Biệt) */}
       <div className="login-left-panel">
-        {/* Logo Trường từ sv_logo_dashboard.png */}
         <div className="login-header-brand">
           <img
             src={logoImg}
@@ -80,7 +87,6 @@ export default function LoginLayout() {
           />
         </div>
 
-        {/* Khối Ô Form Đăng Nhập */}
         <div className="login-form-wrapper">
           <div className="login-system-tag">
             <Sparkles size={16} />
@@ -89,10 +95,9 @@ export default function LoginLayout() {
 
           <h1 className="login-title">Cổng Đăng Nhập</h1>
           <p className="login-subtitle">
-            Dành cho Sinh viên, Giảng viên & Hội đồng Trường ĐH Công Nghiệp Việt - Hưng
+            Dành cho Sinh viên, Giảng viên & Hội đồng Trường ĐH Công Nghiệp Việt - Hung
           </p>
 
-          {/* Thông báo lỗi */}
           {error && (
             <div className="login-alert-error">
               <AlertCircle size={20} className="shrink-0" />
@@ -100,7 +105,6 @@ export default function LoginLayout() {
             </div>
           )}
 
-          {/* Thông báo thành công */}
           {success && (
             <div className="login-alert-success">
               <CheckCircle2 size={20} className="shrink-0" />
@@ -109,7 +113,6 @@ export default function LoginLayout() {
           )}
 
           <form onSubmit={handleSubmit} noValidate>
-            {/* Input Username / Mã SV / Mã GV */}
             <div className="login-input-group">
               <label htmlFor="userName" className="login-input-label">
                 Tên đăng nhập / Mã SV / Mã GV
@@ -129,7 +132,6 @@ export default function LoginLayout() {
               </div>
             </div>
 
-            {/* Input Password */}
             <div className="login-input-group">
               <label htmlFor="password" className="login-input-label">
                 Mật khẩu
@@ -157,7 +159,6 @@ export default function LoginLayout() {
               </div>
             </div>
 
-            {/* Nút Đăng nhập */}
             <button
               type="submit"
               className="login-submit-button"
@@ -178,25 +179,20 @@ export default function LoginLayout() {
           </form>
         </div>
 
-        {/* Footer Bản Quyền */}
         <div className="login-footer">
           <p>© {new Date().getFullYear()} Trường Đại Học Công Nghiệp Việt - Hưng</p>
           <p className="mt-1 text-slate-400">Phát triển phục vụ công tác Quản lý Đồ án & Khóa luận Tốt nghiệp</p>
         </div>
       </div>
 
-      {/* Cột Phải - Sử dụng nghiem-thu-800x450.jpg làm Background & Làm Mờ */}
       <div className="login-right-panel">
-        {/* Layer Background Ảnh nghiem-thu-800x450.jpg được Làm Mờ (Blur Effect) */}
         <div
           className="login-right-bg-image"
           style={{ backgroundImage: `url(${bgNghiemThu})` }}
         ></div>
         <div className="login-right-overlay"></div>
 
-        {/* Card Nội Dung Trong Suốt Đặt Trên Background nghiem-thu */}
         <div className="login-illustration-card">
-          {/* Badge Trạng thái */}
           <div className="login-card-header-badge">
             <div className="login-badge-pill">
               <ShieldCheck size={16} />
@@ -207,7 +203,6 @@ export default function LoginLayout() {
             </span>
           </div>
 
-          {/* Banner Trực Quan Sinh Viên & Giảng Viên */}
           <div className="login-banner-image-container">
             <img
               src={bannerImg}
@@ -220,7 +215,6 @@ export default function LoginLayout() {
             </div>
           </div>
 
-          {/* Grid Tính Năng Trực Quan */}
           <div className="login-visual-feature-grid">
             <div className="feature-card">
               <div className="icon-box">

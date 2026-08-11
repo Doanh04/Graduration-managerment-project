@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import com.graduration.Constain.RoleConstain;
+import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.AuthenticationRequest;
 import com.graduration.DTO.Request.IntrospectRequest;
 import com.graduration.DTO.Request.LogoutRequest;
@@ -104,6 +105,7 @@ public class AuthenticationService {
         }
 
         UserEntity user = authenticatedCandidates.get(0);
+        validateActiveAccount(user);
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
@@ -177,6 +179,7 @@ public class AuthenticationService {
         UserEntity user = userRepository
                 .findById(signedJWT.getJWTClaimsSet().getSubject())
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+        validateActiveAccount(user);
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
@@ -210,6 +213,12 @@ public class AuthenticationService {
             return "LECTURER";
         }
         return "USER";
+    }
+
+    private void validateActiveAccount(UserEntity user) {
+        if (user.getStatus() != StatusConstain.ACTIVE) {
+            throw new AppException(ErrorCode.ACCOUNT_INACTIVE);
+        }
     }
 
     private Set<RoleConstain> resolveRoles(UserEntity user) {

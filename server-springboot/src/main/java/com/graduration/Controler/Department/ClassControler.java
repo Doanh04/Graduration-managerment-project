@@ -42,9 +42,14 @@ public class ClassControler {
     }
 
     @GetMapping("/get-all-class")
-    public ApiResponse<List<ClassResponse>> getAllClasses() {
+    public ApiResponse<List<ClassResponse>> getAllClasses(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
         return ApiResponse.<List<ClassResponse>>builder()
-                .result(classService.getAllClasses())
+                .result(
+                        page == null && size == null
+                                ? classService.getAllClasses()
+                                : classService.getAllClasses(page, size))
                 .build();
     }
 

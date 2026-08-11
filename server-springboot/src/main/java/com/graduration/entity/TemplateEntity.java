@@ -24,7 +24,8 @@ public class TemplateEntity {
     @Column(name = "template_name", nullable = false, unique = true)
     String templateName;
 
-    @Column(name = "description")
+    @Lob
+    @Column(name = "description", columnDefinition = "TEXT")
     String description;
 
     @Column(name = "file_path")

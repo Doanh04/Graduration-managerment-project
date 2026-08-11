@@ -35,7 +35,7 @@ public class TeamEntity {
     @Column(name = "role")
     String role;
 
-    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "team")
     @Builder.Default
     List<StudentEntity> studentEntities = new ArrayList<>();
 
