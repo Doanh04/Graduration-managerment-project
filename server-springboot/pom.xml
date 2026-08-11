@@ -79,6 +79,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
         <!-- Xử lý file Excel .xlsx (Excel đời mới) -->
         <dependency>
             <groupId>org.apache.poi</groupId>

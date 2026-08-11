@@ -16,18 +16,22 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.graduration.Configuration.PaginationSupport;
+import com.graduration.Configuration.TemporaryPasswordGenerator;
 import com.graduration.Constain.RoleConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.RegisterLectureRequest;
 import com.graduration.DTO.Request.UpdateLecturerRequest;
 import com.graduration.DTO.Response.ImportLectureErrorResponse;
 import com.graduration.DTO.Response.ImportLectureResponse;
+import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterLectureResponse;
 import com.graduration.Repository.LectureRepository;
 import com.graduration.Repository.RoleRepository;
@@ -47,8 +51,6 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class UserLecturerService {
-    private static final String DEFAULT_PASSWORD = "12345678";
-
     UserRepository userRepository;
     LectureRepository lectureRepository;
     RoleRepository roleRepository;
@@ -57,6 +59,7 @@ public class UserLecturerService {
     Validator validator;
     TransactionTemplate transactionTemplate;
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public RegisterLectureResponse registerLecturer(RegisterLectureRequest request) {
         normalizeRequest(request);
@@ -82,6 +85,7 @@ public class UserLecturerService {
         return userMaper.toLectureResponse(user, lecturer);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public void deleteLecturerAccount(String userId) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -90,6 +94,7 @@ public class UserLecturerService {
         userRepository.save(user);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public RegisterLectureResponse updateLecturer(String userId, UpdateLecturerRequest request) {
         normalizeUpdateRequest(request);
@@ -120,13 +125,21 @@ public class UserLecturerService {
         return userMaper.toLectureResponse(user, lecturer);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public List<RegisterLectureResponse> getAllLecturers() {
-        return lectureRepository.findAll().stream()
+        return getAllLecturers(0, PaginationSupport.DEFAULT_SIZE);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public List<RegisterLectureResponse> getAllLecturers(Integer page, Integer size) {
+        return lectureRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(lecturer -> userMaper.toLectureResponse(lecturer.getUser(), lecturer))
                 .toList();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public RegisterLectureResponse getLecturerByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
@@ -140,8 +153,9 @@ public class UserLecturerService {
         return userMaper.toLectureResponse(lecturer.getUser(), lecturer);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
-    public void resetPasswordByUserName(String userName) {
+    public PasswordResetResponse resetPasswordByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
         }
@@ -151,10 +165,16 @@ public class UserLecturerService {
                 .map(LectureEntity::getUser)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+        String temporaryPassword = TemporaryPasswordGenerator.generate();
+        user.setPassword(passwordEncoder.encode(temporaryPassword));
         userRepository.save(user);
+        return PasswordResetResponse.builder()
+                .userName(user.getUserName())
+                .temporaryPassword(temporaryPassword)
+                .build();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     public ImportLectureResponse importLecturers(MultipartFile file) {
         validateExcelFile(file);
 

@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.DTO.Request.RegisterStudentRequest;
 import com.graduration.DTO.Response.ApiResponse;
+import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterStudentResponse;
 import com.graduration.Service.UserService.UserStudentService;
 import com.graduration.Service.UserService.UserStudentService.ImportStudentResult;
@@ -48,9 +49,14 @@ public class RegisterStudentControler {
     }
 
     @GetMapping("/get-all-student")
-    public ApiResponse<List<RegisterStudentResponse>> getAllStudents() {
+    public ApiResponse<List<RegisterStudentResponse>> getAllStudents(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
         return ApiResponse.<List<RegisterStudentResponse>>builder()
-                .result(userStudentService.getAllStudents())
+                .result(
+                        page == null && size == null
+                                ? userStudentService.getAllStudents()
+                                : userStudentService.getAllStudents(page, size))
                 .build();
     }
 
@@ -62,10 +68,10 @@ public class RegisterStudentControler {
     }
 
     @PatchMapping("/reset-password/{userName}")
-    public ApiResponse<Void> resetPassword(@PathVariable String userName) {
-        userStudentService.resetPasswordByUserName(userName);
-        return ApiResponse.<Void>builder()
+    public ApiResponse<PasswordResetResponse> resetPassword(@PathVariable String userName) {
+        return ApiResponse.<PasswordResetResponse>builder()
                 .message("Student password reset successfully")
+                .result(userStudentService.resetPasswordByUserName(userName))
                 .build();
     }
 

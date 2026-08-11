@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -149,7 +150,8 @@ class MajorServiceTest {
                 MajorResponse.builder().majorName("Computer Science").build();
         MajorResponse secondResponse =
                 MajorResponse.builder().majorName("Business").build();
-        when(majorRepository.findAll()).thenReturn(List.of(first, second));
+        when(majorRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(first, second)));
         when(majorMapper.toMajorResponse(first)).thenReturn(firstResponse);
         when(majorMapper.toMajorResponse(second)).thenReturn(secondResponse);
 

@@ -171,7 +171,8 @@ class ClassServiceTest {
         ClassResponse firstResponse = response();
         ClassResponse secondResponse =
                 ClassResponse.builder().idClass(11L).classCode("CNTT02").build();
-        when(classRepository.findAll()).thenReturn(List.of(first, second));
+        when(classRepository.findAll(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(first, second)));
         when(classMapper.toClassResponse(first)).thenReturn(firstResponse);
         when(classMapper.toClassResponse(second)).thenReturn(secondResponse);
 

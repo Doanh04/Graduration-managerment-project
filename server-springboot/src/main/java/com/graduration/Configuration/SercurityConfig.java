@@ -37,14 +37,8 @@ public class SercurityConfig {
         "/auth/introspect",
         "/auth/refresh",
         "/auth/logout",
-        "/auth/cookie/**"
+        "/auth/login"
     };
-    private final String[] PUBLIC_ENPOINT_PUT = {"/class/{classId}"};
-    private final String[] PUBLIC_ENPOINT_GET = {
-        "/register-student/get-all-student", " /register-student/{userName}", "/register-student/{userName}"
-    };
-    private final String[] PUBLIC_ENPONT_DELETE = {"/class/{classId}"};
-    private final String[] PUBLIC_ENPONT_PATCH = {"/register-student/reset-password/{userName}"};
 
     public SercurityConfig(CustomJwtDecoder customJwtDecoder) {
         this.customJwtDecoder = customJwtDecoder;
@@ -54,14 +48,6 @@ public class SercurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity httpSercurity) throws Exception {
         httpSercurity.cors(cors -> cors.configurationSource(corsConfigurationSource()));
         httpSercurity.authorizeHttpRequests(request -> request.requestMatchers(HttpMethod.POST, PUBLIC_ENPOINT_POST)
-                .permitAll()
-                .requestMatchers(HttpMethod.GET, PUBLIC_ENPOINT_GET)
-                .permitAll()
-                .requestMatchers(HttpMethod.DELETE, PUBLIC_ENPONT_DELETE)
-                .permitAll()
-                .requestMatchers(HttpMethod.PUT, PUBLIC_ENPOINT_PUT)
-                .permitAll()
-                .requestMatchers(HttpMethod.PATCH, PUBLIC_ENPONT_PATCH)
                 .permitAll()
                 .anyRequest()
                 .authenticated());

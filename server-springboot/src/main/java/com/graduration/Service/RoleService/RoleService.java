@@ -4,9 +4,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.PermissionConstain;
 import com.graduration.Constain.RoleConstain;
 import com.graduration.DTO.Request.CreateRoleRequest;
@@ -32,6 +34,7 @@ public class RoleService {
     PermissionRepository permissionRepository;
     RoleMaper roleMaper;
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional
     public RoleResponse createRole(CreateRoleRequest request) {
         if (roleRepository.existsById(request.getRole()) || roleRepository.existsByRoleName(request.getRoleName())) {
@@ -44,6 +47,7 @@ public class RoleService {
         return roleMaper.toRoleResponse(roleRepository.save(role));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional
     public RoleResponse updateRole(RoleConstain roleId, UpdateRoleRequest request) {
         Roles role = findRole(roleId);
@@ -58,6 +62,7 @@ public class RoleService {
         return roleMaper.toRoleResponse(roleRepository.save(role));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional
     public void deleteRole(RoleConstain roleId) {
         Roles role = findRole(roleId);
@@ -68,14 +73,24 @@ public class RoleService {
         roleRepository.delete(role);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public RoleResponse getRole(RoleConstain roleId) {
         return roleMaper.toRoleResponse(findRole(roleId));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public List<RoleResponse> getAllRoles() {
-        return roleRepository.findAll().stream().map(roleMaper::toRoleResponse).toList();
+        return getAllRoles(0, PaginationSupport.DEFAULT_SIZE);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public List<RoleResponse> getAllRoles(Integer page, Integer size) {
+        return roleRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
+                .map(roleMaper::toRoleResponse)
+                .toList();
     }
 
     private Roles findRole(RoleConstain roleId) {

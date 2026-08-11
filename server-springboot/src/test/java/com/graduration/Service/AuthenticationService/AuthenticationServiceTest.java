@@ -192,6 +192,24 @@ class AuthenticationServiceTest {
     }
 
     @Test
+    void authenticate_inactiveOrDeletedAccountReturnsAccountInactive() {
+        for (StatusConstain status : Set.of(StatusConstain.INACTIVE, StatusConstain.DELETED)) {
+            UserEntity student = studentUser();
+            student.setStatus(status);
+            when(userRepository.findByUserNameOrLecture_LectureCodeOrStudent_StudentCode(
+                            "student01", "student01", "student01"))
+                    .thenReturn(java.util.List.of(student));
+            when(passwordEncoder.matches("password123", student.getPassword())).thenReturn(true);
+
+            AppException exception = assertThrows(
+                    AppException.class, () -> authenticationService.authenticate(authenticationRequest("student01")));
+
+            assertEquals(ErrorCode.ACCOUNT_INACTIVE, exception.getErrorCode());
+            assertEquals("Tài khoản đã dừng hoạt động", exception.getMessage());
+        }
+    }
+
+    @Test
     void introspect_returnsTrueForValidTokenAndFalseForInvalidToken() {
         String token = authenticationService.generateToken(studentUser());
         when(invalidatedRepository.existsById(org.mockito.ArgumentMatchers.anyString()))
@@ -224,6 +242,24 @@ class AuthenticationServiceTest {
         ArgumentCaptor<InvalidatedToken> captor = ArgumentCaptor.forClass(InvalidatedToken.class);
         verify(invalidatedRepository).save(captor.capture());
         assertEquals(oldJwt.getJWTClaimsSet().getJWTID(), captor.getValue().getID());
+    }
+
+    @Test
+    void refresh_inactiveAccountReturnsAccountInactive() throws Exception {
+        UserEntity student = studentUser();
+        String oldToken = authenticationService.generateToken(student);
+        SignedJWT oldJwt = SignedJWT.parse(oldToken);
+        student.setStatus(StatusConstain.INACTIVE);
+        when(invalidatedRepository.existsById(oldJwt.getJWTClaimsSet().getJWTID()))
+                .thenReturn(false);
+        when(userRepository.findById("student-user-id")).thenReturn(Optional.of(student));
+
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> authenticationService.refresh(
+                        RefreshRequest.builder().token(oldToken).build()));
+
+        assertEquals(ErrorCode.ACCOUNT_INACTIVE, exception.getErrorCode());
     }
 
     @Test

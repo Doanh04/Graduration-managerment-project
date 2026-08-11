@@ -42,9 +42,14 @@ public class MajorControler {
     }
 
     @GetMapping("/get-all-major")
-    public ApiResponse<List<MajorResponse>> getAllMajors() {
+    public ApiResponse<List<MajorResponse>> getAllMajors(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
         return ApiResponse.<List<MajorResponse>>builder()
-                .result(majorService.getAllMajors())
+                .result(
+                        page == null && size == null
+                                ? majorService.getAllMajors()
+                                : majorService.getAllMajors(page, size))
                 .build();
     }
 

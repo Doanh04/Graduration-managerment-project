@@ -22,3 +22,7 @@ jwt:
   signerKey: "tgWNKP/9+GK8SlEph/A1WRAHz2KLXhw1ccWCwD1yphs="
   valid-duration: 3600
   refreshable-duration: 36000
+
+app:
+  cookie:
+    secure: false

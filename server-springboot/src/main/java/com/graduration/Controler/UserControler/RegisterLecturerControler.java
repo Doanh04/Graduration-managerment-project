@@ -20,6 +20,7 @@ import com.graduration.DTO.Request.RegisterLectureRequest;
 import com.graduration.DTO.Request.UpdateLecturerRequest;
 import com.graduration.DTO.Response.ApiResponse;
 import com.graduration.DTO.Response.ImportLectureResponse;
+import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterLectureResponse;
 import com.graduration.Service.UserService.UserLecturerService;
 
@@ -60,9 +61,14 @@ public class RegisterLecturerControler {
     }
 
     @GetMapping("/get-all-lecture")
-    public ApiResponse<List<RegisterLectureResponse>> getAllLecturers() {
+    public ApiResponse<List<RegisterLectureResponse>> getAllLecturers(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
         return ApiResponse.<List<RegisterLectureResponse>>builder()
-                .result(userLecturerService.getAllLecturers())
+                .result(
+                        page == null && size == null
+                                ? userLecturerService.getAllLecturers()
+                                : userLecturerService.getAllLecturers(page, size))
                 .build();
     }
 
@@ -74,10 +80,10 @@ public class RegisterLecturerControler {
     }
 
     @PatchMapping("/reset-password/{userName}")
-    public ApiResponse<Void> resetPassword(@PathVariable String userName) {
-        userLecturerService.resetPasswordByUserName(userName);
-        return ApiResponse.<Void>builder()
+    public ApiResponse<PasswordResetResponse> resetPassword(@PathVariable String userName) {
+        return ApiResponse.<PasswordResetResponse>builder()
                 .message("Lecturer password reset successfully")
+                .result(userLecturerService.resetPasswordByUserName(userName))
                 .build();
     }
 

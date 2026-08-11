@@ -43,6 +43,10 @@ public class AuthenticationCookieControler {
     @Value("${jwt.valid-duration}")
     long validDuration;
 
+    @NonFinal
+    @Value("${app.cookie.secure:false}")
+    boolean secureCookie;
+
     @PostMapping("/login")
     public ApiResponse<CookieAuthenticationResponse> login(
             @RequestBody AuthenticationRequest request, HttpServletResponse response) {
@@ -97,7 +101,7 @@ public class AuthenticationCookieControler {
     private void addTokenCookie(HttpServletResponse response, String token) {
         ResponseCookie cookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, token)
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/")
                 .maxAge(Duration.ofSeconds(validDuration))
@@ -108,7 +112,7 @@ public class AuthenticationCookieControler {
     private void clearTokenCookie(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/")
                 .maxAge(Duration.ZERO)

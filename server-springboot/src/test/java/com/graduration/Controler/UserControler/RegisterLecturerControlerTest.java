@@ -31,6 +31,7 @@ import com.graduration.Constain.RoleConstain;
 import com.graduration.DTO.Request.RegisterLectureRequest;
 import com.graduration.DTO.Request.UpdateLecturerRequest;
 import com.graduration.DTO.Response.ImportLectureResponse;
+import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterLectureResponse;
 import com.graduration.Service.UserService.UserLecturerService;
 import com.graduration.exception.GlobalExceptionHandler;
@@ -194,12 +195,17 @@ class RegisterLecturerControlerTest {
 
     @Test
     void resetPassword_returnsSuccessResponse() throws Exception {
-        doNothing().when(userLecturerService).resetPasswordByUserName("lecturer01");
+        when(userLecturerService.resetPasswordByUserName("lecturer01"))
+                .thenReturn(PasswordResetResponse.builder()
+                        .userName("lecturer01")
+                        .temporaryPassword("temporary-password")
+                        .build());
 
         mockMvc.perform(patch("/register-lecture/reset-password/lecturer01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
-                .andExpect(jsonPath("$.message").value("Lecturer password reset successfully"));
+                .andExpect(jsonPath("$.message").value("Lecturer password reset successfully"))
+                .andExpect(jsonPath("$.result.temporaryPassword").value("temporary-password"));
 
         verify(userLecturerService).resetPasswordByUserName("lecturer01");
     }
