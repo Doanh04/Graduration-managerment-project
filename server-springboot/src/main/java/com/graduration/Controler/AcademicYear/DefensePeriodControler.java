@@ -42,14 +42,11 @@ public class DefensePeriodControler {
     }
 
     @GetMapping("/get-all-defense-period")
-    public ApiResponse<List<DefensePeriodResponse>> getAllDefensePeriods(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<DefensePeriodResponse>> getAllDefensePeriods(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<DefensePeriodResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? defensePeriodService.getAllDefensePeriods()
-                                : defensePeriodService.getAllDefensePeriods(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<DefensePeriodResponse>>builder()
+                .result(defensePeriodService.getAllDefensePeriodsPage(page, size))
                 .build();
     }
 

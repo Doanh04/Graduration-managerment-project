@@ -11,7 +11,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.graduration.entity.TeamEntity;
 
 public interface TeamRepository extends JpaRepository<TeamEntity, Long> {
-    @EntityGraph(attributePaths = {"topic", "studentEntities", "studentEntities.classEntity"})
+    @EntityGraph(
+            attributePaths = {"topic", "studentEntities", "studentEntities.classEntity", "studentEntities.userEntity"})
     Optional<TeamEntity> findWithDetailsByIdTeam(Long idTeam);
 
     @EntityGraph(attributePaths = {"topic", "studentEntities", "studentEntities.classEntity"})

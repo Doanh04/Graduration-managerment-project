@@ -1,7 +1,5 @@
 package com.graduration.Controler.LibraryControler;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,14 +40,11 @@ public class LibraryTopicControler {
     }
 
     @GetMapping("/get-all-library-topic")
-    public ApiResponse<List<LibraryTopicResponse>> getAllLibraryTopics(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<LibraryTopicResponse>> getAllLibraryTopics(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<LibraryTopicResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? libraryTopicService.getAllLibraryTopics()
-                                : libraryTopicService.getAllLibraryTopics(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<LibraryTopicResponse>>builder()
+                .result(libraryTopicService.getAllLibraryTopicsPage(page, size))
                 .build();
     }
 

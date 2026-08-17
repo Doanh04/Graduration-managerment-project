@@ -43,6 +43,14 @@ public class AuditLogService {
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public com.graduration.DTO.Response.PageResponse<AuditLogResponse> getAllAuditLogsPage(Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                auditLogRepository.findAll(
+                        PaginationSupport.pageRequest(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))),
+                auditLogMapper::toAuditLogResponse);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public List<AuditLogResponse> getAuditLogsByUserId(String userId) {
         return getAuditLogsByUserId(userId, 0, PaginationSupport.DEFAULT_SIZE);
     }

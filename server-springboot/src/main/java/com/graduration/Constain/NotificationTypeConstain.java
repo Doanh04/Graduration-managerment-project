@@ -1,0 +1,13 @@
+package com.graduration.Constain;
+
+public enum NotificationTypeConstain {
+    DEADLINE_APPROACHING,
+    DEADLINE_EXPIRED,
+    TOPIC_APPROVED,
+    TOPIC_REJECTED,
+    SUBMISSION_REVIEWED,
+    REVISION_REQUIRED,
+    DEFENSE_SCHEDULED,
+    SCORE_PUBLISHED,
+    SYSTEM
+}

@@ -61,4 +61,8 @@ public class LectureEntity {
     @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     List<ComitteesMemberEntity> comitteesMember = new ArrayList<>();
+
+    @OneToMany(mappedBy = "preferredSupervisor")
+    @Builder.Default
+    List<TopicRegistrationEntity> preferredTopicRegistrations = new ArrayList<>();
 }

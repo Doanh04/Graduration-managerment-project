@@ -1,7 +1,5 @@
 package com.graduration.Controler.LibraryControler;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,14 +40,11 @@ public class TemplateControler {
     }
 
     @GetMapping("/get-all-template")
-    public ApiResponse<List<TemplateResponse>> getAllTemplates(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<TemplateResponse>> getAllTemplates(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<TemplateResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? templateService.getAllTemplates()
-                                : templateService.getAllTemplates(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<TemplateResponse>>builder()
+                .result(templateService.getAllTemplatesPage(page, size))
                 .build();
     }
 

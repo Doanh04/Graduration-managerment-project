@@ -1,7 +1,5 @@
 package com.graduration.Controler.UserControler;
 
-import java.util.List;
-
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,14 +47,11 @@ public class RegisterStudentControler {
     }
 
     @GetMapping("/get-all-student")
-    public ApiResponse<List<RegisterStudentResponse>> getAllStudents(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>> getAllStudents(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<RegisterStudentResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? userStudentService.getAllStudents()
-                                : userStudentService.getAllStudents(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>>builder()
+                .result(userStudentService.getAllStudentsPage(page, size))
                 .build();
     }
 

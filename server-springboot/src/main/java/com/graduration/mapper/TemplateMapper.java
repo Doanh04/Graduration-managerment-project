@@ -13,10 +13,28 @@ import com.graduration.entity.TemplateEntity;
 public interface TemplateMapper {
     @Mapping(target = "templateId", ignore = true)
     @Mapping(target = "createAt", ignore = true)
+    @Mapping(target = "templateType", ignore = true)
+    @Mapping(target = "version", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "originalFileName", ignore = true)
+    @Mapping(target = "contentType", ignore = true)
+    @Mapping(target = "fileSize", ignore = true)
+    @Mapping(target = "uploadedBy", ignore = true)
+    @Mapping(target = "defensePeriod", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     TemplateEntity toTemplateEntity(TemplateRequest request);
 
     @Mapping(target = "templateId", ignore = true)
     @Mapping(target = "createAt", ignore = true)
+    @Mapping(target = "templateType", ignore = true)
+    @Mapping(target = "version", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "originalFileName", ignore = true)
+    @Mapping(target = "contentType", ignore = true)
+    @Mapping(target = "fileSize", ignore = true)
+    @Mapping(target = "uploadedBy", ignore = true)
+    @Mapping(target = "defensePeriod", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     void updateTemplate(TemplateRequest request, @MappingTarget TemplateEntity template);
 
     TemplateResponse toTemplateResponse(TemplateEntity template);

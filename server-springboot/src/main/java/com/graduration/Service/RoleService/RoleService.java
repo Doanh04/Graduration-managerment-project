@@ -93,6 +93,13 @@ public class RoleService {
                 .toList();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<RoleResponse> getAllRolesPage(Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                roleRepository.findAll(PaginationSupport.pageRequest(page, size)), roleMaper::toRoleResponse);
+    }
+
     private Roles findRole(RoleConstain roleId) {
         return roleRepository.findById(roleId).orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
     }

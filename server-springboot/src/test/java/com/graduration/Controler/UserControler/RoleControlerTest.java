@@ -116,12 +116,13 @@ class RoleControlerTest {
 
     @Test
     void getAllRoles_returnsRoleList() throws Exception {
-        when(roleService.getAllRoles()).thenReturn(List.of(roleResponse()));
+        when(roleService.getAllRolesPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(roleResponse())));
 
         mockMvc.perform(get("/role"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.length()").value(1))
-                .andExpect(jsonPath("$.result[0].role").value("SUPERVISOR"));
+                .andExpect(jsonPath("$.result.content.length()").value(1))
+                .andExpect(jsonPath("$.result.content[0].role").value("SUPERVISOR"));
     }
 
     private RoleResponse roleResponse() {

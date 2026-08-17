@@ -67,6 +67,15 @@ public class AcademicYearService {
                 .toList();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<AcademicYearResponse> getAllAcademicYearsPage(
+            Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                academicYearRepository.findAll(PaginationSupport.pageRequest(page, size)),
+                academicYearMapper::toAcademicYearResponse);
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public AcademicYearResponse updateAcademicYear(Integer academicId, AcademicYearRequest request) {

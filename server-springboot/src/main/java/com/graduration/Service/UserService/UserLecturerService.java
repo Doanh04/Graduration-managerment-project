@@ -139,6 +139,15 @@ public class UserLecturerService {
                 .toList();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<RegisterLectureResponse> getAllLecturersPage(
+            Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                lectureRepository.findAll(PaginationSupport.pageRequest(page, size)),
+                lecturer -> userMaper.toLectureResponse(lecturer.getUser(), lecturer));
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public RegisterLectureResponse getLecturerByUserName(String userName) {

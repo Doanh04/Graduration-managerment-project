@@ -1,5 +1,8 @@
 package com.graduration.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.persistence.*;
 
 import lombok.*;
@@ -45,4 +48,16 @@ public class StudentEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_team")
     TeamEntity team;
+
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<GraduationEnrollmentEntity> graduationEnrollments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "student")
+    @Builder.Default
+    List<ScoreEntity> scores = new ArrayList<>();
+
+    @OneToMany(mappedBy = "submittedBy")
+    @Builder.Default
+    List<SubmistionEntity> submittedFiles = new ArrayList<>();
 }

@@ -1,9 +1,11 @@
 package com.graduration.entity;
 
-import java.util.Date;
+import java.time.Instant;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import com.graduration.Constain.NotificationTypeConstain;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -22,6 +24,14 @@ public class NotificationDocument {
     String userId;
     String title;
     String content;
-    String type;
-    Date createdAt;
+    NotificationTypeConstain type;
+
+    @Builder.Default
+    Boolean read = false;
+
+    Instant createdAt;
+    Instant readAt;
+    String relatedResourceType;
+    String relatedResourceId;
+    String deliveryStatus;
 }

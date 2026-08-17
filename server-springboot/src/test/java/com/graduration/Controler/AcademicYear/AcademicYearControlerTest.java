@@ -86,11 +86,12 @@ class AcademicYearControlerTest {
 
     @Test
     void getAllAcademicYears_returnsList() throws Exception {
-        when(academicYearService.getAllAcademicYears()).thenReturn(List.of(response()));
+        when(academicYearService.getAllAcademicYearsPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(response())));
 
         mockMvc.perform(get("/academic-year/get-all-academic-year"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.length()").value(1));
+                .andExpect(jsonPath("$.result.content.length()").value(1));
     }
 
     @Test

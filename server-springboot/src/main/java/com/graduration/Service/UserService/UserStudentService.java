@@ -117,6 +117,15 @@ public class UserStudentService {
                 .toList();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
+            Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                studentRepository.findAll(PaginationSupport.pageRequest(page, size)),
+                student -> userMaper.toStudentResponse(student.getUserEntity(), student));
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
     public PasswordResetResponse resetPasswordByUserName(String userName) {

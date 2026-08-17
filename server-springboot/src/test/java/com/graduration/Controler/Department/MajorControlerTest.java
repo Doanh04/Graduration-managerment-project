@@ -84,16 +84,17 @@ class MajorControlerTest {
 
     @Test
     void getAllMajors_returnsMajorList() throws Exception {
-        when(majorService.getAllMajors()).thenReturn(List.of(response()));
+        when(majorService.getAllMajorsPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(response())));
 
         mockMvc.perform(get("/major/get-all-major"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
-                .andExpect(jsonPath("$.result.length()").value(1))
-                .andExpect(jsonPath("$.result[0].majorId").value(1))
-                .andExpect(jsonPath("$.result[0].majorName").value("Computer Science"));
+                .andExpect(jsonPath("$.result.content.length()").value(1))
+                .andExpect(jsonPath("$.result.content[0].majorId").value(1))
+                .andExpect(jsonPath("$.result.content[0].majorName").value("Computer Science"));
 
-        verify(majorService).getAllMajors();
+        verify(majorService).getAllMajorsPage(null, null);
     }
 
     @Test

@@ -27,14 +27,11 @@ public class AuditlogControler {
     }
 
     @GetMapping("/get-all-audit-log")
-    public ApiResponse<List<AuditLogResponse>> getAllAuditLogs(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<AuditLogResponse>> getAllAuditLogs(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<AuditLogResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? auditLogService.getAllAuditLogs()
-                                : auditLogService.getAllAuditLogs(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<AuditLogResponse>>builder()
+                .result(auditLogService.getAllAuditLogsPage(page, size))
                 .build();
     }
 

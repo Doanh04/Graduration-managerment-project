@@ -1,0 +1,13 @@
+package com.graduration.Constain;
+
+public enum DefenseScheduleConflictTypeConstain {
+    INVALID_TIME,
+    PERIOD_MISMATCH,
+    TOPIC_NOT_ELIGIBLE,
+    TOPIC_ALREADY_SCHEDULED,
+    COMMITTEE_NOT_ACTIVE,
+    ROOM_CONFLICT,
+    COMMITTEE_CONFLICT,
+    LECTURER_CONFLICT,
+    SUPERVISOR_REVIEWER_CONFLICT
+}

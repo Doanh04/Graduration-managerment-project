@@ -1,7 +1,5 @@
 package com.graduration.Controler.Department;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,14 +40,11 @@ public class ClassControler {
     }
 
     @GetMapping("/get-all-class")
-    public ApiResponse<List<ClassResponse>> getAllClasses(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<ClassResponse>> getAllClasses(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<ClassResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? classService.getAllClasses()
-                                : classService.getAllClasses(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<ClassResponse>>builder()
+                .result(classService.getAllClassesPage(page, size))
                 .build();
     }
 

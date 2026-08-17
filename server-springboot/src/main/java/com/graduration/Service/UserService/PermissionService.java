@@ -83,6 +83,15 @@ public class PermissionService {
                 .toList();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<PermissionResponse> getAllPermissionsPage(
+            Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                permissionRepository.findAll(PaginationSupport.pageRequest(page, size)),
+                permissioMapper::toPermissionResponse);
+    }
+
     private PermissionEntity findPermission(PermissionConstain permissionId) {
         return permissionRepository
                 .findById(permissionId)

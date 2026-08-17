@@ -53,4 +53,20 @@ public class DefensePeriodEntity {
     @OneToMany(mappedBy = "defensePeriod", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     List<MilesStoneEntity> milesStone = new ArrayList<>();
+
+    @OneToMany(mappedBy = "defensePeriod", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<GraduationEnrollmentEntity> graduationEnrollments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "defensePeriod", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<DefenseCommitteesEntity> defenseCommittees = new ArrayList<>();
+
+    @OneToMany(mappedBy = "defensePeriod", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<ScoreCriterionEntity> scoreCriteria = new ArrayList<>();
+
+    @OneToMany(mappedBy = "defensePeriod")
+    @Builder.Default
+    List<TemplateEntity> templates = new ArrayList<>();
 }

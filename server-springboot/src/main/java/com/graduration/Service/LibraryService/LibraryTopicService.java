@@ -58,6 +58,15 @@ public class LibraryTopicService {
                 .toList();
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<LibraryTopicResponse> getAllLibraryTopicsPage(
+            Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                libraryTopicRepository.findAll(PaginationSupport.pageRequest(page, size)),
+                libraryTopicMapper::toLibraryTopicResponse);
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public LibraryTopicResponse updateLibraryTopic(Long idLibraryTopic, LibraryTopicRequest request) {

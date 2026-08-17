@@ -17,13 +17,18 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.DTO.Request.TeamRequest;
 import com.graduration.DTO.Response.TeamResponse;
 import com.graduration.Repository.StudentRepository;
@@ -52,6 +57,11 @@ class TeamServiceTest {
 
     @InjectMocks
     TeamService teamService;
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void createTeam_createsWithoutStudents() {
@@ -155,6 +165,81 @@ class TeamServiceTest {
     }
 
     @Test
+    void selectTopic_assignsAvailableTopicAndMarksItRegistered() {
+        authenticate("admin-1", "ROLE_ADMIN");
+        TeamEntity team = TeamEntity.builder().idTeam(1L).build();
+        TopicEntity topic = TopicEntity.builder()
+                .idTopic(9L)
+                .status(TopicStatusConstain.OPEN_FOR_REGISTRATION)
+                .build();
+        TeamResponse expected = TeamResponse.builder().idTeam(1L).topicId(9L).build();
+        when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
+        when(topicRepository.findById(9L)).thenReturn(Optional.of(topic));
+        when(teamRepository.save(team)).thenReturn(team);
+        when(topicRepository.save(topic)).thenReturn(topic);
+        when(teamMapper.toTeamResponse(team)).thenReturn(expected);
+
+        TeamResponse result = teamService.selectTopic(1L, 9L);
+
+        assertSame(expected, result);
+        assertSame(topic, team.getTopic());
+        assertSame(team, topic.getTeam());
+        assertEquals(TopicStatusConstain.REGISTERED, topic.getStatus());
+    }
+
+    @Test
+    void selectTopic_allowsStudentBelongingToTeam() {
+        authenticate("user-1", "ROLE_STUDENT");
+        StudentEntity member = StudentEntity.builder()
+                .userEntity(com.graduration.entity.UserEntity.builder()
+                        .userId("user-1")
+                        .build())
+                .build();
+        TeamEntity team =
+                TeamEntity.builder().idTeam(1L).studentEntities(List.of(member)).build();
+        TopicEntity topic = TopicEntity.builder()
+                .idTopic(9L)
+                .status(TopicStatusConstain.APPROVED)
+                .build();
+        when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
+        when(topicRepository.findById(9L)).thenReturn(Optional.of(topic));
+        when(teamRepository.save(team)).thenReturn(team);
+
+        teamService.selectTopic(1L, 9L);
+
+        assertSame(topic, team.getTopic());
+    }
+
+    @Test
+    void selectTopic_rejectsUnavailableTopic() {
+        authenticate("admin-1", "ROLE_ADMIN");
+        TeamEntity team = TeamEntity.builder().idTeam(1L).build();
+        TopicEntity topic = TopicEntity.builder()
+                .idTopic(9L)
+                .status(TopicStatusConstain.DRAFT)
+                .build();
+        when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
+        when(topicRepository.findById(9L)).thenReturn(Optional.of(topic));
+
+        AppException exception = assertThrows(AppException.class, () -> teamService.selectTopic(1L, 9L));
+
+        assertEquals(ErrorCode.TOPIC_NOT_AVAILABLE, exception.getErrorCode());
+        verify(teamRepository, never()).save(any());
+    }
+
+    @Test
+    void selectTopic_rejectsStudentOutsideTeam() {
+        authenticate("user-2", "ROLE_STUDENT");
+        TeamEntity team = TeamEntity.builder().idTeam(1L).build();
+        when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
+
+        AppException exception = assertThrows(AppException.class, () -> teamService.selectTopic(1L, 9L));
+
+        assertEquals(ErrorCode.ACCESS_DENIED, exception.getErrorCode());
+        verify(topicRepository, never()).findById(any());
+    }
+
+    @Test
     void addStudent_setsOwningSideAndReturnsTeam() {
         TeamEntity team = TeamEntity.builder().idTeam(1L).build();
         StudentEntity student = StudentEntity.builder()
@@ -172,6 +257,12 @@ class TeamServiceTest {
         assertSame(team, student.getTeam());
         assertEquals(List.of(student), team.getStudentEntities());
         verify(studentRepository).save(student);
+    }
+
+    private void authenticate(String userId, String authority) {
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority(authority))));
     }
 
     @Test

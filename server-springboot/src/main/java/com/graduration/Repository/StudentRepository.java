@@ -10,6 +10,8 @@ import com.graduration.entity.StudentEntity;
 public interface StudentRepository extends JpaRepository<StudentEntity, String> {
     Optional<StudentEntity> findByStudentCodeIgnoreCase(String studentCode);
 
+    Optional<StudentEntity> findByUserEntity_UserId(String userId);
+
     boolean existsByStudentCodeIgnoreCase(String studentCode);
 
     boolean existsByEmailIgnoreCase(String email);

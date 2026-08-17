@@ -59,6 +59,13 @@ public class MajorService {
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<MajorResponse> getAllMajorsPage(Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                majorRepository.findAll(PaginationSupport.pageRequest(page, size)), majorMapper::toMajorResponse);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public MajorResponse updateMajor(Long majorId, MajorRequest request) {
         MajorEntity major = findMajor(majorId);
