@@ -95,7 +95,10 @@ class TeamServiceTest {
         TeamRequest request =
                 TeamRequest.builder().nameTeam("Team 01").topicId(9L).build();
         TeamEntity team = TeamEntity.builder().nameTeam("Team 01").build();
-        TopicEntity topic = TopicEntity.builder().idTopic(9L).build();
+        TopicEntity topic = TopicEntity.builder()
+                .idTopic(9L)
+                .status(TopicStatusConstain.APPROVED)
+                .build();
         when(topicRepository.findById(9L)).thenReturn(Optional.of(topic));
         when(teamMapper.toTeamEntity(request)).thenReturn(team);
         when(teamRepository.save(team)).thenReturn(team);
@@ -146,7 +149,10 @@ class TeamServiceTest {
     @Test
     void updateTeam_updatesFieldsAndTopic() {
         TeamEntity team = TeamEntity.builder().idTeam(1L).nameTeam("Old name").build();
-        TopicEntity topic = TopicEntity.builder().idTopic(9L).build();
+        TopicEntity topic = TopicEntity.builder()
+                .idTopic(9L)
+                .status(TopicStatusConstain.APPROVED)
+                .build();
         TeamRequest request =
                 TeamRequest.builder().nameTeam(" New name ").topicId(9L).build();
         TeamResponse expected =
@@ -170,7 +176,7 @@ class TeamServiceTest {
         TeamEntity team = TeamEntity.builder().idTeam(1L).build();
         TopicEntity topic = TopicEntity.builder()
                 .idTopic(9L)
-                .status(TopicStatusConstain.OPEN_FOR_REGISTRATION)
+                .status(TopicStatusConstain.APPROVED)
                 .build();
         TeamResponse expected = TeamResponse.builder().idTeam(1L).topicId(9L).build();
         when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));

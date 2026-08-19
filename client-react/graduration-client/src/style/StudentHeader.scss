@@ -1,0 +1,13 @@
+@media (max-width: 1150px) {
+  .student-header-logo { width: 145px; }
+}
+
+@media (max-width: 900px) {
+  .student-header-logo { width: 135px; }
+}
+
+@media (max-width: 520px) {
+  .student-header-logo { width: 120px; }
+  .student-body-menu { top: 88px; left: 12px; }
+  .student-application .app-content { padding-top: 75px; }
+}

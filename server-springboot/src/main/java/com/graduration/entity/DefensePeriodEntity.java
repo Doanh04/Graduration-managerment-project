@@ -39,7 +39,7 @@ public class DefensePeriodEntity {
     String projectType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 32)
     DefensePeriodConstain status;
 
     @ManyToOne(fetch = FetchType.LAZY)

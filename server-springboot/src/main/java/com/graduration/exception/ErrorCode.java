@@ -11,7 +11,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public enum ErrorCode {
     //    Lỗi cấu hình
-    UKNOWN_ERROR(9999, "Unknown error", HttpStatus.INTERNAL_SERVER_ERROR),
+    UKNOWN_ERROR(9999, "Hệ thống đang gặp lỗi. Vui lòng thử lại sau", HttpStatus.INTERNAL_SERVER_ERROR),
     PERMISSION_INVALID(1001, "Permission Invalid", HttpStatus.NOT_FOUND),
     PERMISION_NAME_INVALID(1002, "Name Perission Invalid", HttpStatus.NOT_FOUND),
     PERMISSION_NOT_BLANK(1003, "Permission Not Blank", HttpStatus.BAD_REQUEST),
@@ -23,7 +23,7 @@ public enum ErrorCode {
     ROLE_NOT_FOUND(1009, "role not found", HttpStatus.CONFLICT),
     PERMISSION_NOT_FOUND(1010, "Permission not found", HttpStatus.CONFLICT),
     STATUS_NOT_FOUND(1011, "Status not found", HttpStatus.CONFLICT),
-    INVALID_KEY(1012, "Uncategorized error", HttpStatus.BAD_REQUEST),
+    INVALID_KEY(1012, "Dữ liệu gửi lên không hợp lệ", HttpStatus.BAD_REQUEST),
     INVALID_PASSWORD(1013, "Invalid password", HttpStatus.BAD_REQUEST),
     INVALID_EMAIL(1014, "invalid email", HttpStatus.BAD_REQUEST),
     EMAIL_IS_REQUIRED(1015, "email is required", HttpStatus.BAD_REQUEST),
@@ -192,7 +192,8 @@ public enum ErrorCode {
     REVIEW_COMMENT_NOT_BLANK(1169, "Review comment not blank", HttpStatus.BAD_REQUEST),
     REVIEW_RECOMMENDATION_NOT_BLANK(1170, "Review recommendation not blank", HttpStatus.BAD_REQUEST),
     REVIEW_CANCEL_REASON_NOT_BLANK(1171, "Review cancellation reason not blank", HttpStatus.BAD_REQUEST),
-    REVIEW_NOT_APPROVED(1172, "Topic does not have an approved review", HttpStatus.CONFLICT);
+    REVIEW_NOT_APPROVED(1172, "Topic does not have an approved review", HttpStatus.CONFLICT),
+    IMPORT_DATA_ALREADY_EXISTS(1173, "Dữ liệu import đã có trong hệ thống", HttpStatus.CONFLICT);
 
     ErrorCode(int code, String mesage, HttpStatusCode statusCode) {
         this.code = code;

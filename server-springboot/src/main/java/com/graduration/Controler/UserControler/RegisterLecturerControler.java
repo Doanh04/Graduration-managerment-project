@@ -61,9 +61,13 @@ public class RegisterLecturerControler {
     @GetMapping("/get-all-lecture")
     public ApiResponse<com.graduration.DTO.Response.PageResponse<RegisterLectureResponse>> getAllLecturers(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
         return ApiResponse.<com.graduration.DTO.Response.PageResponse<RegisterLectureResponse>>builder()
-                .result(userLecturerService.getAllLecturersPage(page, size))
+                .result(
+                        keyword == null
+                                ? userLecturerService.getAllLecturersPage(page, size)
+                                : userLecturerService.getAllLecturersPage(page, size, keyword))
                 .build();
     }
 

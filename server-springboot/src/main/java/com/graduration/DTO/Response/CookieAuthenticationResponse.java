@@ -15,6 +15,8 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class CookieAuthenticationResponse {
     boolean authenticated;
+    String userName;
+    String fullName;
     String accountType;
     Set<RoleConstain> roles;
 }

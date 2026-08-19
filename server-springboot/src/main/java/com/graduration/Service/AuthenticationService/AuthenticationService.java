@@ -115,6 +115,8 @@ public class AuthenticationService {
                 .token(generateToken(user))
                 .refreshToken(generateRefreshToken(user))
                 .authenticated(true)
+                .userName(user.getUserName())
+                .fullName(resolveFullName(user))
                 .accountType(resolveAccountType(user))
                 .roles(resolveRoles(user))
                 .build();
@@ -204,6 +206,26 @@ public class AuthenticationService {
                 .token(generateToken(user))
                 .refreshToken(generateRefreshToken(user))
                 .authenticated(true)
+                .userName(user.getUserName())
+                .fullName(resolveFullName(user))
+                .accountType(resolveAccountType(user))
+                .roles(resolveRoles(user))
+                .build();
+    }
+
+    private String resolveFullName(UserEntity user) {
+        if (user.getStudent() != null) return user.getStudent().getFullNameStudent();
+        if (user.getLecture() != null) return user.getLecture().getFullNameLecture();
+        return user.getUserName();
+    }
+
+    public AuthenticationResponse getCurrentUser(String userId) {
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        validateActiveAccount(user);
+        return AuthenticationResponse.builder()
+                .authenticated(true)
+                .userName(user.getUserName())
+                .fullName(resolveFullName(user))
                 .accountType(resolveAccountType(user))
                 .roles(resolveRoles(user))
                 .build();

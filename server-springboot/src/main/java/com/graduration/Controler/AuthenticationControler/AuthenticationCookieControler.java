@@ -8,7 +8,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -101,9 +103,19 @@ public class AuthenticationCookieControler {
         return ApiResponse.<Void>builder().message("Logout successful").build();
     }
 
+    @GetMapping("/me")
+    public ApiResponse<CookieAuthenticationResponse> me(Authentication currentUser) {
+        AuthenticationResponse authentication = authenticationService.getCurrentUser(currentUser.getName());
+        return ApiResponse.<CookieAuthenticationResponse>builder()
+                .result(toCookieResponse(authentication))
+                .build();
+    }
+
     private CookieAuthenticationResponse toCookieResponse(AuthenticationResponse authentication) {
         return CookieAuthenticationResponse.builder()
                 .authenticated(authentication.isAuthenticated())
+                .userName(authentication.getUserName())
+                .fullName(authentication.getFullName())
                 .accountType(authentication.getAccountType())
                 .roles(authentication.getRoles())
                 .build();

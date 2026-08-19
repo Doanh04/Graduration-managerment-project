@@ -28,6 +28,10 @@ jwt:
   refreshable-duration: 36000
 
 app:
+  bootstrap-admin:
+    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+    username: ${BOOTSTRAP_ADMIN_USERNAME:admin.bootstrap}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
   cookie:
     secure: false
   storage:

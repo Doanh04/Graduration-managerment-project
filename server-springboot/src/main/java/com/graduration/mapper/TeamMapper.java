@@ -33,6 +33,7 @@ public interface TeamMapper {
 
     @Mapping(source = "topic.idTopic", target = "topicId")
     @Mapping(source = "topic.title", target = "topicTitle")
+    @Mapping(source = "topic.description", target = "topicDescription")
     @Mapping(source = "studentEntities", target = "students")
     TeamResponse toTeamResponse(TeamEntity team);
 

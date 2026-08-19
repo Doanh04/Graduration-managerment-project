@@ -21,7 +21,8 @@ export const AuthProvider = ({ children }) => {
       // Gọi refresh để kiểm tra cookie và lấy thông tin accountType, roles mới nhất
       const res = await AuthenticationService.refresh();
       if (res && res.result && res.result.authenticated) {
-        setUser(res.result);
+        const profile = await AuthenticationService.profile();
+        setUser(profile?.result || res.result);
         setIsAuthenticated(true);
       } else {
         localStorage.removeItem(AUTH_SESSION_MARKER);
@@ -60,7 +61,8 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (response && (response.code === 1000 || response.result)) {
-      const userData = response.result;
+      const profile = await AuthenticationService.profile();
+      const userData = profile?.result || response.result;
       localStorage.setItem(AUTH_SESSION_MARKER, 'true');
       setUser(userData);
       setIsAuthenticated(true);

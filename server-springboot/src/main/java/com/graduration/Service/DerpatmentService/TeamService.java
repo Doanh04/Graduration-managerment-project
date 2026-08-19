@@ -100,8 +100,9 @@ public class TeamService {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
 
+        TopicEntity selectedTopic = resolveTopicForUpdate(team, request.getTopicId());
         teamMapper.updateTeam(request, team);
-        team.setTopic(resolveTopic(request.getTopicId()));
+        team.setTopic(selectedTopic);
         return teamMapper.toTeamResponse(teamRepository.save(team));
     }
 
@@ -120,8 +121,7 @@ public class TeamService {
 
         TopicEntity topic =
                 topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
-        if (topic.getStatus() != TopicStatusConstain.APPROVED
-                && topic.getStatus() != TopicStatusConstain.OPEN_FOR_REGISTRATION) {
+        if (topic.getStatus() != TopicStatusConstain.APPROVED) {
             throw new AppException(ErrorCode.TOPIC_NOT_AVAILABLE);
         }
         if (teamRepository.existsByTopic_IdTopic(topicId)) {
@@ -274,14 +274,32 @@ public class TeamService {
         if (topicId != null && teamRepository.existsByTopic_IdTopic(topicId)) {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
-        return resolveTopic(topicId);
+        return resolveApprovedTopic(topicId);
+    }
+
+    private TopicEntity resolveTopicForUpdate(TeamEntity team, Long topicId) {
+        if (topicId == null) {
+            return null;
+        }
+        if (team.getTopic() != null && topicId.equals(team.getTopic().getIdTopic())) {
+            return team.getTopic();
+        }
+        return resolveApprovedTopic(topicId);
+    }
+
+    private TopicEntity resolveApprovedTopic(Long topicId) {
+        TopicEntity topic = resolveTopic(topicId);
+        if (topic != null && topic.getStatus() != TopicStatusConstain.APPROVED) {
+            throw new AppException(ErrorCode.TOPIC_NOT_AVAILABLE);
+        }
+        return topic;
     }
 
     private TopicEntity resolveTopic(Long topicId) {
         if (topicId == null) {
             return null;
         }
-        return topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        return topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     }
 
     private void requireTeamMemberOrManager(TeamEntity team) {

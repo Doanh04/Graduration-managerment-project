@@ -1,17 +1,17 @@
 package com.graduration.Service.UserService;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,6 +25,7 @@ import com.graduration.Configuration.TemporaryPasswordGenerator;
 import com.graduration.Constain.RoleConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.RegisterStudentRequest;
+import com.graduration.DTO.Request.UpdateStudentRequest;
 import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterStudentResponse;
 import com.graduration.Repository.ClassRepository;
@@ -121,9 +122,19 @@ public class UserStudentService {
     @Transactional(readOnly = true)
     public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
             Integer page, Integer size) {
+        return getAllStudentsPage(page, size, null);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
+            Integer page, Integer size, String keyword) {
+        var pageable = PaginationSupport.pageRequest(page, size);
+        var students = keyword == null || keyword.isBlank()
+                ? studentRepository.findAll(pageable)
+                : studentRepository.searchByNameOrCode(keyword.trim(), pageable);
         return com.graduration.DTO.Response.PageResponse.from(
-                studentRepository.findAll(PaginationSupport.pageRequest(page, size)),
-                student -> userMaper.toStudentResponse(student.getUserEntity(), student));
+                students, student -> userMaper.toStudentResponse(student.getUserEntity(), student));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
@@ -150,6 +161,51 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    public RegisterStudentResponse updateStudent(String userId, UpdateStudentRequest request) {
+        if (request == null) {
+            throw new AppException(ErrorCode.INVALID_KEY);
+        }
+        UserEntity user = userRepository
+                .findById(userId)
+                .filter(candidate -> candidate.getStudent() != null)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        StudentEntity student = user.getStudent();
+
+        String userName = trim(request.getUserName());
+        String studentCode = trim(request.getStudentCode());
+        String fullName = trim(request.getFullName());
+        String email = normalize(request.getEmail());
+        String phone = normalize(request.getPhone());
+        if (userName == null || userName.isBlank()) throw new AppException(ErrorCode.USERNAME_NOT_BLANK);
+        if (studentCode == null || studentCode.isBlank()) throw new AppException(ErrorCode.STUDENT_NOT_BLANK);
+        if (fullName == null || fullName.isBlank()) throw new AppException(ErrorCode.FULLNAME_NOT_BLANK);
+        if (request.getClassId() == null) throw new AppException(ErrorCode.INVALID_KEY);
+
+        if (userRepository.existsByUserNameAndUserIdNot(userName, userId))
+            throw new AppException(ErrorCode.USERNAME_IS_EXITED);
+        if (studentRepository.existsByStudentCodeIgnoreCaseAndIdStudentNot(studentCode, student.getIdStudent()))
+            throw new AppException(ErrorCode.USER_EXITED);
+        if (email != null && studentRepository.existsByEmailIgnoreCaseAndIdStudentNot(email, student.getIdStudent()))
+            throw new AppException(ErrorCode.EMAIL_VERIFIED_EXITED);
+        if (phone != null && studentRepository.existsByPhoneStudentAndIdStudentNot(phone, student.getIdStudent()))
+            throw new AppException(ErrorCode.PHONE_IS_EXITED);
+
+        ClassEntity studentClass = classRepository
+                .findById(request.getClassId())
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        user.setUserName(userName);
+        student.setStudentCode(studentCode);
+        student.setFullNameStudent(fullName);
+        student.setEmail(email);
+        student.setPhoneStudent(phone);
+        student.setClassEntity(studentClass);
+        userRepository.save(user);
+        studentRepository.save(student);
+        return userMaper.toStudentResponse(user, student);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    @Transactional
     public void deleteStudentAccount(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
@@ -170,6 +226,7 @@ public class UserStudentService {
 
         List<RegisterStudentResponse> importedStudents = new ArrayList<>();
         List<ImportStudentError> errors = new ArrayList<>();
+        List<PendingStudentImport> pendingImports = new ArrayList<>();
         int totalRows = 0;
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
@@ -184,11 +241,8 @@ public class UserStudentService {
                 }
 
                 totalRows++;
-                RegisterStudentRequest request;
                 try {
-                    request = readRequest(row, formatter);
-                    RegisterStudentResponse response = transactionTemplate.execute(status -> registerStudent(request));
-                    importedStudents.add(response);
+                    pendingImports.add(new PendingStudentImport(rowIndex + 1, readRequest(row, formatter)));
                 } catch (RuntimeException exception) {
                     errors.add(
                             new ImportStudentError(rowIndex + 1, cellValue(row, 0, formatter), exception.getMessage()));
@@ -201,7 +255,44 @@ public class UserStudentService {
             throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
         }
 
+        ensureStudentsDoNotExist(pendingImports);
+        for (PendingStudentImport pending : pendingImports) {
+            try {
+                RegisterStudentResponse response =
+                        transactionTemplate.execute(status -> registerStudent(pending.request()));
+                importedStudents.add(response);
+            } catch (RuntimeException exception) {
+                errors.add(
+                        new ImportStudentError(pending.row(), pending.request().getUserName(), exception.getMessage()));
+            }
+        }
+
         return new ImportStudentResult(totalRows, importedStudents.size(), errors.size(), importedStudents, errors);
+    }
+
+    private void ensureStudentsDoNotExist(List<PendingStudentImport> pendingImports) {
+        Set<String> userNames = new HashSet<>();
+        Set<String> studentCodes = new HashSet<>();
+        Set<String> emails = new HashSet<>();
+        Set<String> phones = new HashSet<>();
+        for (PendingStudentImport pending : pendingImports) {
+            RegisterStudentRequest request = pending.request();
+            normalizeRequest(request);
+            if (isDuplicate(userNames, request.getUserName())
+                    || isDuplicate(studentCodes, request.getStudentCode())
+                    || isDuplicate(emails, request.getEmail())
+                    || isDuplicate(phones, request.getPhone())
+                    || userRepository.existsByUserName(request.getUserName())
+                    || studentRepository.existsByStudentCodeIgnoreCase(request.getStudentCode())
+                    || (request.getEmail() != null && studentRepository.existsByEmailIgnoreCase(request.getEmail()))
+                    || (request.getPhone() != null && studentRepository.existsByPhoneStudent(request.getPhone()))) {
+                throw new AppException(ErrorCode.IMPORT_DATA_ALREADY_EXISTS);
+            }
+        }
+    }
+
+    private boolean isDuplicate(Set<String> values, String value) {
+        return value != null && !values.add(value.toLowerCase(Locale.ROOT));
     }
 
     private void validateRequest(RegisterStudentRequest request) {
@@ -319,6 +410,119 @@ public class UserStudentService {
         return true;
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public byte[] exportStudentsByCreationYear(Integer year) {
+        if (year == null || year < 2000 || year > 2100) throw new AppException(ErrorCode.INVALID_KEY);
+        List<StudentEntity> students = studentRepository.findForExportByCreatedAt(
+                LocalDateTime.of(year, 1, 1, 0, 0), LocalDateTime.of(year + 1, 1, 1, 0, 0));
+
+        try (Workbook workbook = new XSSFWorkbook();
+                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Danh sách sinh viên");
+            int[] widths = {8, 18, 30, 18, 30, 16};
+            for (int index = 0; index < widths.length; index++) sheet.setColumnWidth(index, widths[index] * 256);
+
+            Font boldFont = workbook.createFont();
+            boldFont.setBold(true);
+            boldFont.setFontHeightInPoints((short) 12);
+            CellStyle organizationStyle = workbook.createCellStyle();
+            organizationStyle.setFont(boldFont);
+            organizationStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            createMergedTitle(sheet, 0, 0, 2, "BỘ CÔNG THƯƠNG", organizationStyle);
+            createMergedTitle(sheet, 1, 0, 2, "TRƯỜNG ĐẠI HỌC CÔNG NGHIỆP VIỆT - HUNG", organizationStyle);
+            createMergedCell(sheet, 0, 3, 5, "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", organizationStyle);
+            createMergedCell(sheet, 1, 3, 5, "Độc lập - Tự do - Hạnh phúc", organizationStyle);
+
+            Font headingFont = workbook.createFont();
+            headingFont.setBold(true);
+            headingFont.setFontHeightInPoints((short) 15);
+            CellStyle headingStyle = workbook.createCellStyle();
+            headingStyle.setFont(headingFont);
+            headingStyle.setAlignment(HorizontalAlignment.CENTER);
+            createMergedTitle(sheet, 3, 0, 5, "DANH SÁCH SINH VIÊN THAM GIA ĐỒ ÁN TỐT NGHIỆP", headingStyle);
+            createMergedTitle(sheet, 4, 0, 5, "Năm học: " + year, organizationStyle);
+
+            CellStyle headerStyle = borderedStyle(workbook);
+            headerStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setFont(boldFont);
+            Row header = sheet.createRow(6);
+            String[] labels = {"STT", "Mã sinh viên", "Họ và tên", "Lớp", "Email", "Số điện thoại"};
+            for (int index = 0; index < labels.length; index++) {
+                Cell cell = header.createCell(index);
+                cell.setCellValue(labels[index]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            CellStyle bodyStyle = borderedStyle(workbook);
+            for (int index = 0; index < students.size(); index++) {
+                StudentEntity student = students.get(index);
+                Row row = sheet.createRow(7 + index);
+                String className = student.getClassEntity() == null
+                        ? ""
+                        : student.getClassEntity().getClassName();
+                String[] values = {
+                    String.valueOf(index + 1),
+                    student.getStudentCode(),
+                    student.getFullNameStudent(),
+                    className,
+                    Objects.toString(student.getEmail(), ""),
+                    Objects.toString(student.getPhoneStudent(), "")
+                };
+                for (int column = 0; column < values.length; column++) {
+                    Cell cell = row.createCell(column);
+                    cell.setCellValue(values[column]);
+                    cell.setCellStyle(bodyStyle);
+                }
+            }
+            sheet.createFreezePane(0, 7);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new AppException(ErrorCode.UKNOWN_ERROR);
+        }
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public List<Integer> getStudentCreationYears() {
+        return studentRepository.findDistinctCreationYears();
+    }
+
+    private void createMergedTitle(
+            Sheet sheet, int rowIndex, int firstColumn, int lastColumn, String value, CellStyle style) {
+        Row row = sheet.createRow(rowIndex);
+        createMergedCell(sheet, row, rowIndex, firstColumn, lastColumn, value, style);
+    }
+
+    private void createMergedCell(
+            Sheet sheet, int rowIndex, int firstColumn, int lastColumn, String value, CellStyle style) {
+        Row row = sheet.getRow(rowIndex);
+        if (row == null) row = sheet.createRow(rowIndex);
+        createMergedCell(sheet, row, rowIndex, firstColumn, lastColumn, value, style);
+    }
+
+    private void createMergedCell(
+            Sheet sheet, Row row, int rowIndex, int firstColumn, int lastColumn, String value, CellStyle style) {
+        Cell cell = row.createCell(firstColumn);
+        cell.setCellValue(value);
+        cell.setCellStyle(style);
+        sheet.addMergedRegion(new CellRangeAddress(rowIndex, rowIndex, firstColumn, lastColumn));
+    }
+
+    private CellStyle borderedStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        return style;
+    }
+
     public record ImportStudentResult(
             int totalRows,
             int successRows,
@@ -327,4 +531,6 @@ public class UserStudentService {
             List<ImportStudentError> errors) {}
 
     public record ImportStudentError(int row, String userName, String message) {}
+
+    private record PendingStudentImport(int row, RegisterStudentRequest request) {}
 }

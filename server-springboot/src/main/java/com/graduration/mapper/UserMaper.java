@@ -55,6 +55,8 @@ public interface UserMaper {
     @Mapping(source = "student.fullNameStudent", target = "fullName")
     @Mapping(source = "student.phoneStudent", target = "phone")
     @Mapping(source = "student.email", target = "email")
+    @Mapping(source = "student.classEntity.classId", target = "classId")
+    @Mapping(source = "student.classEntity.classCode", target = "classCode")
     @Mapping(source = "user.roles", target = "roles")
     @Mapping(source = "user.roles", target = "permissions")
     RegisterStudentResponse toStudentResponse(UserEntity user, StudentEntity student);

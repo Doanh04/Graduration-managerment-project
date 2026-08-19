@@ -17,6 +17,8 @@ public class AuthenticationResponse {
     String token;
     String refreshToken;
     boolean authenticated;
+    String userName;
+    String fullName;
     String accountType;
     Set<RoleConstain> roles;
 }
