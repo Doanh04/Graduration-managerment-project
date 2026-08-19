@@ -1,5 +1,6 @@
 package com.graduration.Controler.AuthenticationControler;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +46,7 @@ class AuthenticationCookieControlerTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "validDuration", 3600L);
+        ReflectionTestUtils.setField(controller, "refreshableDuration", 36000L);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -59,6 +61,7 @@ class AuthenticationCookieControlerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(
                                 HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("access_token=jwt-token")))
+                .andExpect(result -> assertCookieHeader(result, "refresh_token=refresh-jwt-token"))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("HttpOnly")))
                 .andExpect(header().string(
                                 HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("SameSite=Strict")))
@@ -95,13 +98,14 @@ class AuthenticationCookieControlerTest {
 
     @Test
     void refresh_replacesCookieWithoutReturningTokenInBody() throws Exception {
-        when(authenticationService.refresh(argThat(request -> "old-token".equals(request.getToken()))))
+        when(authenticationService.refresh(argThat(request -> "old-refresh-token".equals(request.getToken()))))
                 .thenReturn(authenticationResponse("new-token", "LECTURER", RoleConstain.SUPERVISOR));
 
-        mockMvc.perform(post("/auth/cookie/refresh").cookie(tokenCookie("old-token")))
+        mockMvc.perform(post("/auth/cookie/refresh").cookie(refreshTokenCookie("old-refresh-token")))
                 .andExpect(status().isOk())
                 .andExpect(header().string(
                                 HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("access_token=new-token")))
+                .andExpect(result -> assertCookieHeader(result, "refresh_token=refresh-new-token"))
                 .andExpect(jsonPath("$.result.accountType").value("LECTURER"))
                 .andExpect(jsonPath("$.result.token").doesNotExist());
 
@@ -110,23 +114,37 @@ class AuthenticationCookieControlerTest {
 
     @Test
     void logout_invalidatesTokenAndClearsCookie() throws Exception {
-        mockMvc.perform(post("/auth/cookie/logout").cookie(tokenCookie("jwt-token")))
+        mockMvc.perform(post("/auth/cookie/logout")
+                        .cookie(tokenCookie("jwt-token"), refreshTokenCookie("refresh-jwt-token")))
                 .andExpect(status().isOk())
                 .andExpect(
                         header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("access_token=")))
+                .andExpect(result -> assertCookieHeader(result, "refresh_token="))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("Max-Age=0")))
                 .andExpect(jsonPath("$.message").value("Logout successful"));
 
-        verify(authenticationService).logout(argThat(request -> "jwt-token".equals(request.getToken())));
+        verify(authenticationService)
+                .logout(argThat(request -> "jwt-token".equals(request.getToken())
+                        && "refresh-jwt-token".equals(request.getRefreshToken())));
     }
 
     private Cookie tokenCookie(String token) {
         return new Cookie(AuthenticationCookieControler.ACCESS_TOKEN_COOKIE, token);
     }
 
+    private Cookie refreshTokenCookie(String token) {
+        return new Cookie(AuthenticationCookieControler.REFRESH_TOKEN_COOKIE, token);
+    }
+
+    private void assertCookieHeader(org.springframework.test.web.servlet.MvcResult result, String expected) {
+        assertTrue(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .anyMatch(headerValue -> headerValue.contains(expected)));
+    }
+
     private AuthenticationResponse authenticationResponse(String token, String accountType, RoleConstain role) {
         return AuthenticationResponse.builder()
                 .token(token)
+                .refreshToken("refresh-" + token)
                 .authenticated(true)
                 .accountType(accountType)
                 .roles(Set.of(role))

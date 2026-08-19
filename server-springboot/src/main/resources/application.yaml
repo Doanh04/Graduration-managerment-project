@@ -5,6 +5,10 @@ server:
 spring:
   application:
     name: graduration-managerment
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
   datasource:
     url: "jdbc:mysql://localhost:3306/graduration-managerment"
     driverClassName: "com.mysql.cj.jdbc.Driver"
@@ -24,5 +28,11 @@ jwt:
   refreshable-duration: 36000
 
 app:
+  bootstrap-admin:
+    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+    username: ${BOOTSTRAP_ADMIN_USERNAME:admin.bootstrap}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
   cookie:
     secure: false
+  storage:
+    root: ${APP_STORAGE_ROOT:./storage}

@@ -20,6 +20,7 @@ public interface TeamMapper {
     @Mapping(target = "studentEntities", ignore = true)
     @Mapping(target = "submistion", ignore = true)
     @Mapping(target = "score", ignore = true)
+    @Mapping(target = "topicRegistrations", ignore = true)
     TeamEntity toTeamEntity(TeamRequest request);
 
     @Mapping(target = "idTeam", ignore = true)
@@ -27,10 +28,12 @@ public interface TeamMapper {
     @Mapping(target = "studentEntities", ignore = true)
     @Mapping(target = "submistion", ignore = true)
     @Mapping(target = "score", ignore = true)
+    @Mapping(target = "topicRegistrations", ignore = true)
     void updateTeam(TeamRequest request, @MappingTarget TeamEntity team);
 
     @Mapping(source = "topic.idTopic", target = "topicId")
     @Mapping(source = "topic.title", target = "topicTitle")
+    @Mapping(source = "topic.description", target = "topicDescription")
     @Mapping(source = "studentEntities", target = "students")
     TeamResponse toTeamResponse(TeamEntity team);
 

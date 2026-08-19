@@ -13,11 +13,14 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.Configuration.PaginationSupport;
+import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.DTO.Request.TeamRequest;
 import com.graduration.DTO.Response.TeamResponse;
 import com.graduration.Repository.StudentRepository;
@@ -76,6 +79,14 @@ public class TeamService {
                 .toList();
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<TeamResponse> getAllTeamsPage(Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                teamRepository.findAllByOrderByIdTeamAsc(PaginationSupport.pageRequest(page, size)),
+                teamMapper::toTeamResponse);
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public TeamResponse updateTeam(Long teamId, TeamRequest request) {
@@ -89,8 +100,38 @@ public class TeamService {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
 
+        TopicEntity selectedTopic = resolveTopicForUpdate(team, request.getTopicId());
         teamMapper.updateTeam(request, team);
-        team.setTopic(resolveTopic(request.getTopicId()));
+        team.setTopic(selectedTopic);
+        return teamMapper.toTeamResponse(teamRepository.save(team));
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_STUDENT')")
+    @Transactional
+    public TeamResponse selectTopic(Long teamId, Long topicId) {
+        TeamEntity team = findTeam(teamId);
+        requireTeamMemberOrManager(team);
+
+        if (team.getTopic() != null) {
+            if (team.getTopic().getIdTopic().equals(topicId)) {
+                return teamMapper.toTeamResponse(team);
+            }
+            throw new AppException(ErrorCode.TEAM_ALREADY_HAS_TOPIC);
+        }
+
+        TopicEntity topic =
+                topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+        if (topic.getStatus() != TopicStatusConstain.APPROVED) {
+            throw new AppException(ErrorCode.TOPIC_NOT_AVAILABLE);
+        }
+        if (teamRepository.existsByTopic_IdTopic(topicId)) {
+            throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
+        }
+
+        team.setTopic(topic);
+        topic.setTeam(team);
+        topic.setStatus(TopicStatusConstain.REGISTERED);
+        topicRepository.save(topic);
         return teamMapper.toTeamResponse(teamRepository.save(team));
     }
 
@@ -233,14 +274,50 @@ public class TeamService {
         if (topicId != null && teamRepository.existsByTopic_IdTopic(topicId)) {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
-        return resolveTopic(topicId);
+        return resolveApprovedTopic(topicId);
+    }
+
+    private TopicEntity resolveTopicForUpdate(TeamEntity team, Long topicId) {
+        if (topicId == null) {
+            return null;
+        }
+        if (team.getTopic() != null && topicId.equals(team.getTopic().getIdTopic())) {
+            return team.getTopic();
+        }
+        return resolveApprovedTopic(topicId);
+    }
+
+    private TopicEntity resolveApprovedTopic(Long topicId) {
+        TopicEntity topic = resolveTopic(topicId);
+        if (topic != null && topic.getStatus() != TopicStatusConstain.APPROVED) {
+            throw new AppException(ErrorCode.TOPIC_NOT_AVAILABLE);
+        }
+        return topic;
     }
 
     private TopicEntity resolveTopic(Long topicId) {
         if (topicId == null) {
             return null;
         }
-        return topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        return topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    }
+
+    private void requireTeamMemberOrManager(TeamEntity team) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        boolean manager = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")
+                        || authority.getAuthority().equals("ROLE_FACULTY"));
+        boolean member = team.getStudentEntities().stream()
+                .anyMatch(student -> student.getUserEntity() != null
+                        && authentication
+                                .getName()
+                                .equals(student.getUserEntity().getUserId()));
+        if (!manager && !member) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
     }
 
     private void normalizeRequest(TeamRequest request) {

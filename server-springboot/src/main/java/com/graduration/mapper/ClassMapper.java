@@ -17,5 +17,7 @@ public interface ClassMapper {
     ClassEntity toClassEntity(ClassRequest request);
 
     @Mapping(source = "classId", target = "idClass")
+    @Mapping(source = "major.majorId", target = "majorId")
+    @Mapping(source = "major.majorName", target = "majorName")
     ClassResponse toClassResponse(ClassEntity classEntity);
 }

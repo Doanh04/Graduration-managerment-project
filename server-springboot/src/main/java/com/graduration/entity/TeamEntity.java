@@ -50,4 +50,8 @@ public class TeamEntity {
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     List<ScoreEntity> score = new ArrayList<>();
+
+    @OneToMany(mappedBy = "team")
+    @Builder.Default
+    List<TopicRegistrationEntity> topicRegistrations = new ArrayList<>();
 }

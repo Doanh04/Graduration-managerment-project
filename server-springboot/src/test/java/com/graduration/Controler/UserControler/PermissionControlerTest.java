@@ -112,12 +112,13 @@ class PermissionControlerTest {
 
     @Test
     void getAllPermissions_returnsPermissionList() throws Exception {
-        when(permissionService.getAllPermissions()).thenReturn(List.of(permissionResponse()));
+        when(permissionService.getAllPermissionsPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(permissionResponse())));
 
         mockMvc.perform(get("/permission"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.length()").value(1))
-                .andExpect(jsonPath("$.result[0].permissionId").value("topic_read"));
+                .andExpect(jsonPath("$.result.content.length()").value(1))
+                .andExpect(jsonPath("$.result.content[0].permissionId").value("topic_read"));
     }
 
     private PermissionResponse permissionResponse() {

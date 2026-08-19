@@ -60,6 +60,14 @@ public class TemplateService {
                 .toList();
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<TemplateResponse> getAllTemplatesPage(Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                templateRepository.findAll(PaginationSupport.pageRequest(page, size)),
+                templateMapper::toTemplateResponse);
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public TemplateResponse updateTemplate(Integer templateId, TemplateRequest request) {

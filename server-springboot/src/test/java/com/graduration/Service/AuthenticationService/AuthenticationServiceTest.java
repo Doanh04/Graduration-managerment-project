@@ -80,6 +80,8 @@ class AuthenticationServiceTest {
         SignedJWT jwt = SignedJWT.parse(response.getToken());
 
         assertTrue(response.isAuthenticated());
+        assertTrue(response.getRefreshToken() != null
+                && !response.getRefreshToken().isBlank());
         assertEquals("STUDENT", response.getAccountType());
         assertEquals(Set.of(RoleConstain.STUDENT), response.getRoles());
         assertEquals("student-user-id", jwt.getJWTClaimsSet().getSubject());
@@ -226,7 +228,7 @@ class AuthenticationServiceTest {
     @Test
     void refresh_invalidatesOldTokenAndReturnsNewToken() throws Exception {
         UserEntity student = studentUser();
-        String oldToken = authenticationService.generateToken(student);
+        String oldToken = authenticationService.generateRefreshToken(student);
         SignedJWT oldJwt = SignedJWT.parse(oldToken);
         when(invalidatedRepository.existsById(oldJwt.getJWTClaimsSet().getJWTID()))
                 .thenReturn(false);
@@ -238,6 +240,7 @@ class AuthenticationServiceTest {
         assertTrue(response.isAuthenticated());
         assertEquals("STUDENT", response.getAccountType());
         assertFalse(oldToken.equals(response.getToken()));
+        assertFalse(oldToken.equals(response.getRefreshToken()));
 
         ArgumentCaptor<InvalidatedToken> captor = ArgumentCaptor.forClass(InvalidatedToken.class);
         verify(invalidatedRepository).save(captor.capture());
@@ -247,7 +250,7 @@ class AuthenticationServiceTest {
     @Test
     void refresh_inactiveAccountReturnsAccountInactive() throws Exception {
         UserEntity student = studentUser();
-        String oldToken = authenticationService.generateToken(student);
+        String oldToken = authenticationService.generateRefreshToken(student);
         SignedJWT oldJwt = SignedJWT.parse(oldToken);
         student.setStatus(StatusConstain.INACTIVE);
         when(invalidatedRepository.existsById(oldJwt.getJWTClaimsSet().getJWTID()))
@@ -275,6 +278,27 @@ class AuthenticationServiceTest {
         assertEquals(jwt.getJWTClaimsSet().getJWTID(), captor.getValue().getID());
         assertEquals(
                 jwt.getJWTClaimsSet().getExpirationTime(), captor.getValue().getExpiryTime());
+    }
+
+    @Test
+    void refresh_rejectsAccessToken() {
+        String accessToken = authenticationService.generateToken(studentUser());
+
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> authenticationService.refresh(
+                        RefreshRequest.builder().token(accessToken).build()));
+
+        assertEquals(ErrorCode.UNAUTHENTICATED, exception.getErrorCode());
+    }
+
+    @Test
+    void introspect_rejectsRefreshToken() {
+        String refreshToken = authenticationService.generateRefreshToken(studentUser());
+
+        assertFalse(authenticationService
+                .introspect(IntrospectRequest.builder().token(refreshToken).build())
+                .isValid());
     }
 
     private AuthenticationRequest authenticationRequest(String userName) {

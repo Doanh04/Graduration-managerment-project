@@ -8,7 +8,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,12 +38,17 @@ import lombok.experimental.NonFinal;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationCookieControler {
     static final String ACCESS_TOKEN_COOKIE = "access_token";
+    static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
     AuthenticationService authenticationService;
 
     @NonFinal
     @Value("${jwt.valid-duration}")
     long validDuration;
+
+    @NonFinal
+    @Value("${jwt.refreshable-duration}")
+    long refreshableDuration;
 
     @NonFinal
     @Value("${app.cookie.secure:false}")
@@ -51,7 +58,7 @@ public class AuthenticationCookieControler {
     public ApiResponse<CookieAuthenticationResponse> login(
             @RequestBody AuthenticationRequest request, HttpServletResponse response) {
         AuthenticationResponse authentication = authenticationService.authenticate(request);
-        addTokenCookie(response, authentication.getToken());
+        addTokenCookies(response, authentication);
 
         return ApiResponse.<CookieAuthenticationResponse>builder()
                 .message("Login successful")
@@ -69,11 +76,11 @@ public class AuthenticationCookieControler {
 
     @PostMapping("/refresh")
     public ApiResponse<CookieAuthenticationResponse> refresh(
-            @CookieValue(name = ACCESS_TOKEN_COOKIE) String token, HttpServletResponse response)
+            @CookieValue(name = REFRESH_TOKEN_COOKIE) String refreshToken, HttpServletResponse response)
             throws ParseException, JOSEException {
         AuthenticationResponse authentication = authenticationService.refresh(
-                RefreshRequest.builder().token(token).build());
-        addTokenCookie(response, authentication.getToken());
+                RefreshRequest.builder().token(refreshToken).build());
+        addTokenCookies(response, authentication);
 
         return ApiResponse.<CookieAuthenticationResponse>builder()
                 .message("Token refreshed successfully")
@@ -82,35 +89,61 @@ public class AuthenticationCookieControler {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@CookieValue(name = ACCESS_TOKEN_COOKIE) String token, HttpServletResponse response)
+    public ApiResponse<Void> logout(
+            @CookieValue(name = ACCESS_TOKEN_COOKIE, required = false) String accessToken,
+            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+            HttpServletResponse response)
             throws ParseException, JOSEException {
-        authenticationService.logout(LogoutRequest.builder().token(token).build());
-        clearTokenCookie(response);
+        authenticationService.logout(LogoutRequest.builder()
+                .token(accessToken)
+                .refreshToken(refreshToken)
+                .build());
+        clearTokenCookies(response);
 
         return ApiResponse.<Void>builder().message("Logout successful").build();
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<CookieAuthenticationResponse> me(Authentication currentUser) {
+        AuthenticationResponse authentication = authenticationService.getCurrentUser(currentUser.getName());
+        return ApiResponse.<CookieAuthenticationResponse>builder()
+                .result(toCookieResponse(authentication))
+                .build();
     }
 
     private CookieAuthenticationResponse toCookieResponse(AuthenticationResponse authentication) {
         return CookieAuthenticationResponse.builder()
                 .authenticated(authentication.isAuthenticated())
+                .userName(authentication.getUserName())
+                .fullName(authentication.getFullName())
                 .accountType(authentication.getAccountType())
                 .roles(authentication.getRoles())
                 .build();
     }
 
-    private void addTokenCookie(HttpServletResponse response, String token) {
-        ResponseCookie cookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, token)
+    private void addTokenCookies(HttpServletResponse response, AuthenticationResponse authentication) {
+        addTokenCookie(response, ACCESS_TOKEN_COOKIE, authentication.getToken(), validDuration);
+        addTokenCookie(response, REFRESH_TOKEN_COOKIE, authentication.getRefreshToken(), refreshableDuration);
+    }
+
+    private void addTokenCookie(HttpServletResponse response, String name, String token, long maxAgeSeconds) {
+        ResponseCookie cookie = ResponseCookie.from(name, token)
                 .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Strict")
                 .path("/")
-                .maxAge(Duration.ofSeconds(validDuration))
+                .maxAge(Duration.ofSeconds(maxAgeSeconds))
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private void clearTokenCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, "")
+    private void clearTokenCookies(HttpServletResponse response) {
+        clearTokenCookie(response, ACCESS_TOKEN_COOKIE);
+        clearTokenCookie(response, REFRESH_TOKEN_COOKIE);
+    }
+
+    private void clearTokenCookie(HttpServletResponse response, String name) {
+        ResponseCookie cookie = ResponseCookie.from(name, "")
                 .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Strict")

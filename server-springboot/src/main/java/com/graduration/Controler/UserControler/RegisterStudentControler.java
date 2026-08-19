@@ -2,7 +2,11 @@ package com.graduration.Controler.UserControler;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.DTO.Request.RegisterStudentRequest;
+import com.graduration.DTO.Request.UpdateStudentRequest;
 import com.graduration.DTO.Response.ApiResponse;
 import com.graduration.DTO.Response.PasswordResetResponse;
 import com.graduration.DTO.Response.RegisterStudentResponse;
@@ -48,15 +53,31 @@ public class RegisterStudentControler {
                 .build();
     }
 
+    @GetMapping(value = "/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> exportStudents(@org.springframework.web.bind.annotation.RequestParam Integer year) {
+        byte[] file = userStudentService.exportStudentsByCreationYear(year);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=student-graduation-" + year + ".xlsx")
+                .body(file);
+    }
+
+    @GetMapping("/export-years")
+    public ApiResponse<List<Integer>> getExportYears() {
+        return ApiResponse.<List<Integer>>builder()
+                .result(userStudentService.getStudentCreationYears())
+                .build();
+    }
+
     @GetMapping("/get-all-student")
-    public ApiResponse<List<RegisterStudentResponse>> getAllStudents(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>> getAllStudents(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<RegisterStudentResponse>>builder()
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>>builder()
                 .result(
-                        page == null && size == null
-                                ? userStudentService.getAllStudents()
-                                : userStudentService.getAllStudents(page, size))
+                        keyword == null
+                                ? userStudentService.getAllStudentsPage(page, size)
+                                : userStudentService.getAllStudentsPage(page, size, keyword))
                 .build();
     }
 
@@ -72,6 +93,15 @@ public class RegisterStudentControler {
         return ApiResponse.<PasswordResetResponse>builder()
                 .message("Student password reset successfully")
                 .result(userStudentService.resetPasswordByUserName(userName))
+                .build();
+    }
+
+    @PatchMapping("/{userId}")
+    public ApiResponse<RegisterStudentResponse> updateStudent(
+            @PathVariable String userId, @Valid @RequestBody UpdateStudentRequest request) {
+        return ApiResponse.<RegisterStudentResponse>builder()
+                .message("Student account updated successfully")
+                .result(userStudentService.updateStudent(userId, request))
                 .build();
     }
 

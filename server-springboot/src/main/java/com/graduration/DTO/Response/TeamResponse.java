@@ -20,6 +20,7 @@ public class TeamResponse {
     String role;
     Long topicId;
     String topicTitle;
+    String topicDescription;
 
     @Builder.Default
     List<StudentSummary> students = new ArrayList<>();

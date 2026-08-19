@@ -13,4 +13,6 @@ public class ClassResponse {
     String classCode;
     String className;
     String description;
+    Long majorId;
+    String majorName;
 }

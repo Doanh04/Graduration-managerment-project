@@ -19,6 +19,7 @@ import logoImg from '../img/sv_logo_dashboard.png';
 import bgNghiemThu from '../img/nghiem-thu-800x450.jpg';
 import bannerImg from '../img/thesis_defense_banner.jpg';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 import '../style/LoginLayout.scss';
 
 const ACCOUNT_INACTIVE_ERROR_CODE = 1073;
@@ -33,6 +34,7 @@ const getLoginErrorMessage = (errorResponse) => {
 
 export default function LoginLayout() {
   const { login } = useAuth();
+  const toast = useToast();
 
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
@@ -49,10 +51,12 @@ export default function LoginLayout() {
 
     if (!userName.trim()) {
       setError('Vui lòng nhập Tên đăng nhập (Mã Sinh viên / Mã Giảng viên)');
+      toast.error('Vui lòng nhập Tên đăng nhập (Mã Sinh viên / Mã Giảng viên)', { title: 'Thiếu thông tin đăng nhập' });
       return;
     }
     if (!password) {
       setError('Vui lòng nhập Mật khẩu');
+      toast.error('Vui lòng nhập Mật khẩu', { title: 'Thiếu thông tin đăng nhập' });
       return;
     }
 
@@ -65,12 +69,16 @@ export default function LoginLayout() {
 
       if (response && (response.code === 1000 || response.result)) {
         setSuccess('Đăng nhập thành công!');
+        toast.success('Đăng nhập thành công!');
       } else {
-        setError(getLoginErrorMessage(response));
+        const message = getLoginErrorMessage(response);
+        setError(message);
+        toast.error(message, { title: 'Đăng nhập thất bại' });
       }
     } catch (err) {
       console.error('Lỗi khi đăng nhập:', err);
       setError(getLoginErrorMessage(err));
+      toast.error(getLoginErrorMessage(err), { title: 'Đăng nhập thất bại' });
     } finally {
       setIsSubmitting(false);
     }

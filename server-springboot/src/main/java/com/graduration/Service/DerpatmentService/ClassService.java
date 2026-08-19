@@ -75,6 +75,13 @@ public class ClassService {
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<ClassResponse> getAllClassesPage(Integer page, Integer size) {
+        return com.graduration.DTO.Response.PageResponse.from(
+                classRepository.findAll(PaginationSupport.pageRequest(page, size)), classMapper::toClassResponse);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public ClassResponse updateClass(Long classId, ClassRequest request) {
         ClassEntity existingClass =

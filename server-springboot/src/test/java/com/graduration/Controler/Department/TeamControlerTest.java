@@ -90,12 +90,13 @@ class TeamControlerTest {
 
     @Test
     void getAllTeams_returnsTeamList() throws Exception {
-        when(teamService.getAllTeams()).thenReturn(List.of(response()));
+        when(teamService.getAllTeamsPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(response())));
 
         mockMvc.perform(get("/team/get-all-team"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.length()").value(1))
-                .andExpect(jsonPath("$.result[0].idTeam").value(1));
+                .andExpect(jsonPath("$.result.content.length()").value(1))
+                .andExpect(jsonPath("$.result.content[0].idTeam").value(1));
     }
 
     @Test
@@ -107,6 +108,23 @@ class TeamControlerTest {
                 .andExpect(jsonPath("$.message").value("Team updated successfully"));
 
         verify(teamService).updateTeam(eq(1L), any(TeamRequest.class));
+    }
+
+    @Test
+    void selectTopic_assignsExistingTopicToTeam() throws Exception {
+        when(teamService.selectTopic(1L, 9L))
+                .thenReturn(TeamResponse.builder()
+                        .idTeam(1L)
+                        .topicId(9L)
+                        .topicTitle("Topic 9")
+                        .build());
+
+        mockMvc.perform(put("/team/1/topic/9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Topic selected successfully"))
+                .andExpect(jsonPath("$.result.topicId").value(9));
+
+        verify(teamService).selectTopic(1L, 9L);
     }
 
     @Test

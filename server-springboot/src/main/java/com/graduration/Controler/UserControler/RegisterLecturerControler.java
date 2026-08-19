@@ -1,7 +1,5 @@
 package com.graduration.Controler.UserControler;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.http.MediaType;
@@ -61,14 +59,15 @@ public class RegisterLecturerControler {
     }
 
     @GetMapping("/get-all-lecture")
-    public ApiResponse<List<RegisterLectureResponse>> getAllLecturers(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<RegisterLectureResponse>> getAllLecturers(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<RegisterLectureResponse>>builder()
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<RegisterLectureResponse>>builder()
                 .result(
-                        page == null && size == null
-                                ? userLecturerService.getAllLecturers()
-                                : userLecturerService.getAllLecturers(page, size))
+                        keyword == null
+                                ? userLecturerService.getAllLecturersPage(page, size)
+                                : userLecturerService.getAllLecturersPage(page, size, keyword))
                 .build();
     }
 

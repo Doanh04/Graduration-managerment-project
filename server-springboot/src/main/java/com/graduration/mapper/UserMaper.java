@@ -42,6 +42,9 @@ public interface UserMaper {
     @Mapping(target = "pathAvt", ignore = true)
     @Mapping(target = "userEntity", ignore = true)
     @Mapping(target = "team", ignore = true)
+    @Mapping(target = "graduationEnrollments", ignore = true)
+    @Mapping(target = "scores", ignore = true)
+    @Mapping(target = "submittedFiles", ignore = true)
     StudentEntity toStudentEntity(RegisterStudentRequest request);
 
     @Mapping(source = "user.userId", target = "idUser")
@@ -52,6 +55,8 @@ public interface UserMaper {
     @Mapping(source = "student.fullNameStudent", target = "fullName")
     @Mapping(source = "student.phoneStudent", target = "phone")
     @Mapping(source = "student.email", target = "email")
+    @Mapping(source = "student.classEntity.classId", target = "classId")
+    @Mapping(source = "student.classEntity.classCode", target = "classCode")
     @Mapping(source = "user.roles", target = "roles")
     @Mapping(source = "user.roles", target = "permissions")
     RegisterStudentResponse toStudentResponse(UserEntity user, StudentEntity student);
@@ -70,6 +75,13 @@ public interface UserMaper {
 
     @Mapping(source = "userName", target = "userName")
     @Mapping(source = "password", target = "password")
+    @Mapping(target = "userId", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "createAt", ignore = true)
+    @Mapping(target = "avt", ignore = true)
+    @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "student", ignore = true)
+    @Mapping(target = "lecture", ignore = true)
     UserEntity toUserEntity(RegisterLectureRequest registerLectureRequest);
 
     @Mapping(source = "lectureCode", target = "lectureCode")
@@ -77,6 +89,14 @@ public interface UserMaper {
     @Mapping(source = "degree", target = "degree")
     @Mapping(source = "email", target = "emaillecture")
     @Mapping(source = "phone", target = "phoneLecture")
+    @Mapping(target = "lectureId", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "comment", ignore = true)
+    @Mapping(target = "topicSuperVisor", ignore = true)
+    @Mapping(target = "score", ignore = true)
+    @Mapping(target = "reviewAssignment", ignore = true)
+    @Mapping(target = "comitteesMember", ignore = true)
+    @Mapping(target = "preferredTopicRegistrations", ignore = true)
     LectureEntity toLecturerEntity(RegisterLectureRequest registerLectureRequest2);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -101,6 +121,7 @@ public interface UserMaper {
     @Mapping(target = "score", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
     @Mapping(target = "comitteesMember", ignore = true)
+    @Mapping(target = "preferredTopicRegistrations", ignore = true)
     void updateLecturerEntity(UpdateLecturerRequest request, @MappingTarget LectureEntity lecturer);
 
     @Mapping(source = "user.userId", target = "userId")

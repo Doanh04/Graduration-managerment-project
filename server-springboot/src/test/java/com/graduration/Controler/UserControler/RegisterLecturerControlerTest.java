@@ -170,14 +170,15 @@ class RegisterLecturerControlerTest {
 
     @Test
     void getAllLecturers_returnsLecturerList() throws Exception {
-        when(userLecturerService.getAllLecturers()).thenReturn(List.of(registerResponse()));
+        when(userLecturerService.getAllLecturersPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(registerResponse())));
 
         mockMvc.perform(get("/register-lecture/get-all-lecture"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
-                .andExpect(jsonPath("$.result.length()").value(1))
-                .andExpect(jsonPath("$.result[0].userName").value("lecturer01"))
-                .andExpect(jsonPath("$.result[0].roles[0]").value("SUPERVISOR"));
+                .andExpect(jsonPath("$.result.content.length()").value(1))
+                .andExpect(jsonPath("$.result.content[0].userName").value("lecturer01"))
+                .andExpect(jsonPath("$.result.content[0].roles[0]").value("SUPERVISOR"));
     }
 
     @Test

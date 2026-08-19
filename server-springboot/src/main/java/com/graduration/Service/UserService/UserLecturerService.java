@@ -139,6 +139,25 @@ public class UserLecturerService {
                 .toList();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<RegisterLectureResponse> getAllLecturersPage(
+            Integer page, Integer size) {
+        return getAllLecturersPage(page, size, null);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    public com.graduration.DTO.Response.PageResponse<RegisterLectureResponse> getAllLecturersPage(
+            Integer page, Integer size, String keyword) {
+        var pageable = PaginationSupport.pageRequest(page, size);
+        var lecturers = keyword == null || keyword.isBlank()
+                ? lectureRepository.findAll(pageable)
+                : lectureRepository.searchByNameOrCode(keyword.trim(), pageable);
+        return com.graduration.DTO.Response.PageResponse.from(
+                lecturers, lecturer -> userMaper.toLectureResponse(lecturer.getUser(), lecturer));
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
     public RegisterLectureResponse getLecturerByUserName(String userName) {
@@ -180,6 +199,7 @@ public class UserLecturerService {
 
         List<RegisterLectureResponse> importedLecturers = new ArrayList<>();
         List<ImportLectureErrorResponse> errors = new ArrayList<>();
+        List<PendingLecturerImport> pendingImports = new ArrayList<>();
         int totalRows = 0;
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
@@ -194,15 +214,12 @@ public class UserLecturerService {
                 }
 
                 totalRows++;
-                RegisterLectureRequest request = readRequest(row, formatter);
-
                 try {
-                    RegisterLectureResponse response = transactionTemplate.execute(status -> registerLecturer(request));
-                    importedLecturers.add(response);
+                    pendingImports.add(new PendingLecturerImport(rowIndex + 1, readRequest(row, formatter)));
                 } catch (RuntimeException exception) {
                     errors.add(ImportLectureErrorResponse.builder()
                             .row(rowIndex + 1)
-                            .userName(request.getUserName())
+                            .userName(cellValue(row, 0, formatter))
                             .message(exception.getMessage())
                             .build());
                 }
@@ -214,6 +231,21 @@ public class UserLecturerService {
             throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
         }
 
+        ensureLecturersDoNotExist(pendingImports);
+        for (PendingLecturerImport pending : pendingImports) {
+            try {
+                RegisterLectureResponse response =
+                        transactionTemplate.execute(status -> registerLecturer(pending.request()));
+                importedLecturers.add(response);
+            } catch (RuntimeException exception) {
+                errors.add(ImportLectureErrorResponse.builder()
+                        .row(pending.row())
+                        .userName(pending.request().getUserName())
+                        .message(exception.getMessage())
+                        .build());
+            }
+        }
+
         return ImportLectureResponse.builder()
                 .totalRows(totalRows)
                 .successRows(importedLecturers.size())
@@ -221,6 +253,31 @@ public class UserLecturerService {
                 .importedLecturers(importedLecturers)
                 .errors(errors)
                 .build();
+    }
+
+    private void ensureLecturersDoNotExist(List<PendingLecturerImport> pendingImports) {
+        Set<String> userNames = new HashSet<>();
+        Set<String> lecturerCodes = new HashSet<>();
+        Set<String> emails = new HashSet<>();
+        Set<String> phones = new HashSet<>();
+        for (PendingLecturerImport pending : pendingImports) {
+            RegisterLectureRequest request = pending.request();
+            normalizeRequest(request);
+            if (isDuplicate(userNames, request.getUserName())
+                    || isDuplicate(lecturerCodes, request.getLectureCode())
+                    || isDuplicate(emails, request.getEmail())
+                    || isDuplicate(phones, request.getPhone())
+                    || userRepository.existsByUserName(request.getUserName())
+                    || lectureRepository.existsByLectureCode(request.getLectureCode())
+                    || (request.getEmail() != null && lectureRepository.existsByEmaillecture(request.getEmail()))
+                    || (request.getPhone() != null && lectureRepository.existsByPhoneLecture(request.getPhone()))) {
+                throw new AppException(ErrorCode.IMPORT_DATA_ALREADY_EXISTS);
+            }
+        }
+    }
+
+    private boolean isDuplicate(Set<String> values, String value) {
+        return value != null && !values.add(value.toLowerCase(Locale.ROOT));
     }
 
     private void validateRequest(RegisterLectureRequest request) {
@@ -356,4 +413,6 @@ public class UserLecturerService {
         }
         return true;
     }
+
+    private record PendingLecturerImport(int row, RegisterLectureRequest request) {}
 }

@@ -1,6 +1,5 @@
 package com.graduration.Controler.Department;
 
-import java.util.List;
 import java.util.Set;
 
 import jakarta.validation.Valid;
@@ -47,11 +46,11 @@ public class TeamControler {
     }
 
     @GetMapping("/get-all-team")
-    public ApiResponse<List<TeamResponse>> getAllTeams(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<TeamResponse>> getAllTeams(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<TeamResponse>>builder()
-                .result(page == null && size == null ? teamService.getAllTeams() : teamService.getAllTeams(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<TeamResponse>>builder()
+                .result(teamService.getAllTeamsPage(page, size))
                 .build();
     }
 
@@ -60,6 +59,14 @@ public class TeamControler {
         return ApiResponse.<TeamResponse>builder()
                 .message("Team updated successfully")
                 .result(teamService.updateTeam(teamId, request))
+                .build();
+    }
+
+    @PutMapping("/{teamId}/topic/{topicId}")
+    public ApiResponse<TeamResponse> selectTopic(@PathVariable Long teamId, @PathVariable Long topicId) {
+        return ApiResponse.<TeamResponse>builder()
+                .message("Topic selected successfully")
+                .result(teamService.selectTopic(teamId, topicId))
                 .build();
     }
 

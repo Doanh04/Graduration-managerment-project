@@ -77,15 +77,16 @@ class ClassControlerTest {
 
     @Test
     void getAllClasses_returnsClassList() throws Exception {
-        when(classService.getAllClasses()).thenReturn(List.of(response()));
+        when(classService.getAllClassesPage(null, null))
+                .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(response())));
 
         mockMvc.perform(get("/class/get-all-class"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
-                .andExpect(jsonPath("$.result.length()").value(1))
-                .andExpect(jsonPath("$.result[0].idClass").value(10));
+                .andExpect(jsonPath("$.result.content.length()").value(1))
+                .andExpect(jsonPath("$.result.content[0].idClass").value(10));
 
-        verify(classService).getAllClasses();
+        verify(classService).getAllClassesPage(null, null);
     }
 
     @Test

@@ -1,7 +1,5 @@
 package com.graduration.Controler.UserControler;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.*;
@@ -57,13 +55,10 @@ public class PermissionControler {
     }
 
     @GetMapping({"", "/get-permission"})
-    public ApiResponse<List<PermissionResponse>> getAllPermissions(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<PermissionResponse>> getAllPermissions(
             @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<PermissionResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? permissionService.getAllPermissions()
-                                : permissionService.getAllPermissions(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<PermissionResponse>>builder()
+                .result(permissionService.getAllPermissionsPage(page, size))
                 .build();
     }
 }

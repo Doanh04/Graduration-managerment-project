@@ -51,6 +51,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticationService {
+    private static final String TOKEN_TYPE_CLAIM = "tokenType";
+    private static final String ACCESS_TOKEN_TYPE = "ACCESS";
+    private static final String REFRESH_TOKEN_TYPE = "REFRESH";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final InvalidatedRepository invalidatedRepository;
@@ -109,30 +113,47 @@ public class AuthenticationService {
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
+                .refreshToken(generateRefreshToken(user))
                 .authenticated(true)
+                .userName(user.getUserName())
+                .fullName(resolveFullName(user))
                 .accountType(resolveAccountType(user))
                 .roles(resolveRoles(user))
                 .build();
     }
 
     public String generateToken(UserEntity user) {
+        return generateToken(user, ACCESS_TOKEN_TYPE, VALID_DURATION, true);
+    }
+
+    public String generateRefreshToken(UserEntity user) {
+        return generateToken(user, REFRESH_TOKEN_TYPE, RERESHABLE_DURATION, false);
+    }
+
+    private String generateToken(UserEntity user, String tokenType, long duration, boolean includeUserClaims) {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(user.getUserId())
                 .issuer("GradurationManagement")
                 .issueTime(new Date())
                 .expirationTime(new Date(
-                        Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()))
+                        Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
                 .jwtID(UUID.randomUUID().toString())
-                .claim("scope", buildScope(user))
-                .claim("userName", user.getUserName())
-                .claim("accountType", resolveAccountType(user))
-                .claim("roles", resolveRoles(user).stream().map(Enum::name).toList())
-                .claim("email", resolveEmail(user))
-                .claim("phone", resolvePhone(user))
-                .claim(
-                        "status",
-                        user.getStatus() == null ? null : user.getStatus().name())
+                .claim(TOKEN_TYPE_CLAIM, tokenType)
                 .build();
+
+        if (includeUserClaims) {
+            claims = new JWTClaimsSet.Builder(claims)
+                    .claim("scope", buildScope(user))
+                    .claim("userName", user.getUserName())
+                    .claim("accountType", resolveAccountType(user))
+                    .claim("roles", resolveRoles(user).stream().map(Enum::name).toList())
+                    .claim("email", resolveEmail(user))
+                    .claim("phone", resolvePhone(user))
+                    .claim(
+                            "status",
+                            user.getStatus() == null ? null : user.getStatus().name())
+                    .build();
+        }
 
         JWSObject jwsObject = new JWSObject(new JWSHeader(JWSAlgorithm.HS256), new Payload(claims.toJSONObject()));
         try {
@@ -183,17 +204,46 @@ public class AuthenticationService {
 
         return AuthenticationResponse.builder()
                 .token(generateToken(user))
+                .refreshToken(generateRefreshToken(user))
                 .authenticated(true)
+                .userName(user.getUserName())
+                .fullName(resolveFullName(user))
+                .accountType(resolveAccountType(user))
+                .roles(resolveRoles(user))
+                .build();
+    }
+
+    private String resolveFullName(UserEntity user) {
+        if (user.getStudent() != null) return user.getStudent().getFullNameStudent();
+        if (user.getLecture() != null) return user.getLecture().getFullNameLecture();
+        return user.getUserName();
+    }
+
+    public AuthenticationResponse getCurrentUser(String userId) {
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        validateActiveAccount(user);
+        return AuthenticationResponse.builder()
+                .authenticated(true)
+                .userName(user.getUserName())
+                .fullName(resolveFullName(user))
                 .accountType(resolveAccountType(user))
                 .roles(resolveRoles(user))
                 .build();
     }
 
     public void logout(LogoutRequest request) throws ParseException, JOSEException {
+        invalidateIfValid(request.getToken(), ACCESS_TOKEN_TYPE);
+        invalidateIfValid(request.getRefreshToken(), REFRESH_TOKEN_TYPE);
+    }
+
+    private void invalidateIfValid(String token, String tokenType) throws ParseException, JOSEException {
+        if (token == null || token.isBlank()) {
+            return;
+        }
         try {
-            invalidateToken(verifyToken(request.getToken(), false));
+            invalidateToken(verifyToken(token, tokenType));
         } catch (AppException exception) {
-            log.info("Token already expired or invalidated");
+            log.info("{} token already expired, invalidated or has the wrong type", tokenType);
         }
     }
 
@@ -244,22 +294,19 @@ public class AuthenticationService {
     }
 
     public SignedJWT verifyToken(String token, boolean isRefresh) throws JOSEException, ParseException {
+        return verifyToken(token, isRefresh ? REFRESH_TOKEN_TYPE : ACCESS_TOKEN_TYPE);
+    }
+
+    private SignedJWT verifyToken(String token, String expectedTokenType) throws JOSEException, ParseException {
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
 
         SignedJWT signedJWT = SignedJWT.parse(token);
-
-        Date expiryTime = (isRefresh)
-                ? new Date(signedJWT
-                        .getJWTClaimsSet()
-                        .getIssueTime()
-                        .toInstant()
-                        .plus(RERESHABLE_DURATION, ChronoUnit.SECONDS)
-                        .toEpochMilli())
-                : signedJWT.getJWTClaimsSet().getExpirationTime();
-
         var verified = signedJWT.verify(verifier);
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        String tokenType = signedJWT.getJWTClaimsSet().getStringClaim(TOKEN_TYPE_CLAIM);
 
-        if (!(verified && expiryTime.after(new Date()))) throw new AppException(ErrorCode.UNAUTHENTICATED);
+        if (!(verified && expiryTime.after(new Date()) && expectedTokenType.equals(tokenType)))
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
 
         if (invalidatedRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID()))
             throw new AppException(ErrorCode.UNAUTHENTICATED);

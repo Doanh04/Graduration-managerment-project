@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext.jsx';
  * - Ngăn người dùng chưa đăng nhập truy cập
  * - Phân quyền vai trò (Role-based access: Student vs Lecturer vs Admin)
  */
-export default function ProtectedRoute({ children, allowedAccountTypes = [] }) {
+export default function ProtectedRoute({ children, allowedAccountTypes = [], allowedRoles = [] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
@@ -45,6 +45,13 @@ export default function ProtectedRoute({ children, allowedAccountTypes = [] }) {
       } else {
         return <Navigate to="/dashboard" replace />;
       }
+    }
+  }
+
+  if (allowedRoles.length > 0) {
+    const userRoles = user.roles || [];
+    if (!allowedRoles.some((role) => userRoles.includes(role))) {
+      return <Navigate to="/access-denied" replace />;
     }
   }
 

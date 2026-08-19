@@ -35,6 +35,6 @@ public class RegisterLectureRequest {
     @Email(message = "INVALID_EMAIL")
     String email;
 
-    @Pattern(regexp = "^\\+?[0-9]{9,15}$", message = "INVALID_PHONE")
+    @Pattern(regexp = "^[0-9]{10}$", message = "INVALID_PHONE")
     String phone;
 }

@@ -1,7 +1,5 @@
 package com.graduration.Controler.AcademicYear;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,14 +47,11 @@ public class AcademicYearControler {
     }
 
     @GetMapping("/get-all-academic-year")
-    public ApiResponse<List<AcademicYearResponse>> getAllAcademicYears(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<AcademicYearResponse>> getAllAcademicYears(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<AcademicYearResponse>>builder()
-                .result(
-                        page == null && size == null
-                                ? academicYearService.getAllAcademicYears()
-                                : academicYearService.getAllAcademicYears(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<AcademicYearResponse>>builder()
+                .result(academicYearService.getAllAcademicYearsPage(page, size))
                 .build();
     }
 

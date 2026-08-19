@@ -1,45 +1,101 @@
-import httpClient from '../../config/HttpClient.jsx';
+import axios from 'axios';
 
-/**
- * Service xử lý các API Xác thực (Authentication) tương ứng với AuthenticationCookieControler ở Backend.
- * Backend hiện tại đã hỗ trợ đăng nhập linh hoạt bằng Identifier (Tên đăng nhập / Mã Sinh viên / Mã Giảng viên).
- */
+const API_BASE_URL = 'http://localhost:8080/graduration';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
 export const AuthenticationService = {
   /**
    * Đăng nhập người dùng bằng HttpOnly Cookie
-   * @param {Object} payload - { identifier, password }
-   * @returns {Promise<Object>} - Trả về dữ liệu ApiResponse { code, message, result } từ Backend
+   * @param {Object} credentials 
+   * @returns {Promise<Object>} - Trả về dữ liệu ApiResponse từ Backend { code, message, result }
    */
-  login: ({ identifier, password }) => {
-    const loginIdentifier = (identifier || '').trim();
-    return httpClient.post('/auth/cookie/login', {
-      identifier: loginIdentifier,
-      password,
-    });
+  login: async ({ identifier, password }) => {
+    try {
+      const response = await api.post('/auth/cookie/login', { identifier, password });
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.data) {
+        throw error.response.data;
+      }
+      throw {
+        code: 9999,
+        message: error.message || 'Đăng nhập thất bại. Không thể kết nối tới server.',
+      };
+    }
   },
 
   /**
    * Kiểm tra tính hợp lệ của Token hiện tại trong Cookie HttpOnly
    * @returns {Promise<Object>} - Trả về ApiResponse { code, result: { valid: boolean } }
    */
-  introspect: () => {
-    return httpClient.post('/auth/cookie/introspect');
+  introspect: async () => {
+    try {
+      const response = await api.post('/auth/cookie/introspect');
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.data) {
+        throw error.response.data;
+      }
+      throw {
+        code: 9999,
+        message: error.message || 'Kiểm tra token thất bại.',
+      };
+    }
   },
 
   /**
    * Làm mới Access Token bằng Cookie HttpOnly
    * @returns {Promise<Object>} - Trả về ApiResponse chứa dữ liệu token mới
    */
-  refresh: () => {
-    return httpClient.post('/auth/cookie/refresh');
+  refresh: async () => {
+    try {
+      const response = await api.post('/auth/cookie/refresh');
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.data) {
+        throw error.response.data;
+      }
+      throw {
+        code: 9999,
+        message: error.message || 'Refresh token thất bại.',
+      };
+    }
+  },
+
+  profile: async () => {
+    try {
+      const response = await api.get('/auth/cookie/me');
+      return response.data;
+    } catch (error) {
+      if (error.response?.data) throw error.response.data;
+      throw { code: 9999, message: error.message || 'Không thể tải thông tin tài khoản.' };
+    }
   },
 
   /**
    * Đăng xuất người dùng và thu hồi/xóa Cookie HttpOnly
    * @returns {Promise<Object>} - Trả về ApiResponse đăng xuất từ Backend
    */
-  logout: () => {
-    return httpClient.post('/auth/cookie/logout');
+  logout: async () => {
+    try {
+      const response = await api.post('/auth/cookie/logout');
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.data) {
+        throw error.response.data;
+      }
+      throw {
+        code: 9999,
+        message: error.message || 'Đăng xuất thất bại.',
+      };
+    }
   },
 };
 

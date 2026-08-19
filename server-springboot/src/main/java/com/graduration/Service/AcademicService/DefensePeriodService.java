@@ -72,6 +72,16 @@ public class DefensePeriodService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional
+    public com.graduration.DTO.Response.PageResponse<DefensePeriodResponse> getAllDefensePeriodsPage(
+            Integer page, Integer size) {
+        finishExpiredPeriods();
+        return com.graduration.DTO.Response.PageResponse.from(
+                defensePeriodRepository.findAllByOrderByStartDateDesc(PaginationSupport.pageRequest(page, size)),
+                defensePeriodMapper::toDefensePeriodResponse);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @Transactional
     public List<DefensePeriodResponse> getDefensePeriodsByAcademicYear(Integer academicId) {
         return getDefensePeriodsByAcademicYear(academicId, 0, PaginationSupport.DEFAULT_SIZE);
     }

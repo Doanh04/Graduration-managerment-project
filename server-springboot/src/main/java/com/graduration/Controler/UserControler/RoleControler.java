@@ -1,7 +1,5 @@
 package com.graduration.Controler.UserControler;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.*;
@@ -55,10 +53,10 @@ public class RoleControler {
     }
 
     @GetMapping
-    public ApiResponse<List<RoleResponse>> getAllRoles(
+    public ApiResponse<com.graduration.DTO.Response.PageResponse<RoleResponse>> getAllRoles(
             @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return ApiResponse.<List<RoleResponse>>builder()
-                .result(page == null && size == null ? roleService.getAllRoles() : roleService.getAllRoles(page, size))
+        return ApiResponse.<com.graduration.DTO.Response.PageResponse<RoleResponse>>builder()
+                .result(roleService.getAllRolesPage(page, size))
                 .build();
     }
 }
