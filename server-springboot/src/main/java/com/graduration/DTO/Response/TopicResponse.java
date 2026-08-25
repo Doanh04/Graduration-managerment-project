@@ -23,6 +23,7 @@ public class TopicResponse {
     CategoryTopicConstain categoryTopic;
     TopicStatusConstain status;
     String createdBy;
+    String createdByName;
     String rejectionReason;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;

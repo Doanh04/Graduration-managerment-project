@@ -41,8 +41,8 @@ public class SubmissionMapper {
     }
 
     public SubmissionCommentResponse toCommentResponse(CommentEntity comment) {
-        LectureEntity lecturer = comment.getLecture();
         UserEntity author = comment.getCreatedBy();
+        LectureEntity lecturer = author == null ? null : author.getLecture();
         return SubmissionCommentResponse.builder()
                 .commentId(comment.getIdComment())
                 .submissionId(

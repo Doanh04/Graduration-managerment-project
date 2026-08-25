@@ -62,6 +62,10 @@ public class TopicEntity {
     TeamEntity team;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_team_id")
+    TeamEntity proposedTeam;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_Defense", nullable = false)
     DefensePeriodEntity defensePeriod;
 

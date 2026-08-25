@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,7 +13,9 @@ import com.graduration.Configuration.PaginationSupport;
 import com.graduration.DTO.Request.TemplateRequest;
 import com.graduration.DTO.Response.TemplateResponse;
 import com.graduration.Repository.TemplateRepository;
+import com.graduration.Repository.UserRepository;
 import com.graduration.entity.TemplateEntity;
+import com.graduration.entity.UserEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
 import com.graduration.mapper.TemplateMapper;
@@ -25,6 +29,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class TemplateService {
     TemplateRepository templateRepository;
+    UserRepository userRepository;
     TemplateMapper templateMapper;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -37,6 +42,7 @@ public class TemplateService {
 
         TemplateEntity template = templateMapper.toTemplateEntity(request);
         template.setCreateAt(LocalDate.now());
+        template.setUploadedBy(currentUser());
         return templateMapper.toTemplateResponse(templateRepository.save(template));
     }
 
@@ -94,6 +100,16 @@ public class TemplateService {
         return templateRepository
                 .findById(templateId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEMPLATE_NOT_FOUND));
+    }
+
+    private UserEntity currentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return userRepository
+                .findById(authentication.getName())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
     private void normalize(TemplateRequest request) {

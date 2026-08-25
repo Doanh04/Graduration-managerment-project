@@ -15,5 +15,7 @@ public class TemplateResponse {
     String templateName;
     String description;
     String filePath;
+    String uploadedByUserId;
+    String uploadedByUsername;
     LocalDate createAt;
 }

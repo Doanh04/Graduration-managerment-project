@@ -71,7 +71,8 @@ class TopicControlerTest {
 
     @Test
     void getTopics_forwardsPaginationAndFilters() throws Exception {
-        when(topicService.getTopics(1, 20, 1, 10L, CategoryTopicConstain.STUDENT, TopicStatusConstain.APPROVED, "java"))
+        when(topicService.getTopics(
+                        1, 20, 1, 10L, CategoryTopicConstain.STUDENT, TopicStatusConstain.APPROVED, "java", false))
                 .thenReturn(PageResponse.of(List.of(response())));
 
         mockMvc.perform(get("/topics")

@@ -43,7 +43,21 @@ public class AuditTrailAspect {
                     + "execution(public * com.graduration.Service..*.import*(..)) || "
                     + "execution(public * com.graduration.Service..*.add*(..)) || "
                     + "execution(public * com.graduration.Service..*.remove*(..)) || "
-                    + "execution(public * com.graduration.Service..*.finish*(..))",
+                    + "execution(public * com.graduration.Service..*.finish*(..)) || "
+                    + "execution(public * com.graduration.Service..*.assign*(..)) || "
+                    + "execution(public * com.graduration.Service..*.deactivate*(..)) || "
+                    + "execution(public * com.graduration.Service..*.select*(..)) || "
+                    + "execution(public * com.graduration.Service..*.submit*(..)) || "
+                    + "execution(public * com.graduration.Service..*.approve*(..)) || "
+                    + "execution(public * com.graduration.Service..*.reject*(..)) || "
+                    + "execution(public * com.graduration.Service..*.upload*(..)) || "
+                    + "execution(public * com.graduration.Service..*.review*(..)) || "
+                    + "execution(public * com.graduration.Service..*.revise*(..)) || "
+                    + "execution(public * com.graduration.Service..*.cancel*(..)) || "
+                    + "execution(public * com.graduration.Service..*.open*(..)) || "
+                    + "execution(public * com.graduration.Service..*.close*(..)) || "
+                    + "execution(public * com.graduration.Service..*.publish*(..)) || "
+                    + "execution(public * com.graduration.Service..*.start*(..))",
             returning = "result")
     public void recordSuccessfulChange(JoinPoint joinPoint, Object result) {
         String className = joinPoint.getTarget().getClass().getName();
@@ -77,6 +91,7 @@ public class AuditTrailAspect {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("service", serviceName);
         metadata.put("method", methodName);
+        addRequestMetadata(metadata);
 
         return AuditLogDocument.builder()
                 .userId(userId)
@@ -84,7 +99,7 @@ public class AuditTrailAspect {
                 .action(toAction(methodName))
                 .resourceType(resourceType)
                 .resourceId(resolveResourceId(joinPoint.getArgs(), result))
-                .description("Successful operation: " + serviceName + "." + methodName)
+                .description("Thao tác thành công: " + resourceType + "." + methodName)
                 .ipAddress(resolveIpAddress())
                 .metadata(metadata)
                 .createdAt(Instant.now())
@@ -132,6 +147,14 @@ public class AuditTrailAspect {
         String[] idProperties = {
             "userId",
             "idUser",
+            "topicId",
+            "assignmentId",
+            "submissionId",
+            "milestoneId",
+            "scheduleId",
+            "committeeId",
+            "memberId",
+            "scoreId",
             "studentCode",
             "lectureId",
             "academicId",
@@ -188,6 +211,15 @@ public class AuditTrailAspect {
             return forwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private void addRequestMetadata(Map<String, Object> metadata) {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return;
+        }
+        HttpServletRequest request = attributes.getRequest();
+        metadata.put("httpMethod", request.getMethod());
+        metadata.put("requestPath", request.getRequestURI());
     }
 
     private String toAction(String methodName) {

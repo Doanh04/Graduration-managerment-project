@@ -1,6 +1,7 @@
 package com.graduration.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +19,16 @@ public interface GraduationEnrollmentRepository extends JpaRepository<Graduation
 			and enrollment.defensePeriod.ID_Defense = :defensePeriodId
 			""")
     boolean existsByStudent_IdStudentAndDefensePeriod_ID_Defense(
+            @Param("studentId") String studentId, @Param("defensePeriodId") Long defensePeriodId);
+
+    @Query(
+            """
+			select enrollment
+			from GraduationEnrollmentEntity enrollment
+			where enrollment.student.idStudent = :studentId
+			and enrollment.defensePeriod.ID_Defense = :defensePeriodId
+			""")
+    Optional<GraduationEnrollmentEntity> findByStudent_IdStudentAndDefensePeriod_ID_Defense(
             @Param("studentId") String studentId, @Param("defensePeriodId") Long defensePeriodId);
 
     @Query(

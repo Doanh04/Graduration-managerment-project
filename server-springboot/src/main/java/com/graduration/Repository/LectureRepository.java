@@ -29,6 +29,9 @@ public interface LectureRepository extends JpaRepository<LectureEntity, String> 
 
     boolean existsByLectureCode(String lectureCode);
 
+    @EntityGraph(attributePaths = {"user", "user.roles", "user.roles.permission"})
+    Optional<LectureEntity> findByLectureCode(String lectureCode);
+
     boolean existsByEmaillecture(String email);
 
     boolean existsByPhoneLecture(String phone);

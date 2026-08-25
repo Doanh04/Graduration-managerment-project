@@ -25,6 +25,9 @@ public class MajorEntity {
     @Column(name = "major_name", unique = true)
     String majorName;
 
+    @Column(name = "major_code", unique = true)
+    String majorCode;
+
     @Column(name = "description")
     String description;
 

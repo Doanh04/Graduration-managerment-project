@@ -45,6 +45,13 @@ public class TeamControler {
                 .build();
     }
 
+    @GetMapping("/me")
+    public ApiResponse<TeamResponse> getMyTeam() {
+        return ApiResponse.<TeamResponse>builder()
+                .result(teamService.getMyTeam())
+                .build();
+    }
+
     @GetMapping("/get-all-team")
     public ApiResponse<com.graduration.DTO.Response.PageResponse<TeamResponse>> getAllTeams(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,

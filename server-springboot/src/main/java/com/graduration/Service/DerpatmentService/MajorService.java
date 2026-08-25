@@ -30,7 +30,8 @@ public class MajorService {
     @Transactional
     public MajorResponse createMajor(MajorRequest request) {
         validateAndNormalizeRequest(request);
-        if (majorRepository.existsByMajorNameIgnoreCase(request.getMajorName())) {
+        if (majorRepository.existsByMajorNameIgnoreCase(request.getMajorName())
+                || majorRepository.existsByMajorCodeIgnoreCase(request.getMajorCode())) {
             throw new AppException(ErrorCode.INVALID_KEY);
         }
 
@@ -70,11 +71,13 @@ public class MajorService {
     public MajorResponse updateMajor(Long majorId, MajorRequest request) {
         MajorEntity major = findMajor(majorId);
         validateAndNormalizeRequest(request);
-        if (majorRepository.existsByMajorNameIgnoreCaseAndMajorIdNot(request.getMajorName(), majorId)) {
+        if (majorRepository.existsByMajorNameIgnoreCaseAndMajorIdNot(request.getMajorName(), majorId)
+                || majorRepository.existsByMajorCodeIgnoreCaseAndMajorIdNot(request.getMajorCode(), majorId)) {
             throw new AppException(ErrorCode.INVALID_KEY);
         }
 
         MajorEntity mappedMajor = majorMapper.toMajorEntity(request);
+        major.setMajorCode(mappedMajor.getMajorCode());
         major.setMajorName(mappedMajor.getMajorName());
         major.setDescription(mappedMajor.getDescription());
 
@@ -101,11 +104,14 @@ public class MajorService {
 
     private void validateAndNormalizeRequest(MajorRequest request) {
         if (request == null
+                || request.getMajorCode() == null
+                || request.getMajorCode().isBlank()
                 || request.getMajorName() == null
                 || request.getMajorName().isBlank()) {
             throw new AppException(ErrorCode.INVALID_KEY);
         }
 
+        request.setMajorCode(request.getMajorCode().trim().toUpperCase());
         request.setMajorName(request.getMajorName().trim());
         if (request.getDescription() != null) {
             String description = request.getDescription().trim();

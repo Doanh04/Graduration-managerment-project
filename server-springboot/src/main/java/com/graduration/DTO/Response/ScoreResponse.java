@@ -2,9 +2,9 @@ package com.graduration.DTO.Response;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 import com.graduration.Constain.ScoreStatusConstain;
+import com.graduration.Constain.ScoreTypeConstain;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -18,6 +18,7 @@ import lombok.experimental.FieldDefaults;
 public class ScoreResponse {
     Long scoreId;
     BigDecimal totalScore;
+    ScoreTypeConstain scoreType;
     String comment;
     ScoreStatusConstain status;
     String studentId;
@@ -28,28 +29,11 @@ public class ScoreResponse {
     Long topicId;
     String topicTitle;
     Long defensePeriodId;
-    String createdByUserId;
-    String createdByUsername;
+    String lecturerId;
+    String lecturerCode;
+    String lecturerName;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
     LocalDateTime submittedAt;
     LocalDateTime publishedAt;
-    List<Detail> details;
-
-    @Getter
-    @Setter
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class Detail {
-        Long criterionId;
-        String criterionCode;
-        String criterionName;
-        BigDecimal maxScore;
-        BigDecimal weight;
-        BigDecimal score;
-        BigDecimal weightedScore;
-        String comment;
-    }
 }

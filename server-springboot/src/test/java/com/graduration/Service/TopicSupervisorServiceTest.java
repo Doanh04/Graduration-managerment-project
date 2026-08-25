@@ -95,6 +95,34 @@ class TopicSupervisorServiceTest {
     }
 
     @Test
+    void assign_acceptsRegisteredStudentProposalAlreadyAssignedToTeam() {
+        Fixture fixture = fixture();
+        fixture.topic.setStatus(TopicStatusConstain.REGISTERED);
+        when(topicRepository.findById(9L)).thenReturn(Optional.of(fixture.topic));
+        when(lectureRepository.findById("lecture-1")).thenReturn(Optional.of(fixture.lecture));
+        when(userRepository.findById("admin")).thenReturn(Optional.of(fixture.admin));
+        when(supervisorRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        supervisorService.assign(9L, request(SupervisorRoleConstain.PRIMARY));
+
+        verify(supervisorRepository).save(any(TopicSuperVisorEntity.class));
+    }
+
+    @Test
+    void assign_acceptsInProgressTopicWhenSupervisorNeedsAssignment() {
+        Fixture fixture = fixture();
+        fixture.topic.setStatus(TopicStatusConstain.IN_PROGRESS);
+        when(topicRepository.findById(9L)).thenReturn(Optional.of(fixture.topic));
+        when(lectureRepository.findById("lecture-1")).thenReturn(Optional.of(fixture.lecture));
+        when(userRepository.findById("admin")).thenReturn(Optional.of(fixture.admin));
+        when(supervisorRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        supervisorService.assign(9L, request(SupervisorRoleConstain.PRIMARY));
+
+        verify(supervisorRepository).save(any(TopicSuperVisorEntity.class));
+    }
+
+    @Test
     void assign_rejectsSecondActivePrimarySupervisor() {
         Fixture fixture = fixture();
         when(topicRepository.findById(9L)).thenReturn(Optional.of(fixture.topic));

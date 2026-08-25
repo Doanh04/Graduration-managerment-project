@@ -15,6 +15,10 @@ public interface TeamRepository extends JpaRepository<TeamEntity, Long> {
             attributePaths = {"topic", "studentEntities", "studentEntities.classEntity", "studentEntities.userEntity"})
     Optional<TeamEntity> findWithDetailsByIdTeam(Long idTeam);
 
+    @EntityGraph(
+            attributePaths = {"topic", "studentEntities", "studentEntities.classEntity", "studentEntities.userEntity"})
+    Optional<TeamEntity> findByStudentEntities_UserEntity_UserId(String userId);
+
     @EntityGraph(attributePaths = {"topic", "studentEntities", "studentEntities.classEntity"})
     List<TeamEntity> findAllByOrderByIdTeamAsc();
 

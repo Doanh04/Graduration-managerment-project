@@ -22,8 +22,8 @@ import lombok.experimental.FieldDefaults;
         name = "template",
         uniqueConstraints =
                 @UniqueConstraint(
-                        name = "uk_template_name_version_period",
-                        columnNames = {"template_name", "version", "id_defense"}))
+                        name = "uk_template_name_version",
+                        columnNames = {"template_name", "version"}))
 public class TemplateEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -37,7 +37,7 @@ public class TemplateEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     String description;
 
-    @Column(name = "file_path")
+    @Column(name = "file_path", columnDefinition = "TEXT")
     String filePath;
 
     @Enumerated(EnumType.STRING)
@@ -63,10 +63,6 @@ public class TemplateEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by")
     UserEntity uploadedBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_defense")
-    DefensePeriodEntity defensePeriod;
 
     @Column(name = "create_at")
     LocalDate createAt;

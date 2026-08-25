@@ -20,7 +20,6 @@ public interface TemplateMapper {
     @Mapping(target = "contentType", ignore = true)
     @Mapping(target = "fileSize", ignore = true)
     @Mapping(target = "uploadedBy", ignore = true)
-    @Mapping(target = "defensePeriod", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     TemplateEntity toTemplateEntity(TemplateRequest request);
 
@@ -33,9 +32,10 @@ public interface TemplateMapper {
     @Mapping(target = "contentType", ignore = true)
     @Mapping(target = "fileSize", ignore = true)
     @Mapping(target = "uploadedBy", ignore = true)
-    @Mapping(target = "defensePeriod", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateTemplate(TemplateRequest request, @MappingTarget TemplateEntity template);
 
+    @Mapping(source = "uploadedBy.userId", target = "uploadedByUserId")
+    @Mapping(source = "uploadedBy.userName", target = "uploadedByUsername")
     TemplateResponse toTemplateResponse(TemplateEntity template);
 }

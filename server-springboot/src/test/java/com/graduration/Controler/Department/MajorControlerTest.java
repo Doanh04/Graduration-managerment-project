@@ -55,8 +55,9 @@ class MajorControlerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-								{
-								"majorName": "Computer Science",
+										{
+										"majorCode": "CS",
+										"majorName": "Computer Science",
 								"description": "Software and systems"
 								}
 								"""))
@@ -64,6 +65,7 @@ class MajorControlerTest {
                 .andExpect(jsonPath("$.code").value(1000))
                 .andExpect(jsonPath("$.message").value("Major created successfully"))
                 .andExpect(jsonPath("$.result.majorId").value(1))
+                .andExpect(jsonPath("$.result.majorCode").value("CS"))
                 .andExpect(jsonPath("$.result.majorName").value("Computer Science"));
 
         verify(majorService).createMajor(any(MajorRequest.class));
@@ -101,6 +103,7 @@ class MajorControlerTest {
     void updateMajor_returnsUpdatedMajor() throws Exception {
         MajorResponse updated = MajorResponse.builder()
                 .majorId(1L)
+                .majorCode("DS")
                 .majorName("Data Science")
                 .description("Analytics")
                 .build();
@@ -111,14 +114,16 @@ class MajorControlerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-								{
-								"majorName": "Data Science",
+										{
+										"majorCode": "DS",
+										"majorName": "Data Science",
 								"description": "Analytics"
 								}
 								"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Major updated successfully"))
                 .andExpect(jsonPath("$.result.majorId").value(1))
+                .andExpect(jsonPath("$.result.majorCode").value("DS"))
                 .andExpect(jsonPath("$.result.majorName").value("Data Science"));
 
         verify(majorService).updateMajor(eq(1L), any(MajorRequest.class));
@@ -139,6 +144,7 @@ class MajorControlerTest {
     private MajorResponse response() {
         return MajorResponse.builder()
                 .majorId(1L)
+                .majorCode("CS")
                 .majorName("Computer Science")
                 .description("Software and systems")
                 .build();

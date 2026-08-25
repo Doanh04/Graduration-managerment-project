@@ -16,11 +16,11 @@ spring:
     password: doanh@123
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: true
   data:
     mongodb:
-      uri: mongodb://localhost:27017/graduration_managerment
+      uri: mongodb://admin:doanh%40123@localhost:27017/graduration_managerment?authSource=admin
 
 jwt:
   signerKey: "tgWNKP/9+GK8SlEph/A1WRAHz2KLXhw1ccWCwD1yphs="
@@ -28,10 +28,6 @@ jwt:
   refreshable-duration: 36000
 
 app:
-  bootstrap-admin:
-    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
-    username: ${BOOTSTRAP_ADMIN_USERNAME:admin.bootstrap}
-    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
   cookie:
     secure: false
   storage:

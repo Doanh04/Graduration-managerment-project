@@ -88,7 +88,7 @@ class DefenseCommitteeServiceTest {
         verify(committeeRepository).save(captor.capture());
         assertEquals("Council 1", captor.getValue().getComitteesName());
         assertEquals(DefenseCommitteeStatusConstain.DRAFT, captor.getValue().getStatus());
-        assertEquals(fixture.academicYear, captor.getValue().getAcademicYear());
+        assertEquals(fixture.academicYear, captor.getValue().getDefensePeriod().getAcademicYear());
     }
 
     @Test
@@ -188,7 +188,6 @@ class DefenseCommitteeServiceTest {
                 .comitteesName("Council 1")
                 .status(DefenseCommitteeStatusConstain.DRAFT)
                 .defensePeriod(period)
-                .academicYear(academicYear)
                 .build();
         return new Fixture(admin, academicYear, period, committee);
     }

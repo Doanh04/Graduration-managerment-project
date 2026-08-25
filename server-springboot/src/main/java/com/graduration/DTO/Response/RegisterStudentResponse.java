@@ -26,6 +26,8 @@ public class RegisterStudentResponse {
     String email;
     Long classId;
     String classCode;
+    Long teamId;
+    String teamName;
 
     @Builder.Default
     Set<RoleConstain> roles = new HashSet<>();

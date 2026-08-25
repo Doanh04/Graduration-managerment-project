@@ -16,6 +16,10 @@ import com.graduration.entity.TopicSuperVisorEntity;
 
 @Repository
 public interface TopicSupervisorRepository extends JpaRepository<TopicSuperVisorEntity, Long> {
+    @Override
+    @EntityGraph(attributePaths = {"topic", "topic.defensePeriod", "lecture", "lecture.user", "assignedBy"})
+    Page<TopicSuperVisorEntity> findAll(Pageable pageable);
+
     boolean existsByTopic_IdTopicAndLecture_LectureIdAndStatus(
             Long topicId, String lectureId, SupervisorAssignmentStatusConstain status);
 

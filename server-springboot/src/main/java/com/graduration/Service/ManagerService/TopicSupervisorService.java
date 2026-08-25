@@ -52,16 +52,14 @@ public class TopicSupervisorService {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public TopicSupervisorResponse assign(Long topicId, AssignTopicSupervisorRequest request) {
-        TopicEntity topic = findAssignableTopic(topicId);
-        LectureEntity lecture = lectureRepository
-                .findById(request.getLectureId())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        TopicEntity topic = findApprovedAssignableTopic(topicId);
+        LectureEntity lecture = findLecturer(request.getLectureId());
         requireActiveLecturer(lecture);
         if (supervisorRepository.existsByTopic_IdTopicAndLecture_LectureIdAndStatus(
                 topicId, lecture.getLectureId(), SupervisorAssignmentStatusConstain.ACTIVE)) {
             throw new AppException(ErrorCode.TOPIC_SUPERVISOR_ALREADY_ASSIGNED);
         }
-        requirePrimaryAvailable(topicId, request.getRole(), null);
+        requirePrimaryAvailable(topicId, SupervisorRoleConstain.PRIMARY, null);
         long assignments = supervisorRepository.countActiveAssignments(
                 lecture.getLectureId(),
                 topic.getDefensePeriod().getID_Defense(),
@@ -72,7 +70,7 @@ public class TopicSupervisorService {
         TopicSuperVisorEntity assignment = TopicSuperVisorEntity.builder()
                 .topic(topic)
                 .lecture(lecture)
-                .supervisorRole(request.getRole())
+                .supervisorRole(SupervisorRoleConstain.PRIMARY)
                 .status(SupervisorAssignmentStatusConstain.ACTIVE)
                 .assignedAt(LocalDateTime.now())
                 .assignedBy(currentUser())
@@ -90,6 +88,13 @@ public class TopicSupervisorService {
         return PageResponse.from(
                 supervisorRepository.findByTopic_IdTopic(topicId, PaginationSupport.pageRequest(page, size)),
                 supervisorMapper::toResponse);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional(readOnly = true)
+    public PageResponse<TopicSupervisorResponse> getAll(Integer page, Integer size) {
+        return PageResponse.from(
+                supervisorRepository.findAll(PaginationSupport.pageRequest(page, size)), supervisorMapper::toResponse);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -116,8 +121,8 @@ public class TopicSupervisorService {
         TopicSuperVisorEntity assignment = findAssignment(assignmentId);
         requireActive(assignment);
         findAssignableTopic(assignment.getTopic().getIdTopic());
-        requirePrimaryAvailable(assignment.getTopic().getIdTopic(), request.getRole(), assignmentId);
-        assignment.setSupervisorRole(request.getRole());
+        requirePrimaryAvailable(assignment.getTopic().getIdTopic(), SupervisorRoleConstain.PRIMARY, assignmentId);
+        assignment.setSupervisorRole(SupervisorRoleConstain.PRIMARY);
         assignment.setNote(normalize(request.getNote()));
         return supervisorMapper.toResponse(supervisorRepository.save(assignment));
     }
@@ -160,12 +165,29 @@ public class TopicSupervisorService {
         return topic;
     }
 
+    private TopicEntity findApprovedAssignableTopic(Long topicId) {
+        TopicEntity topic = findAssignableTopic(topicId);
+        if (topic.getStatus() != TopicStatusConstain.APPROVED
+                && topic.getStatus() != TopicStatusConstain.REGISTERED
+                && topic.getStatus() != TopicStatusConstain.IN_PROGRESS) {
+            throw new AppException(ErrorCode.TOPIC_NOT_AVAILABLE);
+        }
+        return topic;
+    }
+
     private void requireActiveLecturer(LectureEntity lecture) {
         StatusConstain status =
                 lecture.getUser() == null ? null : lecture.getUser().getStatus();
         if (lecture.getUser() == null || status == StatusConstain.INACTIVE || status == StatusConstain.DELETED) {
             throw new AppException(ErrorCode.LECTURER_INACTIVE);
         }
+    }
+
+    private LectureEntity findLecturer(String identifier) {
+        return lectureRepository
+                .findById(identifier)
+                .or(() -> lectureRepository.findByLectureCode(identifier))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
     private void requirePrimaryAvailable(Long topicId, SupervisorRoleConstain role, Long excludedAssignmentId) {

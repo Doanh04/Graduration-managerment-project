@@ -11,8 +11,23 @@ const httpClient = axios.create({
   withCredentials: true,
 });
 
+let pendingRequests = 0;
+const notifyPendingRequests = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('app:http-pending', { detail: pendingRequests }));
+  }
+};
+const finishRequest = () => {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  notifyPendingRequests();
+};
+export const getPendingHttpRequests = () => pendingRequests;
+
 httpClient.interceptors.request.use(
   (config) => {
+    pendingRequests += 1;
+    config.__trackedRequest = true;
+    notifyPendingRequests();
     return config;
   },
   (error) => {
@@ -22,9 +37,11 @@ httpClient.interceptors.request.use(
 
 httpClient.interceptors.response.use(
   (response) => {
+    if (response.config?.__trackedRequest) finishRequest();
     return response.data;
   },
   (error) => {
+    if (error.config?.__trackedRequest) finishRequest();
     if (error.response && error.response.data) {
       return Promise.reject(error.response.data);
     }

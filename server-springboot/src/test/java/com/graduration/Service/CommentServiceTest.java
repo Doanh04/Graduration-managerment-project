@@ -23,7 +23,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.graduration.Constain.CommentTypeConstain;
 import com.graduration.Repository.CommentRepository;
-import com.graduration.Repository.LectureRepository;
 import com.graduration.Repository.SubmissionRepository;
 import com.graduration.Repository.UserRepository;
 import com.graduration.Service.GradurationService.CommentService;
@@ -45,9 +44,6 @@ class CommentServiceTest {
 
     @Mock
     UserRepository userRepository;
-
-    @Mock
-    LectureRepository lectureRepository;
 
     @Mock
     SubmissionMapper submissionMapper;

@@ -10,6 +10,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class MajorResponse {
     Long majorId;
+    String majorCode;
     String majorName;
     String description;
 }

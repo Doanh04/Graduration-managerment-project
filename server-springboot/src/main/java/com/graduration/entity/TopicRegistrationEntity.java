@@ -55,7 +55,7 @@ public class TopicRegistrationEntity {
     @Column(name = "status", nullable = false)
     TopicRegistrationStatusConstain status;
 
-    @Column(name = "submitted_at", nullable = false, updatable = false)
+    @Column(name = "submitted_at", nullable = false)
     LocalDateTime submittedAt;
 
     @Column(name = "reviewed_at")

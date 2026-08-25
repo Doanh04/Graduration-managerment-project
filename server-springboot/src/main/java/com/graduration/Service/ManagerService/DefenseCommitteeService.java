@@ -62,7 +62,6 @@ public class DefenseCommitteeService {
                 .description(normalize(request.getDescription()))
                 .status(DefenseCommitteeStatusConstain.DRAFT)
                 .defensePeriod(period)
-                .academicYear(period.getAcademicYear())
                 .createdBy(currentUser())
                 .build();
         return committeeMapper.toResponse(committeeRepository.save(committee));

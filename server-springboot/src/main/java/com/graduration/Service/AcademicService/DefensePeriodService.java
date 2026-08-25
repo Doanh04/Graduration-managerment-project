@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,44 +42,40 @@ public class DefensePeriodService {
 
         DefensePeriodEntity defensePeriod = defensePeriodMapper.toDefensePeriodEntity(request);
         defensePeriod.setAcademicYear(academicYear);
-        applyFinishedStatus(defensePeriod);
         return defensePeriodMapper.toDefensePeriodResponse(defensePeriodRepository.save(defensePeriod));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")
     @Transactional
     public DefensePeriodResponse getDefensePeriod(Long defensePeriodId) {
         DefensePeriodEntity defensePeriod = findDefensePeriod(defensePeriodId);
-        updateFinishedStatusIfNecessary(defensePeriod);
         return defensePeriodMapper.toDefensePeriodResponse(defensePeriod);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")
     @Transactional
     public List<DefensePeriodResponse> getAllDefensePeriods() {
         return getAllDefensePeriods(0, PaginationSupport.DEFAULT_SIZE);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")
     @Transactional
     public List<DefensePeriodResponse> getAllDefensePeriods(Integer page, Integer size) {
-        finishExpiredPeriods();
         return defensePeriodRepository.findAllByOrderByStartDateDesc(PaginationSupport.pageRequest(page, size)).stream()
                 .map(defensePeriodMapper::toDefensePeriodResponse)
                 .toList();
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")
     @Transactional
     public com.graduration.DTO.Response.PageResponse<DefensePeriodResponse> getAllDefensePeriodsPage(
             Integer page, Integer size) {
-        finishExpiredPeriods();
         return com.graduration.DTO.Response.PageResponse.from(
                 defensePeriodRepository.findAllByOrderByStartDateDesc(PaginationSupport.pageRequest(page, size)),
                 defensePeriodMapper::toDefensePeriodResponse);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")
     @Transactional
     public List<DefensePeriodResponse> getDefensePeriodsByAcademicYear(Integer academicId) {
         return getDefensePeriodsByAcademicYear(academicId, 0, PaginationSupport.DEFAULT_SIZE);
@@ -90,7 +85,6 @@ public class DefensePeriodService {
     @Transactional
     public List<DefensePeriodResponse> getDefensePeriodsByAcademicYear(Integer academicId, Integer page, Integer size) {
         findAcademicYear(academicId);
-        finishExpiredPeriods();
         return defensePeriodRepository
                 .findAllByAcademicYear_AcademicIdOrderByStartDateDesc(
                         academicId, PaginationSupport.pageRequest(page, size))
@@ -109,7 +103,6 @@ public class DefensePeriodService {
 
         defensePeriodMapper.updateDefensePeriod(request, defensePeriod);
         defensePeriod.setAcademicYear(academicYear);
-        applyFinishedStatus(defensePeriod);
         return defensePeriodMapper.toDefensePeriodResponse(defensePeriodRepository.save(defensePeriod));
     }
 
@@ -124,25 +117,9 @@ public class DefensePeriodService {
         defensePeriodRepository.delete(defensePeriod);
     }
 
-    @Scheduled(fixedDelayString = "${academic.defense-period.status-check-ms:60000}")
     @Transactional
     public int finishExpiredPeriods() {
         return defensePeriodRepository.markExpiredPeriodsFinished(LocalDate.now(clock), DefensePeriodConstain.FINISHED);
-    }
-
-    private void updateFinishedStatusIfNecessary(DefensePeriodEntity defensePeriod) {
-        if (applyFinishedStatus(defensePeriod)) {
-            defensePeriodRepository.save(defensePeriod);
-        }
-    }
-
-    private boolean applyFinishedStatus(DefensePeriodEntity defensePeriod) {
-        if (defensePeriod.getEndDate().isBefore(LocalDate.now(clock))
-                && defensePeriod.getStatus() != DefensePeriodConstain.FINISHED) {
-            defensePeriod.setStatus(DefensePeriodConstain.FINISHED);
-            return true;
-        }
-        return false;
     }
 
     private DefensePeriodEntity findDefensePeriod(Long defensePeriodId) {

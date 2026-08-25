@@ -94,8 +94,7 @@ public class AcademicYearService {
     @Transactional
     public void deleteAcademicYear(Integer academicId) {
         AcademicYearEntity academicYear = findAcademicYear(academicId);
-        if (!academicYear.getDefensePeriod().isEmpty()
-                || !academicYear.getDefenseCommittees().isEmpty()) {
+        if (!academicYear.getDefensePeriod().isEmpty()) {
             throw new AppException(ErrorCode.ACADEMIC_YEAR_IN_USE);
         }
         academicYearRepository.delete(academicYear);

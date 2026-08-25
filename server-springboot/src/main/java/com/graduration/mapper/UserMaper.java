@@ -57,6 +57,8 @@ public interface UserMaper {
     @Mapping(source = "student.email", target = "email")
     @Mapping(source = "student.classEntity.classId", target = "classId")
     @Mapping(source = "student.classEntity.classCode", target = "classCode")
+    @Mapping(source = "student.team.idTeam", target = "teamId")
+    @Mapping(source = "student.team.nameTeam", target = "teamName")
     @Mapping(source = "user.roles", target = "roles")
     @Mapping(source = "user.roles", target = "permissions")
     RegisterStudentResponse toStudentResponse(UserEntity user, StudentEntity student);
@@ -91,7 +93,6 @@ public interface UserMaper {
     @Mapping(source = "phone", target = "phoneLecture")
     @Mapping(target = "lectureId", ignore = true)
     @Mapping(target = "user", ignore = true)
-    @Mapping(target = "comment", ignore = true)
     @Mapping(target = "topicSuperVisor", ignore = true)
     @Mapping(target = "score", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
@@ -116,7 +117,6 @@ public interface UserMaper {
     @Mapping(source = "phone", target = "phoneLecture")
     @Mapping(target = "lectureId", ignore = true)
     @Mapping(target = "user", ignore = true)
-    @Mapping(target = "comment", ignore = true)
     @Mapping(target = "topicSuperVisor", ignore = true)
     @Mapping(target = "score", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
@@ -135,6 +135,7 @@ public interface UserMaper {
     @Mapping(source = "user.status", target = "status")
     @Mapping(source = "user.roles", target = "roles")
     @Mapping(source = "user.roles", target = "permissions")
+    @Mapping(source = "lecturer.lectureId", target = "lectureId")
     RegisterLectureResponse toLectureResponse(UserEntity user, LectureEntity lecturer);
 
     default Set<PermissionConstain> toPermissionIds(Set<Roles> roles) {

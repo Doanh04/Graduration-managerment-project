@@ -28,7 +28,7 @@ public class CommentControler {
     public ApiResponse<SubmissionCommentResponse> addComment(
             @PathVariable Long submissionId, @Valid @RequestBody SubmissionCommentRequest request) {
         return ApiResponse.<SubmissionCommentResponse>builder()
-                .message("Comment added successfully")
+                .message("Đã thêm nhận xét thành công")
                 .result(commentService.addComment(submissionId, request.getComment()))
                 .build();
     }
@@ -47,7 +47,7 @@ public class CommentControler {
     public ApiResponse<SubmissionCommentResponse> updateComment(
             @PathVariable Long commentId, @Valid @RequestBody SubmissionCommentRequest request) {
         return ApiResponse.<SubmissionCommentResponse>builder()
-                .message("Comment updated successfully")
+                .message("Đã cập nhật nhận xét thành công")
                 .result(commentService.updateComment(commentId, request.getComment()))
                 .build();
     }
@@ -55,8 +55,6 @@ public class CommentControler {
     @DeleteMapping("/submission-comments/{commentId}")
     public ApiResponse<Void> deleteComment(@PathVariable Long commentId) {
         commentService.deleteComment(commentId);
-        return ApiResponse.<Void>builder()
-                .message("Comment deleted successfully")
-                .build();
+        return ApiResponse.<Void>builder().message("Đã xóa nhận xét thành công").build();
     }
 }

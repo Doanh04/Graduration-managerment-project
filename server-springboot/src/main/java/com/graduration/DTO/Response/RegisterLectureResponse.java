@@ -16,6 +16,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RegisterLectureResponse {
+    String lectureId;
     String userId;
     String userName;
     String lecturerCode;

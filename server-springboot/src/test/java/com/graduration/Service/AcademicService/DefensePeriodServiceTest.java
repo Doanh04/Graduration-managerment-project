@@ -63,7 +63,7 @@ class DefensePeriodServiceTest {
     }
 
     @Test
-    void createDefensePeriod_forcesFinishedWhenEndDatePassed() {
+    void createDefensePeriod_preservesRequestedStatusWhenEndDatePassed() {
         DefensePeriodRequest request = validRequest();
         request.setStartDate(LocalDate.now().minusDays(10));
         request.setEndDate(LocalDate.now().minusDays(1));
@@ -76,7 +76,7 @@ class DefensePeriodServiceTest {
 
         defensePeriodService.createDefensePeriod(request);
 
-        assertEquals(DefensePeriodConstain.FINISHED, entity.getStatus());
+        assertEquals(DefensePeriodConstain.ONGOING, entity.getStatus());
     }
 
     @Test
@@ -107,22 +107,20 @@ class DefensePeriodServiceTest {
     }
 
     @Test
-    void getDefensePeriod_updatesExpiredStatusBeforeReturning() {
+    void getDefensePeriod_preservesManuallyManagedStatus() {
         DefensePeriodEntity entity = entity(LocalDate.now().minusDays(1), DefensePeriodConstain.ONGOING);
         when(defensePeriodRepository.findById(10L)).thenReturn(Optional.of(entity));
         when(defensePeriodMapper.toDefensePeriodResponse(entity)).thenReturn(response());
 
         defensePeriodService.getDefensePeriod(10L);
 
-        assertEquals(DefensePeriodConstain.FINISHED, entity.getStatus());
-        verify(defensePeriodRepository).save(entity);
+        assertEquals(DefensePeriodConstain.ONGOING, entity.getStatus());
+        verify(defensePeriodRepository, never()).save(entity);
     }
 
     @Test
-    void getAllDefensePeriods_finishesExpiredRowsThenMapsResults() {
+    void getAllDefensePeriods_preservesStatusesAndMapsResults() {
         DefensePeriodEntity entity = entity(LocalDate.now().plusDays(1), DefensePeriodConstain.ONGOING);
-        when(defensePeriodRepository.markExpiredPeriodsFinished(any(), eqFinished()))
-                .thenReturn(2);
         when(defensePeriodRepository.findAllByOrderByStartDateDesc(any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(entity)));
         when(defensePeriodMapper.toDefensePeriodResponse(entity)).thenReturn(response());
@@ -130,7 +128,7 @@ class DefensePeriodServiceTest {
         List<DefensePeriodResponse> result = defensePeriodService.getAllDefensePeriods();
 
         assertEquals(1, result.size());
-        verify(defensePeriodRepository).markExpiredPeriodsFinished(any(LocalDate.class), eqFinished());
+        verify(defensePeriodRepository, never()).markExpiredPeriodsFinished(any(LocalDate.class), eqFinished());
     }
 
     @Test
@@ -173,7 +171,7 @@ class DefensePeriodServiceTest {
     }
 
     @Test
-    void scheduledJob_marksAllExpiredPeriodsFinished() {
+    void explicitFinishExpiredPeriods_marksAllExpiredPeriodsFinished() {
         when(defensePeriodRepository.markExpiredPeriodsFinished(any(), eqFinished()))
                 .thenReturn(3);
 

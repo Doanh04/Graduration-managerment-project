@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import PageLoadingSkeleton from './feedback/PageLoadingSkeleton.jsx';
 
 /**
  * Route Guard bảo vệ các route nội bộ:
@@ -14,14 +15,7 @@ export default function ProtectedRoute({ children, allowedAccountTypes = [], all
 
   // Đang kiểm tra phiên làm việc (khi F5 / tải lại trang)
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 text-slate-700 font-sans">
-        <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-white shadow-xl border border-slate-100">
-          <div className="w-10 h-10 border-4 border-cyan-200 border-t-cyan-600 rounded-full animate-spin"></div>
-          <p className="text-sm font-semibold text-slate-600">Đang xác thực phiên làm việc...</p>
-        </div>
-      </div>
-    );
+    return <PageLoadingSkeleton fullScreen message="Đang xác thực phiên làm việc..." />;
   }
 
   // Chưa đăng nhập -> Chuyển hướng tới trang Đăng nhập

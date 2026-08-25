@@ -1,6 +1,7 @@
 package com.graduration.Service.DerpatmentService;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,11 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.Configuration.PaginationSupport;
+import com.graduration.Constain.TopicRegistrationStatusConstain;
 import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.DTO.Request.TeamRequest;
 import com.graduration.DTO.Response.TeamResponse;
 import com.graduration.Repository.StudentRepository;
 import com.graduration.Repository.TeamRepository;
+import com.graduration.Repository.TopicRegistrationRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.entity.StudentEntity;
 import com.graduration.entity.TeamEntity;
@@ -44,6 +47,7 @@ public class TeamService {
     TeamRepository teamRepository;
     StudentRepository studentRepository;
     TopicRepository topicRepository;
+    TopicRegistrationRepository topicRegistrationRepository;
     TeamMapper teamMapper;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -55,14 +59,34 @@ public class TeamService {
         }
 
         TeamEntity team = teamMapper.toTeamEntity(request);
-        team.setTopic(resolveTopicForCreate(request.getTopicId()));
-        return teamMapper.toTeamResponse(teamRepository.save(team));
+        TopicEntity selectedTopic = resolveTopicForCreate(request.getTopicId());
+        team.setTopic(selectedTopic);
+        TeamEntity savedTeam = teamRepository.save(team);
+        if (selectedTopic != null) {
+            selectedTopic.setTeam(savedTeam);
+            selectedTopic.setStatus(TopicStatusConstain.REGISTERED);
+            topicRepository.save(selectedTopic);
+        }
+        return teamMapper.toTeamResponse(savedTeam);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional(readOnly = true)
     public TeamResponse getTeam(Long teamId) {
         return teamMapper.toTeamResponse(findTeam(teamId));
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_STUDENT')")
+    @Transactional(readOnly = true)
+    public TeamResponse getMyTeam() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return teamRepository
+                .findByStudentEntities_UserEntity_UserId(authentication.getName())
+                .map(teamMapper::toTeamResponse)
+                .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
@@ -101,12 +125,14 @@ public class TeamService {
         }
 
         TopicEntity selectedTopic = resolveTopicForUpdate(team, request.getTopicId());
+        TopicEntity previousTopic = team.getTopic();
         teamMapper.updateTeam(request, team);
         team.setTopic(selectedTopic);
+        synchronizeTopicAssignment(team, previousTopic, selectedTopic);
         return teamMapper.toTeamResponse(teamRepository.save(team));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_STUDENT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     public TeamResponse selectTopic(Long teamId, Long topicId) {
         TeamEntity team = findTeam(teamId);
@@ -131,6 +157,7 @@ public class TeamService {
         team.setTopic(topic);
         topic.setTeam(team);
         topic.setStatus(TopicStatusConstain.REGISTERED);
+        cancelPendingRegistrations(team);
         topicRepository.save(topic);
         return teamMapper.toTeamResponse(teamRepository.save(team));
     }
@@ -275,6 +302,35 @@ public class TeamService {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
         return resolveApprovedTopic(topicId);
+    }
+
+    private void synchronizeTopicAssignment(TeamEntity team, TopicEntity previousTopic, TopicEntity selectedTopic) {
+        if (previousTopic != null && previousTopic != selectedTopic) {
+            previousTopic.setTeam(null);
+            previousTopic.setStatus(TopicStatusConstain.APPROVED);
+            topicRepository.save(previousTopic);
+        }
+        if (selectedTopic != null && selectedTopic != previousTopic) {
+            selectedTopic.setTeam(team);
+            selectedTopic.setStatus(TopicStatusConstain.REGISTERED);
+            topicRepository.save(selectedTopic);
+            cancelPendingRegistrations(team);
+        }
+    }
+
+    private void cancelPendingRegistrations(TeamEntity team) {
+        var pendingRegistrations = topicRegistrationRepository.findByTeam_IdTeamAndStatus(
+                team.getIdTeam(), TopicRegistrationStatusConstain.PENDING);
+        if (pendingRegistrations.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        pendingRegistrations.forEach(registration -> {
+            registration.setStatus(TopicRegistrationStatusConstain.CANCELLED);
+            registration.setReviewedAt(now);
+            registration.setRejectionReason("Nhóm đã được gán đề tài khác");
+        });
+        topicRegistrationRepository.saveAll(pendingRegistrations);
     }
 
     private TopicEntity resolveTopicForUpdate(TeamEntity team, Long topicId) {

@@ -14,11 +14,9 @@ import com.graduration.Constain.SupervisorAssignmentStatusConstain;
 import com.graduration.DTO.Response.PageResponse;
 import com.graduration.DTO.Response.SubmissionCommentResponse;
 import com.graduration.Repository.CommentRepository;
-import com.graduration.Repository.LectureRepository;
 import com.graduration.Repository.SubmissionRepository;
 import com.graduration.Repository.UserRepository;
 import com.graduration.entity.CommentEntity;
-import com.graduration.entity.LectureEntity;
 import com.graduration.entity.SubmistionEntity;
 import com.graduration.entity.TeamEntity;
 import com.graduration.entity.UserEntity;
@@ -37,7 +35,6 @@ public class CommentService {
     CommentRepository commentRepository;
     SubmissionRepository submissionRepository;
     UserRepository userRepository;
-    LectureRepository lectureRepository;
     SubmissionMapper submissionMapper;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
@@ -95,13 +92,10 @@ public class CommentService {
 
     private CommentEntity createComment(SubmistionEntity submission, String content, CommentTypeConstain commentType) {
         UserEntity author = currentUser();
-        LectureEntity lecturer =
-                lectureRepository.findByUser_UserId(author.getUserId()).orElse(null);
         return commentRepository.save(CommentEntity.builder()
                 .content(content.trim())
                 .commentType(commentType)
                 .submistion(submission)
-                .lecture(lecturer)
                 .createdBy(author)
                 .edited(false)
                 .build());

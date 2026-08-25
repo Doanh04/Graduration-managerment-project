@@ -44,13 +44,9 @@ public class LectureEntity {
 
     @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    List<CommentEntity> comment = new ArrayList<>();
-
-    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     List<TopicSuperVisorEntity> topicSuperVisor = new ArrayList<>();
 
-    @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "lecture")
     @Builder.Default
     List<ScoreEntity> score = new ArrayList<>();
 
