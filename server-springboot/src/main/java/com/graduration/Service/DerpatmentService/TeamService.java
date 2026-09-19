@@ -1,6 +1,7 @@
 package com.graduration.Service.DerpatmentService;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,18 +21,23 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.Configuration.PaginationSupport;
+import com.graduration.Constain.TopicRegistrationStatusConstain;
 import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.DTO.Request.TeamRequest;
 import com.graduration.DTO.Response.TeamResponse;
+import com.graduration.Repository.DefensePeriodRepository;
 import com.graduration.Repository.StudentRepository;
 import com.graduration.Repository.TeamRepository;
+import com.graduration.Repository.TopicRegistrationRepository;
 import com.graduration.Repository.TopicRepository;
+import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.StudentEntity;
 import com.graduration.entity.TeamEntity;
 import com.graduration.entity.TopicEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
 import com.graduration.mapper.TeamMapper;
+import com.graduration.Service.GradurationService.GraduationEnrollmentService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -43,36 +49,87 @@ import lombok.experimental.FieldDefaults;
 public class TeamService {
     TeamRepository teamRepository;
     StudentRepository studentRepository;
+    DefensePeriodRepository defensePeriodRepository;
     TopicRepository topicRepository;
+    TopicRegistrationRepository topicRegistrationRepository;
     TeamMapper teamMapper;
+    GraduationEnrollmentService graduationEnrollmentService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm createTeam: Nhận dữ liệu đầu vào của createTeam, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản
+    // ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
     public TeamResponse createTeam(TeamRequest request) {
         normalizeRequest(request);
-        if (teamRepository.existsByNameTeamIgnoreCase(request.getNameTeam())) {
+        DefensePeriodEntity defensePeriod = findActiveDefensePeriod(request.getDefensePeriodId());
+        if (teamRepository.existsByNameAndDefensePeriod(request.getNameTeam(), defensePeriod.getID_Defense())) {
             throw new AppException(ErrorCode.TEAM_ALREADY_EXISTS);
         }
 
         TeamEntity team = teamMapper.toTeamEntity(request);
-        team.setTopic(resolveTopicForCreate(request.getTopicId()));
-        return teamMapper.toTeamResponse(teamRepository.save(team));
+        team.setDefensePeriod(defensePeriod);
+        TopicEntity selectedTopic = resolveTopicForCreate(request.getTopicId(), defensePeriod);
+        team.setTopic(selectedTopic);
+        TeamEntity savedTeam = teamRepository.save(team);
+        if (selectedTopic != null) {
+            selectedTopic.setTeam(savedTeam);
+            selectedTopic.setStatus(TopicStatusConstain.APPROVED);
+            topicRepository.save(selectedTopic);
+            graduationEnrollmentService.autoEnrollStudents(
+                    savedTeam.getStudentEntities(), defensePeriod, "Tự động ghi danh khi nhóm được gán đề tài");
+        }
+        return teamMapper.toTeamResponse(savedTeam);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional(readOnly = true)
+    // Hàm getTeam: Nhận mã hoặc điều kiện tìm kiếm của getTeam, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi không
+    // tồn tại và trả về dữ liệu đã ánh xạ.
     public TeamResponse getTeam(Long teamId) {
         return teamMapper.toTeamResponse(findTeam(teamId));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_STUDENT')")
+    @Transactional(readOnly = true)
+    // Hàm getMyTeam: Nhận các tham số lọc/phân trang của getMyTeam, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
+    public TeamResponse getMyTeam() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return teamRepository
+                .findFirstByStudentEntities_UserEntity_UserIdOrderByDefensePeriod_EndDateDesc(authentication.getName())
+                .map(teamMapper::toTeamResponse)
+                .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_STUDENT')")
+    @Transactional(readOnly = true)
+    public List<TeamResponse> getMyTeams() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return teamRepository
+                .findAllByStudentEntities_UserEntity_UserIdOrderByDefensePeriod_EndDateDesc(authentication.getName())
+                .stream()
+                .map(teamMapper::toTeamResponse)
+                .toList();
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional(readOnly = true)
+    // Hàm getAllTeams: Nhận các tham số lọc/phân trang của getAllTeams, truy vấn dữ liệu phù hợp từ repository, ánh xạ
+    // từng entity sang DTO và trả về cho giao diện.
     public List<TeamResponse> getAllTeams() {
         return getAllTeams(0, PaginationSupport.DEFAULT_SIZE);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional(readOnly = true)
+    // Hàm getAllTeams: Nhận các tham số lọc/phân trang của getAllTeams, truy vấn dữ liệu phù hợp từ repository, ánh xạ
+    // từng entity sang DTO và trả về cho giao diện.
     public List<TeamResponse> getAllTeams(Integer page, Integer size) {
         return teamRepository.findAllByOrderByIdTeamAsc(PaginationSupport.pageRequest(page, size)).stream()
                 .map(teamMapper::toTeamResponse)
@@ -81,18 +138,32 @@ public class TeamService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional(readOnly = true)
+    // Hàm getAllTeamsPage: Nhận các tham số lọc/phân trang của getAllTeamsPage, truy vấn dữ liệu phù hợp từ repository,
+    // ánh xạ từng entity sang DTO và trả về cho giao diện.
     public com.graduration.DTO.Response.PageResponse<TeamResponse> getAllTeamsPage(Integer page, Integer size) {
+        return getAllTeamsPage(page, size, null);
+    }
+
+    public com.graduration.DTO.Response.PageResponse<TeamResponse> getAllTeamsPage(
+            Integer page, Integer size, Long defensePeriodId) {
         return com.graduration.DTO.Response.PageResponse.from(
-                teamRepository.findAllByOrderByIdTeamAsc(PaginationSupport.pageRequest(page, size)),
+                defensePeriodId == null
+                        ? teamRepository.findAllByOrderByIdTeamAsc(PaginationSupport.pageRequest(page, size))
+                        : teamRepository.findAllByDefensePeriodId(
+                                defensePeriodId, PaginationSupport.pageRequest(page, size)),
                 teamMapper::toTeamResponse);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm updateTeam: Nhận mã bản ghi cùng dữ liệu cập nhật của updateTeam, tải bản ghi hiện có, kiểm tra trạng thái và
+    // ràng buộc rồi ghi các giá trị mới xuống repository.
     public TeamResponse updateTeam(Long teamId, TeamRequest request) {
         TeamEntity team = findTeam(teamId);
         normalizeRequest(request);
-        if (teamRepository.existsByNameTeamIgnoreCaseAndIdTeamNot(request.getNameTeam(), teamId)) {
+        DefensePeriodEntity defensePeriod = resolveDefensePeriodForUpdate(team, request.getDefensePeriodId());
+        if (teamRepository.existsByNameAndDefensePeriodAndIdNot(
+                request.getNameTeam(), defensePeriod.getID_Defense(), teamId)) {
             throw new AppException(ErrorCode.TEAM_ALREADY_EXISTS);
         }
         if (request.getTopicId() != null
@@ -100,14 +171,19 @@ public class TeamService {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
 
+        team.setDefensePeriod(defensePeriod);
         TopicEntity selectedTopic = resolveTopicForUpdate(team, request.getTopicId());
+        TopicEntity previousTopic = team.getTopic();
         teamMapper.updateTeam(request, team);
         team.setTopic(selectedTopic);
+        synchronizeTopicAssignment(team, previousTopic, selectedTopic);
         return teamMapper.toTeamResponse(teamRepository.save(team));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_STUDENT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm selectTopic: Nhận teamId và topicId; kiểm tra nhóm chưa có đề tài, đề tài đã APPROVED và chưa được nhóm khác
+    // dùng, sau đó liên kết hai entity và hủy các đăng ký chờ của nhóm.
     public TeamResponse selectTopic(Long teamId, Long topicId) {
         TeamEntity team = findTeam(teamId);
         requireTeamMemberOrManager(team);
@@ -130,16 +206,23 @@ public class TeamService {
 
         team.setTopic(topic);
         topic.setTeam(team);
-        topic.setStatus(TopicStatusConstain.REGISTERED);
+        topic.setStatus(TopicStatusConstain.APPROVED);
+        graduationEnrollmentService.autoEnrollStudents(
+                team.getStudentEntities(), team.getDefensePeriod(), "Tự động ghi danh khi nhóm được gán đề tài");
+        cancelPendingRegistrations(team);
         topicRepository.save(topic);
         return teamMapper.toTeamResponse(teamRepository.save(team));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm deleteTeam: Nhận mã bản ghi của deleteTeam, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc
+    // chuyển bản ghi sang trạng thái tương ứng.
     public void deleteTeam(Long teamId) {
         TeamEntity team = findTeam(teamId);
-        team.getStudentEntities().forEach(student -> student.setTeam(null));
+        team.getStudentEntities().forEach(student -> {
+            student.getTeamMemberships().remove(team);
+        });
         studentRepository.saveAll(team.getStudentEntities());
         team.getStudentEntities().clear();
         if (team.getTopic() != null) {
@@ -150,6 +233,8 @@ public class TeamService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm addStudent: Nhận teamId và mã sinh viên; tìm nhóm/sinh viên, kiểm tra sinh viên chưa thuộc nhóm khác, gắn
+    // quan hệ và lưu hồ sơ sinh viên.
     public TeamResponse addStudent(Long teamId, String studentCode) {
         TeamEntity team = findTeam(teamId);
         StudentEntity student = findStudentByCode(studentCode);
@@ -160,6 +245,8 @@ public class TeamService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm addStudents: Nhận teamId và tập mã sinh viên; loại mã trùng, kiểm tra từng sinh viên chưa thuộc nhóm khác,
+    // gắn các sinh viên hợp lệ và lưu hàng loạt.
     public TeamResponse addStudents(Long teamId, Set<String> studentCodes) {
         if (studentCodes == null
                 || studentCodes.isEmpty()
@@ -181,13 +268,16 @@ public class TeamService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm removeStudent: Nhận mã bản ghi của removeStudent, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc
+    // chuyển bản ghi sang trạng thái tương ứng.
     public TeamResponse removeStudent(Long teamId, String studentCode) {
         TeamEntity team = findTeam(teamId);
         StudentEntity student = findStudentByCode(studentCode);
-        if (student.getTeam() == null || !teamId.equals(student.getTeam().getIdTeam())) {
+        if (team.getStudentEntities().stream()
+                .noneMatch(member -> member.getIdStudent().equals(student.getIdStudent()))) {
             throw new AppException(ErrorCode.INVALID_KEY);
         }
-        student.setTeam(null);
+        student.getTeamMemberships().remove(team);
         team.getStudentEntities()
                 .removeIf(member -> student.getStudentCode().equalsIgnoreCase(member.getStudentCode()));
         studentRepository.save(student);
@@ -196,6 +286,8 @@ public class TeamService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm importStudents: Nhận tệp hoặc dòng dữ liệu đầu vào của importStudents, đọc các ô, kiểm tra định dạng và lỗi
+    // nghiệp vụ rồi tạo danh sách dữ liệu hợp lệ để lưu.
     public ImportTeamStudentsResponse importStudents(Long teamId, MultipartFile file) {
         validateExcelFile(file);
         TeamEntity team = findTeam(teamId);
@@ -236,6 +328,8 @@ public class TeamService {
                 totalRows, importedStudents.size(), errors.size(), importedStudents, errors);
     }
 
+    // Hàm findTeam: Nhận mã hoặc điều kiện tìm kiếm của findTeam, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi không
+    // tồn tại và trả về dữ liệu đã ánh xạ.
     private TeamEntity findTeam(Long teamId) {
         if (teamId == null) {
             throw new AppException(ErrorCode.TEAM_NOT_FOUND);
@@ -245,6 +339,8 @@ public class TeamService {
                 .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
     }
 
+    // Hàm findStudentByCode: Nhận mã hoặc điều kiện tìm kiếm của findStudentByCode, truy vấn bản ghi/quan hệ tương ứng,
+    // báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private StudentEntity findStudentByCode(String studentCode) {
         if (isBlank(studentCode)) {
             throw new AppException(ErrorCode.USER_NOT_FOUND);
@@ -254,29 +350,73 @@ public class TeamService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Hàm attachStudent: Nhận TeamEntity và StudentEntity; từ chối sinh viên đang ở nhóm khác, còn nếu chưa có nhóm thì
+    // thêm sinh viên vào cả quan hệ team và entity.
     private void attachStudent(TeamEntity team, StudentEntity student) {
         validateStudentAssignment(team, student);
-        if (student.getTeam() != null) {
+        if (team.getStudentEntities().stream()
+                .anyMatch(member -> member.getIdStudent().equals(student.getIdStudent()))) {
             return;
         }
-        student.setTeam(team);
         team.getStudentEntities().add(student);
+        student.getTeamMemberships().add(team);
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateStudentAssignment(TeamEntity team, StudentEntity student) {
-        if (student.getTeam() != null
-                && !team.getIdTeam().equals(student.getTeam().getIdTeam())) {
+        DefensePeriodEntity defensePeriod = requireDefensePeriod(team);
+        if (teamRepository.existsStudentInAnotherTeamOfDefensePeriod(
+                student.getIdStudent(), defensePeriod.getID_Defense(), team.getIdTeam())) {
             throw new AppException(ErrorCode.STUDENT_ALREADY_IN_TEAM);
         }
     }
 
-    private TopicEntity resolveTopicForCreate(Long topicId) {
+    // Hàm resolveTopicForCreate: Nhận topicId khi tạo nhóm; kiểm tra đề tài chưa gắn cho nhóm nào rồi lấy đề tài đã
+    // APPROVED để gán vào nhóm mới.
+    private TopicEntity resolveTopicForCreate(Long topicId, DefensePeriodEntity defensePeriod) {
         if (topicId != null && teamRepository.existsByTopic_IdTopic(topicId)) {
             throw new AppException(ErrorCode.TOPIC_ALREADY_ASSIGNED);
         }
-        return resolveApprovedTopic(topicId);
+        return resolveApprovedTopic(topicId, defensePeriod);
     }
 
+    // Hàm synchronizeTopicAssignment: Nhận nhóm cùng đề tài cũ/mới; gỡ liên kết và khôi phục đề tài cũ, gắn đề tài mới
+    // ở trạng thái APPROVED và hủy đăng ký chờ của nhóm.
+    private void synchronizeTopicAssignment(TeamEntity team, TopicEntity previousTopic, TopicEntity selectedTopic) {
+        if (previousTopic != null && previousTopic != selectedTopic) {
+            previousTopic.setTeam(null);
+            previousTopic.setStatus(TopicStatusConstain.APPROVED);
+            topicRepository.save(previousTopic);
+        }
+        if (selectedTopic != null && selectedTopic != previousTopic) {
+            selectedTopic.setTeam(team);
+            selectedTopic.setStatus(TopicStatusConstain.APPROVED);
+            topicRepository.save(selectedTopic);
+            cancelPendingRegistrations(team);
+            graduationEnrollmentService.autoEnrollStudents(
+                    team.getStudentEntities(), team.getDefensePeriod(), "Tự động ghi danh khi nhóm được gán đề tài");
+        }
+    }
+
+    // Hàm cancelPendingRegistrations: Nhận TeamEntity; tìm các đăng ký đề tài PENDING của nhóm, chuyển chúng sang
+    // CANCELLED, ghi thời điểm/lý do và lưu hàng loạt.
+    private void cancelPendingRegistrations(TeamEntity team) {
+        var pendingRegistrations = topicRegistrationRepository.findByTeam_IdTeamAndStatus(
+                team.getIdTeam(), TopicRegistrationStatusConstain.PENDING);
+        if (pendingRegistrations.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        pendingRegistrations.forEach(registration -> {
+            registration.setStatus(TopicRegistrationStatusConstain.CANCELLED);
+            registration.setReviewedAt(now);
+            registration.setRejectionReason("Nhóm đã được gán đề tài khác");
+        });
+        topicRegistrationRepository.saveAll(pendingRegistrations);
+    }
+
+    // Hàm resolveTopicForUpdate: Nhận nhóm hiện tại và topicId mới; trả null khi bỏ chọn, giữ đề tài đang gắn nếu không
+    // đổi, hoặc tải đề tài APPROVED mới để cập nhật.
     private TopicEntity resolveTopicForUpdate(TeamEntity team, Long topicId) {
         if (topicId == null) {
             return null;
@@ -284,17 +424,27 @@ public class TeamService {
         if (team.getTopic() != null && topicId.equals(team.getTopic().getIdTopic())) {
             return team.getTopic();
         }
-        return resolveApprovedTopic(topicId);
+        return resolveApprovedTopic(topicId, team.getDefensePeriod());
     }
 
-    private TopicEntity resolveApprovedTopic(Long topicId) {
+    // Hàm resolveApprovedTopic: Nhận topicId; tải đề tài qua resolveTopic và chỉ trả về khi trạng thái APPROVED, nếu
+    // khác thì báo đề tài chưa sẵn sàng.
+    private TopicEntity resolveApprovedTopic(Long topicId, DefensePeriodEntity defensePeriod) {
         TopicEntity topic = resolveTopic(topicId);
         if (topic != null && topic.getStatus() != TopicStatusConstain.APPROVED) {
             throw new AppException(ErrorCode.TOPIC_NOT_AVAILABLE);
         }
+        if (topic != null
+                && !defensePeriod
+                        .getID_Defense()
+                        .equals(topic.getDefensePeriod().getID_Defense())) {
+            throw new AppException(ErrorCode.SUBMISSION_PERIOD_MISMATCH);
+        }
         return topic;
     }
 
+    // Hàm resolveTopic: Nhận topicId tùy chọn; trả null khi không truyền mã, ngược lại truy vấn TopicEntity và báo lỗi
+    // nếu không tồn tại.
     private TopicEntity resolveTopic(Long topicId) {
         if (topicId == null) {
             return null;
@@ -302,6 +452,7 @@ public class TeamService {
         return topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireTeamMemberOrManager(TeamEntity team) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -320,6 +471,8 @@ public class TeamService {
         }
     }
 
+    // Hàm normalizeRequest: Nhận TeamRequest; bắt buộc tên nhóm, trim tên nhóm và chuyển mô tả/vai trò trống thành null
+    // trước khi tạo hoặc cập nhật nhóm.
     private void normalizeRequest(TeamRequest request) {
         if (request == null || isBlank(request.getNameTeam())) {
             throw new AppException(ErrorCode.TEAM_NAME_NOT_BLANK);
@@ -329,14 +482,51 @@ public class TeamService {
         request.setRole(normalize(request.getRole()));
     }
 
+    private DefensePeriodEntity findActiveDefensePeriod(Long defensePeriodId) {
+        if (defensePeriodId == null) throw new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND);
+        DefensePeriodEntity period = defensePeriodRepository
+                .findById(defensePeriodId)
+                .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND));
+        if (period.getStatus() == com.graduration.Constain.DefensePeriodConstain.FINISHED) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
+        }
+        return period;
+    }
+
+    private DefensePeriodEntity requireDefensePeriod(TeamEntity team) {
+        if (team.getDefensePeriod() == null) {
+            throw new AppException(ErrorCode.TEAM_DEFENSE_PERIOD_REQUIRED);
+        }
+        return team.getDefensePeriod();
+    }
+
+    private DefensePeriodEntity resolveDefensePeriodForUpdate(TeamEntity team, Long requestedPeriodId) {
+        if (team.getDefensePeriod() == null) {
+            if (requestedPeriodId == null) {
+                throw new AppException(ErrorCode.TEAM_DEFENSE_PERIOD_REQUIRED);
+            }
+            return findActiveDefensePeriod(requestedPeriodId);
+        }
+        if (requestedPeriodId != null
+                && !requestedPeriodId.equals(team.getDefensePeriod().getID_Defense())) {
+            throw new AppException(ErrorCode.TEAM_DEFENSE_PERIOD_IMMUTABLE);
+        }
+        return team.getDefensePeriod();
+    }
+
+    // Hàm normalize: Nhận chuỗi tùy chọn từ request hoặc bộ lọc; trả về null khi giá trị null/rỗng, còn lại cắt khoảng
+    // trắng đầu/cuối để dữ liệu lưu và so sánh nhất quán.
     private String normalize(String value) {
         return isBlank(value) ? null : value.trim();
     }
 
+    // Hàm isBlank: Nhận chuỗi cần kiểm tra; trả về true khi chuỗi null hoặc chỉ gồm khoảng trắng, giúp các hàm nghiệp
+    // vụ xử lý trường bắt buộc thống nhất.
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateExcelFile(MultipartFile file) {
         if (file == null
                 || file.isEmpty()
@@ -346,6 +536,7 @@ public class TeamService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateExcelHeader(Row header, DataFormatter formatter) {
         if (header == null
                 || !"studentCode"
@@ -355,6 +546,8 @@ public class TeamService {
         }
     }
 
+    // Hàm cellValue: Nhận ô Excel trong tệp thành viên nhóm; chuyển nội dung ô về chuỗi đã định dạng để tìm mã sinh
+    // viên và gắn vào nhóm.
     private String cellValue(Row row, int column, DataFormatter formatter) {
         if (row == null) {
             return null;
@@ -362,6 +555,8 @@ public class TeamService {
         return normalize(formatter.formatCellValue(row.getCell(column)));
     }
 
+    // Hàm ImportTeamStudentsResponse: Đóng gói tổng số dòng thành viên nhóm, số dòng thành công/thất bại, sinh viên đã
+    // thêm và lỗi import để trả về client.
     public record ImportTeamStudentsResponse(
             int totalRows,
             int successRows,
@@ -369,5 +564,7 @@ public class TeamService {
             List<TeamResponse.StudentSummary> importedStudents,
             List<ImportTeamStudentError> errors) {}
 
+    // Hàm ImportTeamStudentError: Đóng gói số dòng, mã sinh viên và thông báo lỗi của dòng Excel thành viên nhóm không
+    // thể xử lý.
     public record ImportTeamStudentError(int row, String studentCode, String message) {}
 }

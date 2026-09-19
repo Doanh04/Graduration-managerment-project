@@ -22,5 +22,11 @@ public class UpdateStudentRequest {
 
     String email;
     String phone;
+
+    /** Mã lớp dùng để tra cứu lớp học khi cập nhật hồ sơ sinh viên. */
+    String classCode;
+
+    /** Trường cũ chỉ được dùng để tương thích với client chưa nâng cấp. */
+    @Deprecated
     Long classId;
 }

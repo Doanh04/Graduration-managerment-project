@@ -18,6 +18,9 @@ public class TeamResponse {
     String description;
     LocalDate joinDate;
     String role;
+    Long defensePeriodId;
+    String defensePeriodName;
+    String academicYear;
     Long topicId;
     String topicTitle;
     String topicDescription;

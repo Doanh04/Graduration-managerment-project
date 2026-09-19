@@ -26,13 +26,15 @@ public class DefenseCommitteeMapper {
                                 ? null
                                 : entity.getDefensePeriod().getPeriodName())
                 .academicYearId(
-                        entity.getAcademicYear() == null
+                        entity.getDefensePeriod() == null
+                                        || entity.getDefensePeriod().getAcademicYear() == null
                                 ? null
-                                : entity.getAcademicYear().getAcademicId())
+                                : entity.getDefensePeriod().getAcademicYear().getAcademicId())
                 .academicYear(
-                        entity.getAcademicYear() == null
+                        entity.getDefensePeriod() == null
+                                        || entity.getDefensePeriod().getAcademicYear() == null
                                 ? null
-                                : entity.getAcademicYear().getAcademicYear())
+                                : entity.getDefensePeriod().getAcademicYear().getAcademicYear())
                 .activeMemberCount(activeMembers)
                 .scheduleCount(entity.getDefenseSchedules().size())
                 .createdAt(entity.getCreatedAt())

@@ -56,6 +56,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm assign: Nhận dữ liệu đầu vào của assign, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản ghi
+    // nghiệp vụ rồi lưu repository để trả kết quả cho API.
     public ReviewAssignmentResponse assign(Long topicId, AssignReviewRequest request) {
         TopicEntity topic = findEligibleTopic(topicId);
         LectureEntity lecture = lectureRepository
@@ -94,6 +96,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getByTopic: Nhận các tham số lọc/phân trang của getByTopic, truy vấn dữ liệu phù hợp từ repository, ánh xạ
+    // từng entity sang DTO và trả về cho giao diện.
     public PageResponse<ReviewAssignmentResponse> getByTopic(
             Long topicId, ReviewAssignmentStatusConstain status, Integer page, Integer size) {
         if (!topicRepository.existsById(topicId)) {
@@ -106,6 +110,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getByLecturer: Nhận các tham số lọc/phân trang của getByLecturer, truy vấn dữ liệu phù hợp từ repository, ánh
+    // xạ từng entity sang DTO và trả về cho giao diện.
     public PageResponse<ReviewAssignmentResponse> getByLecturer(
             String lectureId, ReviewAssignmentStatusConstain status, Integer page, Integer size) {
         if (!lectureRepository.existsById(lectureId)) {
@@ -116,6 +122,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getMine: Nhận các tham số lọc/phân trang của getMine, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public PageResponse<ReviewAssignmentResponse> getMine(
             ReviewAssignmentStatusConstain status, Integer page, Integer size) {
         LectureEntity lecture = currentLecturer();
@@ -124,6 +132,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm start: Nhận mã bản ghi và thông tin thao tác của start, kiểm tra trạng thái hiện tại cùng quyền thực hiện,
+    // cập nhật trạng thái/lý do và lưu thay đổi.
     public ReviewAssignmentResponse start(Long assignmentId) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
         requireOwnerOrManager(assignment);
@@ -134,6 +144,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm submit: Nhận assignmentId và SubmitReviewRequest; kiểm tra người phụ trách, trạng thái, nhận xét và
+    // recommendation, ghi thời điểm gửi rồi chuyển assignment sang SUBMITTED.
     public ReviewAssignmentResponse submit(Long assignmentId, SubmitReviewRequest request) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
         requireOwnerOrManager(assignment);
@@ -159,6 +171,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm approve: Nhận mã bản ghi và thông tin thao tác của approve, kiểm tra trạng thái hiện tại cùng quyền thực
+    // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public ReviewAssignmentResponse approve(Long assignmentId) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
         requireStatus(assignment, ReviewAssignmentStatusConstain.SUBMITTED);
@@ -173,6 +187,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm requestRevision: Nhận assignment và yêu cầu chỉnh sửa; kiểm tra người sở hữu cùng trạng thái, lưu ghi chú/lý
+    // do yêu cầu bổ sung và chuyển assignment về trạng thái cần xử lý lại.
     public ReviewAssignmentResponse requestRevision(Long assignmentId) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
         requireStatus(assignment, ReviewAssignmentStatusConstain.SUBMITTED);
@@ -184,6 +200,8 @@ public class ReviewAssignmentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm cancel: Nhận mã bản ghi của cancel, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
+    // ghi sang trạng thái tương ứng.
     public ReviewAssignmentResponse cancel(Long assignmentId, CancelReviewRequest request) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
         if (assignment.getStatus() == ReviewAssignmentStatusConstain.CANCELLED
@@ -205,6 +223,8 @@ public class ReviewAssignmentService {
         return reviewMapper.toResponse(reviewRepository.save(assignment));
     }
 
+    // Hàm pageByLecturer: Nhận lectureId cùng thông tin phân trang; truy vấn các assignment phản biện của giảng viên đó
+    // và chuyển từng entity thành danh sách response phân trang.
     private PageResponse<ReviewAssignmentResponse> pageByLecturer(
             String lectureId, ReviewAssignmentStatusConstain status, Integer page, Integer size) {
         return PageResponse.from(
@@ -212,6 +232,8 @@ public class ReviewAssignmentService {
                 reviewMapper::toResponse);
     }
 
+    // Hàm findEligibleTopic: Nhận mã hoặc điều kiện tìm kiếm của findEligibleTopic, truy vấn bản ghi/quan hệ tương ứng,
+    // báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicEntity findEligibleTopic(Long topicId) {
         TopicEntity topic =
                 topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
@@ -220,13 +242,15 @@ public class ReviewAssignmentService {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         if (topic.getTeam() == null
-                || (topic.getStatus() != TopicStatusConstain.REGISTERED
+                || (topic.getStatus() != TopicStatusConstain.APPROVED
+                        && topic.getStatus() != TopicStatusConstain.REGISTERED
                         && topic.getStatus() != TopicStatusConstain.IN_PROGRESS)) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_TOPIC_NOT_ELIGIBLE);
         }
         return topic;
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireValidDeadline(TopicEntity topic, LocalDateTime deadline) {
         if (deadline == null || !deadline.isAfter(LocalDateTime.now())) {
             throw new AppException(ErrorCode.REVIEW_DEADLINE_INVALID);
@@ -243,6 +267,7 @@ public class ReviewAssignmentService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireActiveLecturer(LectureEntity lecture) {
         StatusConstain status =
                 lecture.getUser() == null ? null : lecture.getUser().getStatus();
@@ -251,6 +276,8 @@ public class ReviewAssignmentService {
         }
     }
 
+    // Hàm isActiveSupervisor: Duyệt các phân công của đề tài và chỉ chấp nhận phân công ACTIVE trùng lectureId được
+    // truyền vào để xác định giảng viên hướng dẫn hiện hành.
     private boolean isActiveSupervisor(TopicEntity topic, String lectureId) {
         return topic.getTopicSuperVisorEntities().stream()
                 .anyMatch(item -> item.getStatus() == SupervisorAssignmentStatusConstain.ACTIVE
@@ -258,12 +285,15 @@ public class ReviewAssignmentService {
                         && lectureId.equals(item.getLecture().getLectureId()));
     }
 
+    // Hàm findAssignment: Nhận mã hoặc điều kiện tìm kiếm của findAssignment, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private ReviewAssignmentEntity findAssignment(Long assignmentId) {
         return reviewRepository
                 .findById(assignmentId)
                 .orElseThrow(() -> new AppException(ErrorCode.REVIEW_ASSIGNMENT_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireOwnerOrManager(ReviewAssignmentEntity assignment) {
         if (isManager()) {
             return;
@@ -275,33 +305,44 @@ public class ReviewAssignmentService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireStatus(ReviewAssignmentEntity assignment, ReviewAssignmentStatusConstain expected) {
         if (assignment.getStatus() != expected) {
             throw new AppException(ErrorCode.REVIEW_OPERATION_NOT_ALLOWED);
         }
     }
 
+    // Hàm isManager: Kiểm tra Authentication hiện tại có quyền ROLE_ADMIN hoặc ROLE_FACULTY hay không để xác định người
+    // dùng có quyền quản lý dữ liệu.
     private boolean isManager() {
         return hasAuthority("ROLE_ADMIN") || hasAuthority("ROLE_FACULTY");
     }
 
+    // Hàm hasAuthority: Nhận tên quyền cần kiểm tra; so sánh với danh sách GrantedAuthority của tài khoản hiện tại và
+    // trả về true nếu tài khoản có quyền đó.
     private boolean hasAuthority(String authority) {
         return currentAuthentication().getAuthorities().stream()
                 .anyMatch(item -> item.getAuthority().equals(authority));
     }
 
+    // Hàm currentLecturer: Dùng userId hiện tại truy vấn hồ sơ giảng viên; nếu không có hồ sơ thì báo lỗi, còn có thì
+    // trả về LectureEntity để thực hiện nghiệp vụ.
     private LectureEntity currentLecturer() {
         return lectureRepository
                 .findByUser_UserId(currentAuthentication().getName())
                 .orElseThrow(() -> new AppException(ErrorCode.LECTURER_PROFILE_NOT_FOUND));
     }
 
+    // Hàm currentUser: Lấy userId của tài khoản đang đăng nhập từ Authentication, truy vấn UserEntity tương ứng và trả
+    // về người thực hiện để gắn vào bản ghi.
     private UserEntity currentUser() {
         return userRepository
                 .findById(currentAuthentication().getName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Hàm currentAuthentication: Đọc Authentication từ SecurityContext của request hiện tại; từ chối khi chưa đăng nhập
+    // và trả về đối tượng xác thực để lấy userId cùng quyền.
     private Authentication currentAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -310,6 +351,8 @@ public class ReviewAssignmentService {
         return authentication;
     }
 
+    // Hàm normalize: Nhận ghi chú phân công phản biện; chuyển chuỗi trống thành null và trim nội dung trước khi lưu
+    // ReviewAssignmentEntity.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

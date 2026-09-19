@@ -16,7 +16,7 @@ import com.graduration.entity.DefenseCommitteesEntity;
 @Repository
 public interface DefenseCommitteeRepository extends JpaRepository<DefenseCommitteesEntity, Long> {
     @Override
-    @EntityGraph(attributePaths = {"defensePeriod", "academicYear"})
+    @EntityGraph(attributePaths = {"defensePeriod", "defensePeriod.academicYear"})
     Optional<DefenseCommitteesEntity> findById(Long committeeId);
 
     @Query(

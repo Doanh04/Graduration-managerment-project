@@ -61,20 +61,25 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm registerLecturer: Nhận RegisterLectureRequest; chuẩn hóa/kiểm tra dữ liệu, tải role giảng viên, tạo
+    // UserEntity và LectureEntity rồi lưu hồ sơ giảng viên với sẵn quyền hướng dẫn và phản biện.
     public RegisterLectureResponse registerLecturer(RegisterLectureRequest request) {
         normalizeRequest(request);
         validateRequest(request);
         validateUniqueness(request);
 
-        Roles lecturerRole = roleRepository
+        Roles supervisorRole = roleRepository
                 .findById(RoleConstain.SUPERVISOR)
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+        Roles reviewerRole = roleRepository
+                .findById(RoleConstain.REVIEWER)
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
 
         UserEntity user = userMaper.toUserEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatus(StatusConstain.ACTIVE);
         user.setCreateAt(LocalDateTime.now());
-        user.setRoles(new HashSet<>(Set.of(lecturerRole)));
+        user.setRoles(new HashSet<>(Set.of(supervisorRole, reviewerRole)));
         user = userRepository.save(user);
 
         LectureEntity lecturer = userMaper.toLecturerEntity(request);
@@ -87,6 +92,8 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm deleteLecturerAccount: Nhận mã bản ghi của deleteLecturerAccount, kiểm tra quyền và các quan hệ đang sử dụng,
+    // sau đó xóa hoặc chuyển bản ghi sang trạng thái tương ứng.
     public void deleteLecturerAccount(String userId) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -96,6 +103,8 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm updateLecturer: Nhận mã bản ghi cùng dữ liệu cập nhật của updateLecturer, tải bản ghi hiện có, kiểm tra trạng
+    // thái và ràng buộc rồi ghi các giá trị mới xuống repository.
     public RegisterLectureResponse updateLecturer(String userId, UpdateLecturerRequest request) {
         normalizeUpdateRequest(request);
         validateUpdateRequest(request);
@@ -127,12 +136,16 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllLecturers: Nhận các tham số lọc/phân trang của getAllLecturers, truy vấn dữ liệu phù hợp từ repository,
+    // ánh xạ từng entity sang DTO và trả về cho giao diện.
     public List<RegisterLectureResponse> getAllLecturers() {
         return getAllLecturers(0, PaginationSupport.DEFAULT_SIZE);
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllLecturers: Nhận các tham số lọc/phân trang của getAllLecturers, truy vấn dữ liệu phù hợp từ repository,
+    // ánh xạ từng entity sang DTO và trả về cho giao diện.
     public List<RegisterLectureResponse> getAllLecturers(Integer page, Integer size) {
         return lectureRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(lecturer -> userMaper.toLectureResponse(lecturer.getUser(), lecturer))
@@ -141,6 +154,8 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllLecturersPage: Nhận các tham số lọc/phân trang của getAllLecturersPage, truy vấn dữ liệu phù hợp từ
+    // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public com.graduration.DTO.Response.PageResponse<RegisterLectureResponse> getAllLecturersPage(
             Integer page, Integer size) {
         return getAllLecturersPage(page, size, null);
@@ -148,6 +163,8 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllLecturersPage: Nhận các tham số lọc/phân trang của getAllLecturersPage, truy vấn dữ liệu phù hợp từ
+    // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public com.graduration.DTO.Response.PageResponse<RegisterLectureResponse> getAllLecturersPage(
             Integer page, Integer size, String keyword) {
         var pageable = PaginationSupport.pageRequest(page, size);
@@ -160,6 +177,8 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getLecturerByUserName: Nhận mã hoặc điều kiện tìm kiếm của getLecturerByUserName, truy vấn bản ghi/quan hệ
+    // tương ứng, báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public RegisterLectureResponse getLecturerByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
@@ -174,6 +193,8 @@ public class UserLecturerService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm resetPasswordByUserName: Nhận username giảng viên; tìm hồ sơ tương ứng, sinh mật khẩu tạm, mã hóa và cập nhật
+    // UserEntity rồi trả thông tin đặt lại.
     public PasswordResetResponse resetPasswordByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
@@ -194,6 +215,8 @@ public class UserLecturerService {
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    // Hàm importLecturers: Nhận tệp hoặc dòng dữ liệu đầu vào của importLecturers, đọc các ô, kiểm tra định dạng và lỗi
+    // nghiệp vụ rồi tạo danh sách dữ liệu hợp lệ để lưu.
     public ImportLectureResponse importLecturers(MultipartFile file) {
         validateExcelFile(file);
 
@@ -255,6 +278,8 @@ public class UserLecturerService {
                 .build();
     }
 
+    // Hàm ensureLecturersDoNotExist: Nhận đối tượng và điều kiện nghiệp vụ của ensureLecturersDoNotExist, đối chiếu các
+    // quan hệ/trạng thái cần thiết và trả kết quả hoặc ném lỗi khi điều kiện không đạt.
     private void ensureLecturersDoNotExist(List<PendingLecturerImport> pendingImports) {
         Set<String> userNames = new HashSet<>();
         Set<String> lecturerCodes = new HashSet<>();
@@ -276,10 +301,13 @@ public class UserLecturerService {
         }
     }
 
+    // Hàm isDuplicate: Nhận đối tượng và điều kiện nghiệp vụ của isDuplicate, đối chiếu các quan hệ/trạng thái cần
+    // thiết và trả kết quả hoặc ném lỗi khi điều kiện không đạt.
     private boolean isDuplicate(Set<String> values, String value) {
         return value != null && !values.add(value.toLowerCase(Locale.ROOT));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateRequest(RegisterLectureRequest request) {
         Set<ConstraintViolation<RegisterLectureRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
@@ -292,6 +320,7 @@ public class UserLecturerService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateUniqueness(RegisterLectureRequest request) {
         if (userRepository.existsByUserName(request.getUserName())) {
             throw new AppException(ErrorCode.USERNAME_IS_EXITED);
@@ -307,6 +336,7 @@ public class UserLecturerService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateUpdateRequest(UpdateLecturerRequest request) {
         Set<ConstraintViolation<UpdateLecturerRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
@@ -319,6 +349,7 @@ public class UserLecturerService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateUpdateUniqueness(String userId, String lecturerId, UpdateLecturerRequest request) {
         if (request.getUserName() != null
                 && userRepository.existsByUserNameAndUserIdNot(request.getUserName(), userId)) {
@@ -338,6 +369,8 @@ public class UserLecturerService {
         }
     }
 
+    // Hàm normalizeRequest: Nhận RegisterLectureRequest; trim username, mã giảng viên và họ tên, chuẩn hóa bằng
+    // cấp/email/số điện thoại tùy chọn trước khi tạo hồ sơ.
     private void normalizeRequest(RegisterLectureRequest request) {
         request.setUserName(trim(request.getUserName()));
         request.setLectureCode(trim(request.getLectureCode()));
@@ -347,6 +380,8 @@ public class UserLecturerService {
         request.setPhone(normalize(request.getPhone()));
     }
 
+    // Hàm normalizeUpdateRequest: Nhận UpdateLecturerRequest; trim username, mã giảng viên và họ tên, chuẩn hóa các
+    // trường bằng cấp/email/số điện thoại trước khi cập nhật.
     private void normalizeUpdateRequest(UpdateLecturerRequest request) {
         request.setUserName(trim(request.getUserName()));
         request.setLectureCode(trim(request.getLectureCode()));
@@ -356,14 +391,19 @@ public class UserLecturerService {
         request.setPhone(normalize(request.getPhone()));
     }
 
+    // Hàm trim: Nhận chuỗi mã hoặc tên từ request/ô Excel; giữ nguyên null và loại bỏ khoảng trắng đầu/cuối để dùng cho
+    // kiểm tra trùng và ghi cơ sở dữ liệu.
     private String trim(String value) {
         return value == null ? null : value.trim();
     }
 
+    // Hàm normalize: Nhận bằng cấp, email hoặc số điện thoại tùy chọn của giảng viên; chuyển giá trị null/rỗng thành
+    // null và trim phần có nội dung trước khi kiểm tra/lưu.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateExcelFile(MultipartFile file) {
         if (file == null
                 || file.isEmpty()
@@ -373,6 +413,7 @@ public class UserLecturerService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateExcelHeader(Row header, DataFormatter formatter) {
         String[] expectedHeaders = {"userName", "password", "lectureCode", "fullName", "degree", "email", "phone"};
 
@@ -389,6 +430,8 @@ public class UserLecturerService {
         }
     }
 
+    // Hàm readRequest: Nhận một dòng Excel giảng viên; đọc username, mã giảng viên, họ tên, bằng cấp, email và điện
+    // thoại để tạo RegisterLectureRequest.
     private RegisterLectureRequest readRequest(Row row, DataFormatter formatter) {
         return RegisterLectureRequest.builder()
                 .userName(cellValue(row, 0, formatter))
@@ -401,10 +444,14 @@ public class UserLecturerService {
                 .build();
     }
 
+    // Hàm cellValue: Nhận ô Excel danh sách giảng viên; đọc đúng kiểu dữ liệu và chuyển thành chuỗi dùng để tạo
+    // RegisterLectureRequest hoặc báo lỗi dòng.
     private String cellValue(Row row, int column, DataFormatter formatter) {
         return normalize(formatter.formatCellValue(row.getCell(column)));
     }
 
+    // Hàm isEmptyRow: Nhận một dòng Excel; kiểm tra toàn bộ ô có rỗng hoặc chỉ chứa khoảng trắng hay không để bỏ qua
+    // dòng không có dữ liệu.
     private boolean isEmptyRow(Row row, DataFormatter formatter) {
         for (int column = 0; column <= 6; column++) {
             if (!formatter.formatCellValue(row.getCell(column)).isBlank()) {
@@ -414,5 +461,7 @@ public class UserLecturerService {
         return true;
     }
 
+    // Hàm PendingLecturerImport: Đóng gói dữ liệu giảng viên đọc từ một dòng Excel trước khi kiểm tra trùng username/mã
+    // và lưu tài khoản.
     private record PendingLecturerImport(int row, RegisterLectureRequest request) {}
 }

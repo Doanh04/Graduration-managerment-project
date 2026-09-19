@@ -22,4 +22,6 @@ public interface DefenseScheduleHistoryRepository extends JpaRepository<DefenseS
     Page<DefenseScheduleHistoryEntity> findByScheduleId(@Param("scheduleId") Long scheduleId, Pageable pageable);
 
     boolean existsBySchedule_IdDefenseScheduce(Long scheduleId);
+
+    long deleteBySchedule_IdDefenseScheduce(Long scheduleId);
 }

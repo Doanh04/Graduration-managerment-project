@@ -27,6 +27,7 @@ public class DefensePeriodRequest {
     @NotNull(message = "END_DATE_NOT_BLANK")
     LocalDate endDate;
 
+    @NotBlank(message = "DEFENSE_PERIOD_PROJECT_TYPE_NOT_BLANK")
     @Size(max = 255, message = "INVALID_KEY")
     String projectType;
 

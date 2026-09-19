@@ -58,6 +58,12 @@ public class TopicEntity {
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
+    /** Nội dung tệp PDF/DOC/DOCX của đề tài được lưu trực tiếp trong database. */
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    byte[] fileData;
+
     @OneToOne(mappedBy = "topic", cascade = CascadeType.ALL)
     TeamEntity team;
 

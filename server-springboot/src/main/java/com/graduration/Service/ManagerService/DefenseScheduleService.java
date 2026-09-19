@@ -22,7 +22,9 @@ import com.graduration.Constain.DefenseScheduleConflictTypeConstain;
 import com.graduration.Constain.DefenseScheduleHistoryActionConstain;
 import com.graduration.Constain.DefenseScheduleStatusConstain;
 import com.graduration.Constain.SupervisorAssignmentStatusConstain;
+import com.graduration.Constain.SupervisorRoleConstain;
 import com.graduration.Constain.TopicStatusConstain;
+import com.graduration.DTO.Request.BulkDefenseScheduleRequest;
 import com.graduration.DTO.Request.DefenseScheduleRequest;
 import com.graduration.DTO.Request.RescheduleDefenseRequest;
 import com.graduration.DTO.Request.ScheduleReasonRequest;
@@ -32,6 +34,7 @@ import com.graduration.DTO.Response.PageResponse;
 import com.graduration.Repository.DefenseCommitteeRepository;
 import com.graduration.Repository.DefensePeriodRepository;
 import com.graduration.Repository.DefenseScheduleRepository;
+import com.graduration.Repository.LectureRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.Repository.UserRepository;
 import com.graduration.Service.ManagerService.DefenseScheduleHistoryService.Snapshot;
@@ -53,6 +56,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class DefenseScheduleService {
     DefenseScheduleRepository scheduleRepository;
+    LectureRepository lectureRepository;
     DefensePeriodRepository periodRepository;
     DefenseCommitteeRepository committeeRepository;
     TopicRepository topicRepository;
@@ -62,6 +66,8 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm create: Nhận dữ liệu đầu vào của create, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản ghi
+    // nghiệp vụ rồi lưu repository để trả kết quả cho API.
     public DefenseScheduleResponse create(Long periodId, DefenseScheduleRequest request) {
         DefensePeriodEntity period = findOpenPeriod(periodId);
         TopicEntity topic = findTopic(request.getTopicId());
@@ -83,7 +89,31 @@ public class DefenseScheduleService {
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional
+    // Hàm createBulk: Nhận dữ liệu đầu vào của createBulk, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản
+    // ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
+    public List<DefenseScheduleResponse> createBulk(Long periodId, BulkDefenseScheduleRequest request) {
+        return request.getTopicSchedules().stream()
+                .map(item -> create(
+                        periodId,
+                        DefenseScheduleRequest.builder()
+                                .topicId(item.getTopicId())
+                                .committeeId(request.getCommitteeId())
+                                .defenseDate(request.getDefenseDate())
+                                .startTime(item.getStartTime())
+                                .endTime(item.getEndTime())
+                                .room(request.getRoom())
+                                .location(request.getLocation())
+                                .session(request.getSession())
+                                .note(request.getNote())
+                                .build()))
+                .toList();
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getByPeriod: Nhận các tham số lọc/phân trang của getByPeriod, truy vấn dữ liệu phù hợp từ repository, ánh xạ
+    // từng entity sang DTO và trả về cho giao diện.
     public PageResponse<DefenseScheduleResponse> getByPeriod(
             Long periodId,
             LocalDate date,
@@ -106,14 +136,37 @@ public class DefenseScheduleService {
                 scheduleMapper::toResponse);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_SUPERVISOR', 'ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional(readOnly = true)
+    // Lấy các lịch bảo vệ chưa bị hủy mà giảng viên hiện tại được phân vào hội đồng với bất kỳ vai trò nào.
+    // Danh sách này giúp mọi thành viên hội đồng xem được hồ sơ đề tài trên trang Phản biện; quyền chấm điểm được
+    // kiểm tra riêng theo vai trò Chủ tịch ở ScoreService.
+    public PageResponse<DefenseScheduleResponse> getReviewerSchedules(Integer page, Integer size) {
+        String userId = currentAuthentication().getName();
+        String lectureId = lectureRepository
+                .findByUser_UserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.LECTURER_PROFILE_NOT_FOUND))
+                .getLectureId();
+        return PageResponse.from(
+                scheduleRepository.findByCommitteeMember(
+                        lectureId,
+                        CommitteeMemberStatusConstain.ACTIVE,
+                        DefenseScheduleStatusConstain.CANCELLED,
+                        PaginationSupport.pageRequest(page, size)),
+                scheduleMapper::toResponse);
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getById: Nhận các tham số lọc/phân trang của getById, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public DefenseScheduleResponse getById(Long scheduleId) {
         return scheduleMapper.toResponse(findSchedule(scheduleId));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     public DefenseScheduleValidationResponse validate(Long periodId, DefenseScheduleRequest request) {
         return validateInternal(
                 findOpenPeriod(periodId),
@@ -125,6 +178,8 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm update: Nhận mã bản ghi cùng dữ liệu cập nhật của update, tải bản ghi hiện có, kiểm tra trạng thái và ràng
+    // buộc rồi ghi các giá trị mới xuống repository.
     public DefenseScheduleResponse update(Long scheduleId, DefenseScheduleRequest request) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         requireStatus(schedule, DefenseScheduleStatusConstain.DRAFT);
@@ -151,6 +206,8 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm publish: Nhận mã bản ghi và thông tin thao tác của publish, kiểm tra trạng thái hiện tại cùng quyền thực
+    // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse publish(Long scheduleId) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         requireStatus(schedule, DefenseScheduleStatusConstain.DRAFT);
@@ -175,6 +232,8 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm postpone: Nhận mã bản ghi và thông tin thao tác của postpone, kiểm tra trạng thái hiện tại cùng quyền thực
+    // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse postpone(Long scheduleId, ScheduleReasonRequest request) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         if (schedule.getStatus() != DefenseScheduleStatusConstain.PUBLISHED
@@ -199,6 +258,31 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm resume: Nhận mã bản ghi và thông tin thao tác của resume, kiểm tra trạng thái hiện tại cùng quyền thực hiện,
+    // cập nhật trạng thái/lý do và lưu thay đổi.
+    public DefenseScheduleResponse resume(Long scheduleId) {
+        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        if (schedule.getStatus() != DefenseScheduleStatusConstain.POSTPONED) {
+            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
+        }
+        Snapshot before = historyService.snapshot(schedule);
+        schedule.setStatus(DefenseScheduleStatusConstain.PUBLISHED);
+        schedule.setPublishedAt(LocalDateTime.now());
+        DefenseSchedulesEntity saved = scheduleRepository.save(schedule);
+        historyService.record(
+                saved,
+                DefenseScheduleHistoryActionConstain.PUBLISHED,
+                before,
+                historyService.snapshot(saved),
+                null,
+                currentUser());
+        return scheduleMapper.toResponse(saved);
+    }
+
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional
+    // Hàm reschedule: Nhận mã lịch POSTPONED và dữ liệu lịch mới; kiểm tra lý do, đợt bảo vệ, hội đồng cùng xung đột
+    // thời gian, cập nhật lịch và chuyển về DRAFT để phát hành lại.
     public DefenseScheduleResponse reschedule(Long scheduleId, RescheduleDefenseRequest request) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         requireStatus(schedule, DefenseScheduleStatusConstain.POSTPONED);
@@ -241,6 +325,8 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm complete: Nhận mã bản ghi và thông tin thao tác của complete, kiểm tra trạng thái hiện tại cùng quyền thực
+    // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse complete(Long scheduleId) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         if (schedule.getStatus() != DefenseScheduleStatusConstain.PUBLISHED
@@ -266,6 +352,8 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm cancel: Nhận mã bản ghi của cancel, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
+    // ghi sang trạng thái tương ứng.
     public DefenseScheduleResponse cancel(Long scheduleId, ScheduleReasonRequest request) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         if (schedule.getStatus() == DefenseScheduleStatusConstain.COMPLETED
@@ -290,15 +378,20 @@ public class DefenseScheduleService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm delete: Nhận mã bản ghi của delete, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
+    // ghi sang trạng thái tương ứng.
     public void delete(Long scheduleId) {
         DefenseSchedulesEntity schedule = findSchedule(scheduleId);
         requireStatus(schedule, DefenseScheduleStatusConstain.DRAFT);
-        if (historyService.hasHistory(scheduleId)) {
-            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
-        }
+        // Lịch nháp có thể đã phát sinh bản ghi CREATED trong lịch sử; xóa lịch sử con trước
+        // rồi mới xóa lịch, không đụng tới đề tài, nhóm hay các phân công liên quan.
+        historyService.deleteHistory(scheduleId);
+        // Flush ngay để API chỉ trả thành công sau khi lịch sử và lịch đã được xóa khỏi DB.
         scheduleRepository.delete(schedule);
+        scheduleRepository.flush();
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private DefenseScheduleValidationResponse validateInternal(
             DefensePeriodEntity period,
             TopicEntity topic,
@@ -343,12 +436,22 @@ public class DefenseScheduleService {
                     "Defense date must be inside the defense period");
         }
         if (topic.getTeam() == null
-                || (topic.getStatus() != TopicStatusConstain.REGISTERED
+                || (topic.getStatus() != TopicStatusConstain.APPROVED
+                        && topic.getStatus() != TopicStatusConstain.REGISTERED
                         && topic.getStatus() != TopicStatusConstain.IN_PROGRESS)) {
             add(
                     conflicts,
                     DefenseScheduleConflictTypeConstain.TOPIC_NOT_ELIGIBLE,
-                    "Topic must have a team and be registered or in progress");
+                    "Topic must have a team and be approved, registered or in progress");
+        }
+        boolean hasActivePrimarySupervisor = topic.getTopicSuperVisorEntities().stream()
+                .anyMatch(assignment -> assignment.getStatus() == SupervisorAssignmentStatusConstain.ACTIVE
+                        && assignment.getSupervisorRole() == SupervisorRoleConstain.PRIMARY);
+        if (!hasActivePrimarySupervisor) {
+            add(
+                    conflicts,
+                    DefenseScheduleConflictTypeConstain.TOPIC_NOT_ELIGIBLE,
+                    "Topic must have an active primary supervisor before defense scheduling");
         }
         if (topic.getDefenseSchedule() != null
                 && (excludedScheduleId == null
@@ -411,6 +514,8 @@ public class DefenseScheduleService {
         return response(conflicts);
     }
 
+    // Hàm hasSupervisorReviewerConflict: Nhận đề tài, hội đồng và khoảng thời gian; đối chiếu giảng viên hướng dẫn với
+    // thành viên phản biện đang hoạt động để phát hiện trùng người trong cùng lịch.
     private boolean hasSupervisorReviewerConflict(TopicEntity topic, DefenseCommitteesEntity committee) {
         Set<String> supervisors = topic.getTopicSuperVisorEntities().stream()
                 .filter(item -> item.getStatus() == SupervisorAssignmentStatusConstain.ACTIVE)
@@ -424,6 +529,8 @@ public class DefenseScheduleService {
                         && supervisors.contains(item.getLecture().getLectureId()));
     }
 
+    // Hàm apply: Nhận entity lịch bảo vệ và request; chép ngày, giờ, phòng, địa điểm, buổi và ghi chú từ request vào
+    // entity trước khi lưu.
     private void apply(DefenseSchedulesEntity schedule, DefenseScheduleRequest request) {
         schedule.setDefenseDate(request.getDefenseDate());
         schedule.setStartTime(request.getStartTime());
@@ -434,6 +541,8 @@ public class DefenseScheduleService {
         schedule.setNote(normalize(request.getNote()));
     }
 
+    // Hàm fromEntity: Nhận entity lịch bảo vệ; chuyển các trường lịch hiện có thành request dùng để tái kiểm tra khi
+    // phát hành hoặc điều chỉnh lịch.
     private DefenseScheduleRequest fromEntity(DefenseSchedulesEntity schedule) {
         return DefenseScheduleRequest.builder()
                 .topicId(schedule.getTopic().getIdTopic())
@@ -448,12 +557,15 @@ public class DefenseScheduleService {
                 .build();
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireValid(DefenseScheduleValidationResponse validation) {
         if (!validation.isValid()) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_CONFLICT);
         }
     }
 
+    // Hàm response: Nhận danh sách Conflict phát hiện khi kiểm tra lịch; tạo DTO gồm valid, loại lỗi và thông báo để
+    // client hiển thị lý do không thể lưu.
     private DefenseScheduleValidationResponse response(List<DefenseScheduleValidationResponse.Conflict> conflicts) {
         return DefenseScheduleValidationResponse.builder()
                 .valid(conflicts.isEmpty())
@@ -461,6 +573,8 @@ public class DefenseScheduleService {
                 .build();
     }
 
+    // Hàm add: Nhận dữ liệu đầu vào của add, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản ghi nghiệp vụ
+    // rồi lưu repository để trả kết quả cho API.
     private void add(
             List<DefenseScheduleValidationResponse.Conflict> conflicts,
             DefenseScheduleConflictTypeConstain type,
@@ -471,22 +585,30 @@ public class DefenseScheduleService {
                 .build());
     }
 
+    // Hàm findSchedule: Nhận mã hoặc điều kiện tìm kiếm của findSchedule, truy vấn bản ghi/quan hệ tương ứng, báo lỗi
+    // khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private DefenseSchedulesEntity findSchedule(Long scheduleId) {
         return scheduleRepository
                 .findById(scheduleId)
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_SCHEDULE_NOT_FOUND));
     }
 
+    // Hàm findTopic: Nhận mã hoặc điều kiện tìm kiếm của findTopic, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi
+    // không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicEntity findTopic(Long topicId) {
         return topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     }
 
+    // Hàm findCommittee: Nhận mã hoặc điều kiện tìm kiếm của findCommittee, truy vấn bản ghi/quan hệ tương ứng, báo lỗi
+    // khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private DefenseCommitteesEntity findCommittee(Long committeeId) {
         return committeeRepository
                 .findById(committeeId)
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_COMMITTEE_NOT_FOUND));
     }
 
+    // Hàm findOpenPeriod: Nhận mã hoặc điều kiện tìm kiếm của findOpenPeriod, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private DefensePeriodEntity findOpenPeriod(Long periodId) {
         DefensePeriodEntity period = periodRepository
                 .findById(periodId)
@@ -497,12 +619,14 @@ public class DefenseScheduleService {
         return period;
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireStatus(DefenseSchedulesEntity schedule, DefenseScheduleStatusConstain status) {
         if (schedule.getStatus() != status) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private String requireReason(ScheduleReasonRequest request) {
         if (request == null
                 || request.getReason() == null
@@ -512,12 +636,16 @@ public class DefenseScheduleService {
         return request.getReason().trim();
     }
 
+    // Hàm currentUser: Lấy userId của tài khoản đang đăng nhập từ Authentication, truy vấn UserEntity tương ứng và trả
+    // về người thực hiện để gắn vào bản ghi.
     private UserEntity currentUser() {
         return userRepository
                 .findById(currentAuthentication().getName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Hàm currentAuthentication: Đọc Authentication từ SecurityContext của request hiện tại; từ chối khi chưa đăng nhập
+    // và trả về đối tượng xác thực để lấy userId cùng quyền.
     private Authentication currentAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -526,6 +654,8 @@ public class DefenseScheduleService {
         return authentication;
     }
 
+    // Hàm normalize: Nhận phòng hoặc ghi chú lịch bảo vệ; chuyển chuỗi trống thành null và trim nội dung trước khi lọc
+    // lịch hoặc lưu DefenseSchedulesEntity.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

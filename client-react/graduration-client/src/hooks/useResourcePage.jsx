@@ -39,7 +39,16 @@ export default function useResourcePage(endpoint, { initialSize = 10, params = {
 
   useEffect(() => { load(); }, [load]);
 
-  return { ...data, page, setPage, keyword, setKeyword, loading, error, reload: load };
+  const removeItem = useCallback((predicate) => {
+    setData((current) => {
+      const content = current.content.filter((item) => !predicate(item));
+      const totalElements = Math.max(0, current.totalElements - (content.length < current.content.length ? 1 : 0));
+      const totalPages = totalElements === 0 ? 0 : Math.ceil(totalElements / initialSize);
+      return { ...current, content, totalElements, totalPages, first: page === 0, last: totalPages === 0 || page >= totalPages - 1 };
+    });
+  }, [initialSize, page]);
+
+  return { ...data, page, setPage, keyword, setKeyword, loading, error, reload: load, removeItem };
 }
 
 function valueAt(source, key) { return key.split('.').reduce((value, part) => value?.[part], source); }

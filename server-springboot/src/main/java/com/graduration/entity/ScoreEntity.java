@@ -2,8 +2,6 @@ package com.graduration.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 import jakarta.persistence.*;
 
@@ -24,8 +22,8 @@ import lombok.experimental.FieldDefaults;
         name = "score",
         uniqueConstraints =
                 @UniqueConstraint(
-                        name = "uk_score_student_topic",
-                        columnNames = {"id_student", "id_topic"}))
+                        name = "uk_score_student_topic_lecturer_type",
+                        columnNames = {"id_student", "id_topic", "lecture_id", "score_type"}))
 public class ScoreEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -52,33 +50,17 @@ public class ScoreEntity {
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lecture_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "lecture_id", nullable = false)
     LectureEntity lecture;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    UserEntity createdBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_team")
-    TeamEntity team;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_student")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_student", nullable = false)
     StudentEntity student;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_topic")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_topic", nullable = false)
     TopicEntity topic;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "criterion_id")
-    ScoreCriterionEntity criterion;
-
-    @OneToMany(mappedBy = "score", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    List<ScoreDetailEntity> details = new ArrayList<>();
 
     @Column(name = "submitted_at")
     LocalDateTime submittedAt;

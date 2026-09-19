@@ -41,19 +41,23 @@ class MajorServiceTest {
     @Test
     void createMajor_normalizesMapsAndSavesMajor() {
         MajorRequest request = MajorRequest.builder()
+                .majorCode("  IT  ")
                 .majorName("  Information Technology  ")
                 .description("  Software and systems  ")
                 .build();
         MajorEntity mappedMajor = MajorEntity.builder()
+                .majorCode("IT")
                 .majorName("Information Technology")
                 .description("Software and systems")
                 .build();
         MajorEntity savedMajor = MajorEntity.builder()
                 .majorId(1L)
+                .majorCode("IT")
                 .majorName("Information Technology")
                 .description("Software and systems")
                 .build();
         MajorResponse expected = MajorResponse.builder()
+                .majorCode("IT")
                 .majorName("Information Technology")
                 .description("Software and systems")
                 .build();
@@ -65,6 +69,7 @@ class MajorServiceTest {
         MajorResponse actual = majorService.createMajor(request);
 
         assertSame(expected, actual);
+        assertEquals("IT", request.getMajorCode());
         assertEquals("Information Technology", request.getMajorName());
         assertEquals("Software and systems", request.getDescription());
         verify(majorRepository).save(mappedMajor);
@@ -73,6 +78,7 @@ class MajorServiceTest {
     @Test
     void createMajor_convertsBlankDescriptionToNull() {
         MajorRequest request = MajorRequest.builder()
+                .majorCode("CS")
                 .majorName("Computer Science")
                 .description("   ")
                 .build();
@@ -88,7 +94,8 @@ class MajorServiceTest {
 
     @Test
     void createMajor_rejectsBlankMajorName() {
-        MajorRequest request = MajorRequest.builder().majorName("   ").build();
+        MajorRequest request =
+                MajorRequest.builder().majorCode("CS").majorName("   ").build();
 
         AppException exception = assertThrows(AppException.class, () -> majorService.createMajor(request));
 
@@ -98,8 +105,10 @@ class MajorServiceTest {
 
     @Test
     void createMajor_rejectsDuplicateNameIgnoringCase() {
-        MajorRequest request =
-                MajorRequest.builder().majorName("computer science").build();
+        MajorRequest request = MajorRequest.builder()
+                .majorCode("CS")
+                .majorName("computer science")
+                .build();
         when(majorRepository.existsByMajorNameIgnoreCase("computer science")).thenReturn(true);
 
         AppException exception = assertThrows(AppException.class, () -> majorService.createMajor(request));
@@ -165,6 +174,7 @@ class MajorServiceTest {
     @Test
     void updateMajor_updatesFieldsAndPreservesEntityIdentity() {
         MajorRequest request = MajorRequest.builder()
+                .majorCode("  DS  ")
                 .majorName("  Data Science  ")
                 .description("  Analytics  ")
                 .build();
@@ -174,6 +184,7 @@ class MajorServiceTest {
                 .description("Old description")
                 .build();
         MajorEntity mapped = MajorEntity.builder()
+                .majorCode("DS")
                 .majorName("Data Science")
                 .description("Analytics")
                 .build();
@@ -192,6 +203,7 @@ class MajorServiceTest {
 
         assertSame(expected, actual);
         assertEquals(1L, existing.getMajorId());
+        assertEquals("DS", existing.getMajorCode());
         assertEquals("Data Science", existing.getMajorName());
         assertEquals("Analytics", existing.getDescription());
         verify(majorRepository).save(existing);
@@ -199,7 +211,8 @@ class MajorServiceTest {
 
     @Test
     void updateMajor_rejectsNameOwnedByAnotherMajor() {
-        MajorRequest request = MajorRequest.builder().majorName("Business").build();
+        MajorRequest request =
+                MajorRequest.builder().majorCode("BUS").majorName("Business").build();
         MajorEntity current =
                 MajorEntity.builder().majorId(1L).majorName("Computer Science").build();
         when(majorRepository.findById(1L)).thenReturn(Optional.of(current));

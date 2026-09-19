@@ -6,8 +6,10 @@ import java.time.LocalTime;
 import java.util.List;
 
 import com.graduration.Constain.CommitteeMemberRoleConstain;
+import com.graduration.Constain.DefenseCommitteeStatusConstain;
 import com.graduration.Constain.DefenseScheduleStatusConstain;
 import com.graduration.Constain.DefenseSessionConstain;
+import com.graduration.Constain.EnrollmentStatusConstain;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -21,6 +23,9 @@ import lombok.experimental.FieldDefaults;
 public class DefenseScheduleResponse {
     Long scheduleId;
     Long defensePeriodId;
+    String defensePeriodName;
+    String academicYear;
+    String projectType;
     LocalDate defenseDate;
     LocalTime startTime;
     LocalTime endTime;
@@ -31,11 +36,21 @@ public class DefenseScheduleResponse {
     String note;
     Long topicId;
     String topicTitle;
+    String topicDescription;
+    String topicObjective;
+    String topicTechnology;
+    String topicFileName;
+    String topicFileContentType;
+    Long topicFileSize;
     Long teamId;
     String teamName;
+    String teamDescription;
+    Long submissionId;
     List<StudentSummary> students;
     Long committeeId;
     String committeeName;
+    String committeeDescription;
+    DefenseCommitteeStatusConstain committeeStatus;
     List<MemberSummary> committeeMembers;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
@@ -55,6 +70,10 @@ public class DefenseScheduleResponse {
         String studentId;
         String studentCode;
         String fullName;
+        String email;
+        String phone;
+        EnrollmentStatusConstain enrollmentStatus;
+        boolean defenseEligible;
     }
 
     @Getter
@@ -66,6 +85,8 @@ public class DefenseScheduleResponse {
         String lectureId;
         String lectureCode;
         String lectureName;
+        String email;
+        String degree;
         CommitteeMemberRoleConstain role;
     }
 }

@@ -2,6 +2,8 @@ package com.graduration.DTO.Response;
 
 import java.time.LocalDate;
 
+import com.graduration.Constain.TemplateTypeConstain;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -14,6 +16,11 @@ public class TemplateResponse {
     Integer templateId;
     String templateName;
     String description;
-    String filePath;
+    TemplateTypeConstain templateType;
+    String fileName;
+    String contentType;
+    Long fileSize;
+    String uploadedByUserId;
+    String uploadedByUsername;
     LocalDate createAt;
 }

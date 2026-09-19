@@ -31,14 +31,8 @@ public class SubmistionEntity {
     @Column(name = "ID_Submission")
     Long IdSubmission;
 
-    @Column(name = "File_Path", nullable = false) // đường dẫn lưu trữ file trên hệ thống
-    String filePath;
-
     @Column(name = "File_Name", nullable = false) // Tên file
     String fileName;
-
-    @Column(name = "stored_file_name")
-    String storedFileName;
 
     @Column(name = "content_type")
     String contentType;
@@ -48,6 +42,11 @@ public class SubmistionEntity {
 
     @Column(name = "checksum")
     String checksum;
+
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "LONGBLOB", nullable = false)
+    byte[] fileData;
 
     @Column(name = "Is_Late", nullable = false) // xacs định nộp muộn không
     Boolean isLate;

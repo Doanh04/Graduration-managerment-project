@@ -6,6 +6,7 @@ mvnw
 mvnw.cmd
 node_modules/
 .env.*
+!.env.example
 *.log
 dist/
 package-lock.json

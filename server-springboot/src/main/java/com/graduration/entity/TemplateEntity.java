@@ -22,8 +22,8 @@ import lombok.experimental.FieldDefaults;
         name = "template",
         uniqueConstraints =
                 @UniqueConstraint(
-                        name = "uk_template_name_version_period",
-                        columnNames = {"template_name", "version", "id_defense"}))
+                        name = "uk_template_name_version",
+                        columnNames = {"template_name", "version"}))
 public class TemplateEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -36,9 +36,6 @@ public class TemplateEntity {
     @Lob
     @Column(name = "description", columnDefinition = "TEXT")
     String description;
-
-    @Column(name = "file_path")
-    String filePath;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "template_type")
@@ -60,13 +57,15 @@ public class TemplateEntity {
     @Column(name = "file_size")
     Long fileSize;
 
+    /** Nội dung nhị phân của tệp biểu mẫu, lưu trực tiếp trong database thay vì lưu trên filesystem. */
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    byte[] fileData;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by")
     UserEntity uploadedBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_defense")
-    DefensePeriodEntity defensePeriod;
 
     @Column(name = "create_at")
     LocalDate createAt;
@@ -81,6 +80,7 @@ public class TemplateEntity {
         updatedAt = now;
         version = version == null ? 1 : version;
         status = status == null ? TemplateStatusConstain.ACTIVE : status;
+        templateType = templateType == null ? TemplateTypeConstain.OTHER : templateType;
     }
 
     @PreUpdate

@@ -2,6 +2,8 @@ package com.graduration.DTO.Request;
 
 import jakarta.validation.constraints.NotBlank;
 
+import com.graduration.Constain.TemplateTypeConstain;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -15,5 +17,7 @@ public class TemplateRequest {
     String templateName;
 
     String description;
-    String filePath;
+
+    /** Phân loại biểu mẫu để tra cứu và hiển thị đúng mục đích sử dụng. */
+    TemplateTypeConstain templateType;
 }

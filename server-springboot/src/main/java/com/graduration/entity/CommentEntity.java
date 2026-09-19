@@ -48,10 +48,6 @@ public class CommentEntity {
     SubmistionEntity submistion;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lecture_id")
-    LectureEntity lecture;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     UserEntity createdBy;
 

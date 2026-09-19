@@ -19,6 +19,14 @@ import lombok.RequiredArgsConstructor;
 public class TopicSupervisorControler {
     private final TopicSupervisorService topicSupervisorService;
 
+    @GetMapping("/topic-supervisors")
+    public ApiResponse<PageResponse<TopicSupervisorResponse>> getAll(
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return ApiResponse.<PageResponse<TopicSupervisorResponse>>builder()
+                .result(topicSupervisorService.getAll(page, size))
+                .build();
+    }
+
     @PostMapping("/topics/{topicId}/supervisors")
     public ApiResponse<TopicSupervisorResponse> assign(
             @PathVariable Long topicId, @Valid @RequestBody AssignTopicSupervisorRequest request) {

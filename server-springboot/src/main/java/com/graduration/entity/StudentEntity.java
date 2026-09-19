@@ -45,9 +45,10 @@ public class StudentEntity {
     @JoinColumn(name = "class_id")
     ClassEntity classEntity;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_team")
-    TeamEntity team;
+    /** Nhóm theo từng đợt bảo vệ. */
+    @ManyToMany(mappedBy = "studentEntities")
+    @Builder.Default
+    List<TeamEntity> teamMemberships = new ArrayList<>();
 
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

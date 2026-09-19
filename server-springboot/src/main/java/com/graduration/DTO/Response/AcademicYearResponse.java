@@ -22,9 +22,6 @@ public class AcademicYearResponse {
     @Builder.Default
     List<DefensePeriodSummary> defensePeriods = new ArrayList<>();
 
-    @Builder.Default
-    List<DefenseCommitteeSummary> defenseCommittees = new ArrayList<>();
-
     @Data
     @Builder
     @NoArgsConstructor
@@ -37,15 +34,7 @@ public class AcademicYearResponse {
         LocalDate endDate;
         String projectType;
         DefensePeriodConstain status;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class DefenseCommitteeSummary {
-        Long committeeId;
-        String committeeName;
+        int topicCount;
+        int milestoneCount;
     }
 }

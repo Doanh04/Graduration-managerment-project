@@ -90,7 +90,7 @@ class TeamControlerTest {
 
     @Test
     void getAllTeams_returnsTeamList() throws Exception {
-        when(teamService.getAllTeamsPage(null, null))
+        when(teamService.getAllTeamsPage(null, null, null))
                 .thenReturn(com.graduration.DTO.Response.PageResponse.of(List.of(response())));
 
         mockMvc.perform(get("/team/get-all-team"))

@@ -9,5 +9,9 @@ import com.graduration.entity.MajorEntity;
 public interface MajorRepository extends JpaRepository<MajorEntity, Long> {
     boolean existsByMajorNameIgnoreCase(String majorName);
 
+    boolean existsByMajorCodeIgnoreCase(String majorCode);
+
     boolean existsByMajorNameIgnoreCaseAndMajorIdNot(String majorName, Long majorId);
+
+    boolean existsByMajorCodeIgnoreCaseAndMajorIdNot(String majorCode, Long majorId);
 }

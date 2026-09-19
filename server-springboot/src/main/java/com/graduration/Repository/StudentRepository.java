@@ -21,9 +21,44 @@ public interface StudentRepository extends JpaRepository<StudentEntity, String> 
 			""")
     Page<StudentEntity> searchByNameOrCode(@Param("keyword") String keyword, Pageable pageable);
 
+    @Query(
+            """
+			select distinct student from StudentEntity student
+			left join student.graduationEnrollments enrollment
+			left join enrollment.defensePeriod period
+			where (:keyword is null or :keyword = ''
+				or lower(student.fullNameStudent) like lower(concat('%', :keyword, '%'))
+				or lower(student.studentCode) like lower(concat('%', :keyword, '%')))
+			and (:academicYearId is null or period.academicYear.academicId = :academicYearId)
+			and (:defensePeriodId is null or period.ID_Defense = :defensePeriodId)
+			and (:classCode is null or lower(student.classEntity.classCode) = lower(:classCode))
+			""")
+    Page<StudentEntity> searchByKeywordAndAcademicYearAndDefensePeriod(
+            @Param("keyword") String keyword,
+            @Param("academicYearId") Integer academicYearId,
+            @Param("defensePeriodId") Long defensePeriodId,
+            @Param("classCode") String classCode,
+            Pageable pageable);
+
     Optional<StudentEntity> findByStudentCodeIgnoreCase(String studentCode);
 
     Optional<StudentEntity> findByUserEntity_UserId(String userId);
+
+    /** Tìm hồ sơ sinh viên theo username tài khoản, dùng để hiển thị người đề xuất ở các bản ghi cũ. */
+    Optional<StudentEntity> findByUserEntity_UserName(String userName);
+
+    /** Tra cứu tên sinh viên theo user, mã hồ sơ hoặc mã sinh viên được lưu trong đề xuất. */
+    @Query(
+            """
+			select student.fullNameStudent
+			from StudentEntity student
+			left join student.userEntity user
+			where student.idStudent = :identifier
+			or lower(student.studentCode) = lower(:identifier)
+			or user.userId = :identifier
+			or lower(user.userName) = lower(:identifier)
+			""")
+    Optional<String> findDisplayNameByAnyIdentifier(@Param("identifier") String identifier);
 
     boolean existsByStudentCodeIgnoreCase(String studentCode);
 
@@ -48,6 +83,21 @@ public interface StudentRepository extends JpaRepository<StudentEntity, String> 
 			order by student.fullNameStudent, student.studentCode
 			""")
     List<StudentEntity> findForExportByCreatedAt(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(
+            """
+			select student from StudentEntity student
+			where exists (
+				select enrollment.enrollmentId
+				from GraduationEnrollmentEntity enrollment
+				where enrollment.student.idStudent = student.idStudent
+				and enrollment.defensePeriod.academicYear.academicId = :academicYearId
+				and enrollment.defensePeriod.ID_Defense = :defensePeriodId
+			)
+			order by student.fullNameStudent, student.studentCode
+			""")
+    List<StudentEntity> findForExportByAcademicYearAndDefensePeriod(
+            @Param("academicYearId") Integer academicYearId, @Param("defensePeriodId") Long defensePeriodId);
 
     @Query(
             """

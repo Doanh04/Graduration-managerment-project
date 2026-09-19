@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, BookOpen, CalendarClock, CheckCircle2, Clock3, FileCheck2, LoaderCircle, TrendingUp, Users } from 'lucide-react';
 import ResourceService from '../../services/ResourceService.jsx';
+import { formatDateTimeDisplay } from '../../utils/dateFormat.js';
 
 const sectionCopy = {
   admin: ['Tổng quan học kỳ đồ án', 'Theo dõi tiến độ toàn khoa và xử lý các công việc quan trọng.'],
@@ -71,6 +72,6 @@ export default function DashboardPage({ section }) {
 }
 
 function formatStatus(value) { return value ? value.replaceAll('_', ' ') : '—'; }
-function formatDate(value) { if (!value) return 'Chưa đặt hạn'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(date); }
+function formatDate(value) { return value ? formatDateTimeDisplay(value) : 'Chưa đặt hạn'; }
 function deadlineText(value) { if (!value) return 'Chưa có deadline'; const diff = new Date(value).getTime() - Date.now(); const days = Math.ceil(diff / 86400000); return days < 0 ? `Đã quá hạn ${Math.abs(days)} ngày` : `Còn ${days} ngày · ${formatDate(value)}`; }
 async function countRecordsByYear(source, year) { const records = await ResourceService.getAll(source.endpoint, source.params); return records.filter((record) => { const rawDate = record?.[source.yearField]; if (!rawDate) return false; const parsed = new Date(rawDate); return !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === year; }).length; }

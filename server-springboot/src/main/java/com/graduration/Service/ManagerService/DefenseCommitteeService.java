@@ -50,6 +50,8 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm create: Nhận dữ liệu đầu vào của create, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản ghi
+    // nghiệp vụ rồi lưu repository để trả kết quả cho API.
     public DefenseCommitteeResponse create(Long defensePeriodId, DefenseCommitteeRequest request) {
         DefensePeriodEntity period = findOpenPeriod(defensePeriodId);
         validateRequest(request);
@@ -62,7 +64,6 @@ public class DefenseCommitteeService {
                 .description(normalize(request.getDescription()))
                 .status(DefenseCommitteeStatusConstain.DRAFT)
                 .defensePeriod(period)
-                .academicYear(period.getAcademicYear())
                 .createdBy(currentUser())
                 .build();
         return committeeMapper.toResponse(committeeRepository.save(committee));
@@ -70,6 +71,8 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm getByDefensePeriod: Nhận các tham số lọc/phân trang của getByDefensePeriod, truy vấn dữ liệu phù hợp từ
+    // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public PageResponse<DefenseCommitteeResponse> getByDefensePeriod(
             Long defensePeriodId, DefenseCommitteeStatusConstain status, String keyword, Integer page, Integer size) {
         if (!defensePeriodRepository.existsById(defensePeriodId)) {
@@ -83,12 +86,16 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm getById: Nhận các tham số lọc/phân trang của getById, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public DefenseCommitteeResponse getById(Long committeeId) {
         return committeeMapper.toResponse(findCommittee(committeeId));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm update: Nhận mã bản ghi cùng dữ liệu cập nhật của update, tải bản ghi hiện có, kiểm tra trạng thái và ràng
+    // buộc rồi ghi các giá trị mới xuống repository.
     public DefenseCommitteeResponse update(Long committeeId, DefenseCommitteeRequest request) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
         requireStatus(committee, DefenseCommitteeStatusConstain.DRAFT);
@@ -106,12 +113,15 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     public DefenseCommitteeValidationResponse validate(Long committeeId) {
         return buildValidation(findCommittee(committeeId));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm activate: Nhận mã hội đồng; kiểm tra hội đồng đang ở bản nháp, đợt bảo vệ còn mở và thành viên đạt điều kiện,
+    // sau đó chuyển trạng thái sang ACTIVE và lưu thời điểm kích hoạt.
     public DefenseCommitteeResponse activate(Long committeeId) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
         requireStatus(committee, DefenseCommitteeStatusConstain.DRAFT);
@@ -128,6 +138,8 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm moveToDraft: Nhận mã hội đồng ACTIVE; kiểm tra chưa có lịch sử dụng, sau đó chuyển hội đồng về DRAFT để chỉnh
+    // sửa và xóa thời điểm kích hoạt.
     public DefenseCommitteeResponse moveToDraft(Long committeeId) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
         requireStatus(committee, DefenseCommitteeStatusConstain.ACTIVE);
@@ -139,6 +151,8 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm deactivate: Nhận mã đối tượng cùng lý do vô hiệu hóa; kiểm tra trạng thái hiện tại và ràng buộc đang sử dụng,
+    // ghi lý do, đổi sang INACTIVE rồi lưu.
     public DefenseCommitteeResponse deactivate(Long committeeId, DeactivateDefenseCommitteeRequest request) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
         if (committee.getStatus() == DefenseCommitteeStatusConstain.INACTIVE) {
@@ -157,6 +171,8 @@ public class DefenseCommitteeService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm delete: Nhận mã bản ghi của delete, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
+    // ghi sang trạng thái tương ứng.
     public void delete(Long committeeId) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
         requireStatus(committee, DefenseCommitteeStatusConstain.DRAFT);
@@ -167,6 +183,8 @@ public class DefenseCommitteeService {
         committeeRepository.delete(committee);
     }
 
+    // Hàm buildValidation: Nhận hội đồng và danh sách thành viên; đếm chủ tịch, thư ký, phản biện, kiểm tra số lượng
+    // tối thiểu và trạng thái giảng viên để tạo kết quả hợp lệ cùng danh sách lỗi.
     private DefenseCommitteeValidationResponse buildValidation(DefenseCommitteesEntity committee) {
         List<ComitteesMemberEntity> activeMembers = committee.getComitteesMember().stream()
                 .filter(member -> member.getStatus() == CommitteeMemberStatusConstain.ACTIVE)
@@ -203,10 +221,13 @@ public class DefenseCommitteeService {
                 .build();
     }
 
+    // Hàm countRole: Nhận danh sách thành viên ACTIVE và vai trò cần đếm; lọc các thành viên có đúng vai trò đó và trả
+    // về số lượng để kiểm tra cấu hình hội đồng.
     private long countRole(List<ComitteesMemberEntity> members, CommitteeMemberRoleConstain role) {
         return members.stream().filter(member -> member.getRole() == role).count();
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireNoUsableSchedule(DefenseCommitteesEntity committee) {
         boolean inUse = committee.getDefenseSchedules().stream()
                 .anyMatch(schedule -> schedule.getStatus() != DefenseScheduleStatusConstain.CANCELLED);
@@ -215,6 +236,8 @@ public class DefenseCommitteeService {
         }
     }
 
+    // Hàm findOpenPeriod: Nhận mã hoặc điều kiện tìm kiếm của findOpenPeriod, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private DefensePeriodEntity findOpenPeriod(Long defensePeriodId) {
         DefensePeriodEntity period = defensePeriodRepository
                 .findById(defensePeriodId)
@@ -225,18 +248,22 @@ public class DefenseCommitteeService {
         return period;
     }
 
+    // Hàm findCommittee: Nhận mã hoặc điều kiện tìm kiếm của findCommittee, truy vấn bản ghi/quan hệ tương ứng, báo lỗi
+    // khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private DefenseCommitteesEntity findCommittee(Long committeeId) {
         return committeeRepository
                 .findById(committeeId)
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_COMMITTEE_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireStatus(DefenseCommitteesEntity committee, DefenseCommitteeStatusConstain expected) {
         if (committee.getStatus() != expected) {
             throw new AppException(ErrorCode.DEFENSE_COMMITTEE_OPERATION_NOT_ALLOWED);
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateRequest(DefenseCommitteeRequest request) {
         if (request == null
                 || request.getCommitteeName() == null
@@ -245,12 +272,16 @@ public class DefenseCommitteeService {
         }
     }
 
+    // Hàm currentUser: Lấy userId của tài khoản đang đăng nhập từ Authentication, truy vấn UserEntity tương ứng và trả
+    // về người thực hiện để gắn vào bản ghi.
     private UserEntity currentUser() {
         return userRepository
                 .findById(currentAuthentication().getName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Hàm currentAuthentication: Đọc Authentication từ SecurityContext của request hiện tại; từ chối khi chưa đăng nhập
+    // và trả về đối tượng xác thực để lấy userId cùng quyền.
     private Authentication currentAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -259,6 +290,8 @@ public class DefenseCommitteeService {
         return authentication;
     }
 
+    // Hàm normalize: Nhận từ khóa tìm kiếm hoặc mô tả hội đồng; chuyển chuỗi trống thành null và trim để truy vấn/lưu
+    // DefenseCommitteesEntity.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

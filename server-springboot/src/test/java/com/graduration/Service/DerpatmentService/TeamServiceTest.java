@@ -190,7 +190,7 @@ class TeamServiceTest {
         assertSame(expected, result);
         assertSame(topic, team.getTopic());
         assertSame(team, topic.getTeam());
-        assertEquals(TopicStatusConstain.REGISTERED, topic.getStatus());
+        assertEquals(TopicStatusConstain.APPROVED, topic.getStatus());
     }
 
     @Test

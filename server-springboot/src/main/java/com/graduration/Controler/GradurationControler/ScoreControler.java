@@ -39,6 +39,13 @@ public class ScoreControler {
                 .build();
     }
 
+    @GetMapping("/students/{studentId}/topics/{topicId}/score")
+    public ApiResponse<ScoreResponse> getCurrentScore(@PathVariable String studentId, @PathVariable Long topicId) {
+        return ApiResponse.<ScoreResponse>builder()
+                .result(scoreService.getCurrentScore(studentId, topicId))
+                .build();
+    }
+
     @PatchMapping("/scores/{scoreId}/submit")
     public ApiResponse<ScoreResponse> submit(@PathVariable Long scoreId) {
         return ApiResponse.<ScoreResponse>builder()
@@ -61,6 +68,12 @@ public class ScoreControler {
                 .message("Score unlocked successfully")
                 .result(scoreService.unlock(scoreId))
                 .build();
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/scores/{scoreId}")
+    public ApiResponse<Void> delete(@PathVariable Long scoreId) {
+        scoreService.delete(scoreId);
+        return ApiResponse.<Void>builder().message("Score deleted successfully").build();
     }
 
     @GetMapping("/defense-periods/{defensePeriodId}/scores")

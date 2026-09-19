@@ -45,12 +45,27 @@ public class TeamControler {
                 .build();
     }
 
+    @GetMapping("/me")
+    public ApiResponse<TeamResponse> getMyTeam() {
+        return ApiResponse.<TeamResponse>builder()
+                .result(teamService.getMyTeam())
+                .build();
+    }
+
+    @GetMapping("/my-teams")
+    public ApiResponse<java.util.List<TeamResponse>> getMyTeams() {
+        return ApiResponse.<java.util.List<TeamResponse>>builder()
+                .result(teamService.getMyTeams())
+                .build();
+    }
+
     @GetMapping("/get-all-team")
     public ApiResponse<com.graduration.DTO.Response.PageResponse<TeamResponse>> getAllTeams(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size) {
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long defensePeriodId) {
         return ApiResponse.<com.graduration.DTO.Response.PageResponse<TeamResponse>>builder()
-                .result(teamService.getAllTeamsPage(page, size))
+                .result(teamService.getAllTeamsPage(page, size, defensePeriodId))
                 .build();
     }
 

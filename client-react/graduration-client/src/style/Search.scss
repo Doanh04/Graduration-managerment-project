@@ -33,3 +33,38 @@
 .option-message { display: block; padding: 13px 10px; color: #8995a6; font-size: 9px; text-align: center; }
 .option-message.error { color: #c34234; }
 .options-caption { display: block; padding: 6px 10px 8px; color: #9aa5b3; font-size: 7px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.schedule-topic-list-field { grid-column: 1 / -1; display: grid; gap: 10px; }
+.schedule-topic-list-heading { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #44516a; }
+.schedule-topic-list-heading b { color: #ef4444; margin-left: 3px; }
+.schedule-topic-list-heading strong { color: #0098c7; }
+.schedule-topic-search { height: 42px; border: 1px solid #d8e1ed; border-radius: 10px; display: flex; align-items: center; gap: 9px; padding: 0 12px; }
+.schedule-topic-search input { border: 0 !important; padding: 0 !important; height: auto !important; outline: 0; flex: 1; font-size: 12px !important; }
+.schedule-topic-options { max-height: 190px; overflow-y: auto; border: 1px solid #dfe7f1; border-radius: 10px; padding: 6px; display: grid; gap: 4px; }
+.schedule-topic-options > button { border: 0; background: #fff; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; text-align: left; color: #26344d; }
+.schedule-topic-options > button:hover, .schedule-topic-options > button.selected { background: #eaf8fc; color: #008db8; }
+.schedule-topic-options button span { display: grid; gap: 3px; }
+.schedule-topic-options button strong { font-size: 13px; font-weight: 600; }
+.schedule-topic-options button small { color: #8491a7; font-size: 11px; }
+.schedule-topic-times { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; }
+.schedule-topic-times article { display: grid; grid-template-columns: 28px minmax(150px, 1fr) 132px 132px 34px; gap: 10px; align-items: end; border: 1px solid #dfe7f1; border-radius: 10px; padding: 10px; }
+.schedule-topic-times article > div { display: grid; gap: 3px; align-self: center; }
+.schedule-topic-times article > div strong { font-size: 13px; font-weight: 600; }
+.schedule-topic-times article small { color: #8491a7; font-size: 11px; }
+.schedule-topic-times article label { display: grid; gap: 5px; font-size: 11px; }
+.schedule-topic-times article input { height: 38px !important; padding: 0 8px !important; font-size: 12px !important; }
+.schedule-topic-times .schedule-order { align-self: center; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #eaf8fc; color: #008db8; font-weight: 700; }
+.schedule-topic-times .danger { height: 36px; border: 0; border-radius: 8px; color: #ef4444; background: #fff0ee; }
+@media (max-width: 760px) { .schedule-topic-times article { grid-template-columns: 28px 1fr 34px; } .schedule-topic-times article label { grid-column: 2 / -1; } }
+
+.table-toolbar-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.table-toolbar-actions { display: flex; gap: 8px; }
+.table-filter { display: flex; align-items: center; gap: 6px; color: #718096; font-size: 9px; font-weight: 600; }
+.table-filter select { height: 38px; min-width: 145px; padding: 0 28px 0 10px; border: 1px solid #dfe5ec; border-radius: 9px; outline: 0; color: #526176; background: #fff; font-size: 9px; }
+.table-filter select:focus { border-color: #00a3d9; box-shadow: 0 0 0 3px rgba(0,163,217,.1); }
+.date-field { position: relative; }
+.date-input-wrap { position: relative; display: flex; align-items: center; width: 100%; }
+.date-input-wrap > input[type='text'] { width: 100%; padding-right: 42px; }
+.date-picker-button { position: absolute; top: 5px; right: 5px; z-index: 1; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 7px; color: #718096; background: #f3f6f8; }
+.date-picker-button:hover { color: #0087b3; background: #eaf8fc; }
+.date-picker-native { position: absolute; width: 1px !important; height: 1px !important; padding: 0 !important; border: 0 !important; opacity: 0; pointer-events: none; }
+@media (max-width: 760px) { .table-toolbar-right { width: 100%; justify-content: stretch; } .table-filter { flex: 1 1 180px; } .table-filter select { width: 100%; min-width: 0; } .table-toolbar-actions { width: 100%; overflow: auto; } }

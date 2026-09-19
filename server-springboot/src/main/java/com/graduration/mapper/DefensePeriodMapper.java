@@ -17,8 +17,6 @@ public interface DefensePeriodMapper {
     @Mapping(target = "milesStone", ignore = true)
     @Mapping(target = "graduationEnrollments", ignore = true)
     @Mapping(target = "defenseCommittees", ignore = true)
-    @Mapping(target = "scoreCriteria", ignore = true)
-    @Mapping(target = "templates", ignore = true)
     DefensePeriodEntity toDefensePeriodEntity(DefensePeriodRequest request);
 
     @Mapping(target = "ID_Defense", ignore = true)
@@ -27,8 +25,6 @@ public interface DefensePeriodMapper {
     @Mapping(target = "milesStone", ignore = true)
     @Mapping(target = "graduationEnrollments", ignore = true)
     @Mapping(target = "defenseCommittees", ignore = true)
-    @Mapping(target = "scoreCriteria", ignore = true)
-    @Mapping(target = "templates", ignore = true)
     void updateDefensePeriod(DefensePeriodRequest request, @MappingTarget DefensePeriodEntity defensePeriod);
 
     @Mapping(source = "ID_Defense", target = "defensePeriodId")

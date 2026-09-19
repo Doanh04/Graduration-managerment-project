@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.graduration.Constain.CommitteeMemberRoleConstain;
@@ -59,4 +61,21 @@ public interface CommitteeMemberRepository extends JpaRepository<ComitteesMember
 
     long countByDefenseCommittees_IdComitteesAndRoleAndStatus(
             Long committeeId, CommitteeMemberRoleConstain role, CommitteeMemberStatusConstain status);
+
+    @Query(
+            """
+			select count(member) > 0
+			from ComitteesMemberEntity member
+			join member.defenseCommittees committee
+			join committee.defenseSchedules schedule
+			where schedule.topic.idTopic = :topicId
+			and member.lecture.lectureId = :lectureId
+			and member.role = :role
+			and member.status = :status
+			""")
+    boolean existsByTopicAndLecturerAndRoleAndStatus(
+            @Param("topicId") Long topicId,
+            @Param("lectureId") String lectureId,
+            @Param("role") CommitteeMemberRoleConstain role,
+            @Param("status") CommitteeMemberStatusConstain status);
 }

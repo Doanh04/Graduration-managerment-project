@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080/graduration';
+// Khi chạy sau Nginx, API dùng cùng origin qua đường dẫn /graduration.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/graduration';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

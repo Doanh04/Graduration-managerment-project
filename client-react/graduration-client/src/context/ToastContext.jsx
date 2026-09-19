@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 import '../style/Toast.scss';
 
@@ -7,10 +7,17 @@ let toastSequence = 0;
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const recentToast = useRef({ signature: '', time: 0, id: 0 });
   const dismiss = useCallback((id) => setToasts((items) => items.filter((item) => item.id !== id)), []);
   const dismissAll = useCallback(() => setToasts([]), []);
   const show = useCallback((message, type = 'info', options = {}) => {
+    const signature = `${type}:${options.title || ''}:${message}`;
+    const now = Date.now();
+    if (recentToast.current.signature === signature && now - recentToast.current.time < 1000) {
+      return recentToast.current.id;
+    }
     const id = ++toastSequence;
+    recentToast.current = { signature, time: now, id };
     const toast = { id, message, type, title: options.title, duration: options.duration ?? 5000 };
     setToasts((items) => [...items.slice(-3), toast]);
     if (toast.duration > 0) window.setTimeout(() => dismiss(id), toast.duration);

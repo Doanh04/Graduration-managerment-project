@@ -37,11 +37,12 @@ public interface UserMaper {
 
     @Mapping(source = "fullName", target = "fullNameStudent")
     @Mapping(source = "phone", target = "phoneStudent")
+    @Mapping(source = "classCode", target = "classEntity.classCode")
     @Mapping(source = "classId", target = "classEntity.classId")
     @Mapping(target = "idStudent", ignore = true)
     @Mapping(target = "pathAvt", ignore = true)
     @Mapping(target = "userEntity", ignore = true)
-    @Mapping(target = "team", ignore = true)
+    @Mapping(target = "teamMemberships", ignore = true)
     @Mapping(target = "graduationEnrollments", ignore = true)
     @Mapping(target = "scores", ignore = true)
     @Mapping(target = "submittedFiles", ignore = true)
@@ -57,6 +58,9 @@ public interface UserMaper {
     @Mapping(source = "student.email", target = "email")
     @Mapping(source = "student.classEntity.classId", target = "classId")
     @Mapping(source = "student.classEntity.classCode", target = "classCode")
+    @Mapping(source = "student.classEntity.major.majorName", target = "majorName")
+    @Mapping(target = "teamId", ignore = true)
+    @Mapping(target = "teamName", ignore = true)
     @Mapping(source = "user.roles", target = "roles")
     @Mapping(source = "user.roles", target = "permissions")
     RegisterStudentResponse toStudentResponse(UserEntity user, StudentEntity student);
@@ -91,7 +95,6 @@ public interface UserMaper {
     @Mapping(source = "phone", target = "phoneLecture")
     @Mapping(target = "lectureId", ignore = true)
     @Mapping(target = "user", ignore = true)
-    @Mapping(target = "comment", ignore = true)
     @Mapping(target = "topicSuperVisor", ignore = true)
     @Mapping(target = "score", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
@@ -116,7 +119,6 @@ public interface UserMaper {
     @Mapping(source = "phone", target = "phoneLecture")
     @Mapping(target = "lectureId", ignore = true)
     @Mapping(target = "user", ignore = true)
-    @Mapping(target = "comment", ignore = true)
     @Mapping(target = "topicSuperVisor", ignore = true)
     @Mapping(target = "score", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
@@ -135,6 +137,7 @@ public interface UserMaper {
     @Mapping(source = "user.status", target = "status")
     @Mapping(source = "user.roles", target = "roles")
     @Mapping(source = "user.roles", target = "permissions")
+    @Mapping(source = "lecturer.lectureId", target = "lectureId")
     RegisterLectureResponse toLectureResponse(UserEntity user, LectureEntity lecturer);
 
     default Set<PermissionConstain> toPermissionIds(Set<Roles> roles) {

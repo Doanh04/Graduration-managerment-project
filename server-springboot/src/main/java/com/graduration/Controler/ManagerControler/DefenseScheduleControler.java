@@ -1,12 +1,14 @@
 package com.graduration.Controler.ManagerControler;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.*;
 
 import com.graduration.Constain.DefenseScheduleStatusConstain;
+import com.graduration.DTO.Request.BulkDefenseScheduleRequest;
 import com.graduration.DTO.Request.DefenseScheduleRequest;
 import com.graduration.DTO.Request.RescheduleDefenseRequest;
 import com.graduration.DTO.Request.ScheduleReasonRequest;
@@ -35,6 +37,15 @@ public class DefenseScheduleControler {
                 .build();
     }
 
+    @PostMapping("/defense-periods/{periodId}/schedules/bulk")
+    public ApiResponse<List<DefenseScheduleResponse>> createBulk(
+            @PathVariable Long periodId, @Valid @RequestBody BulkDefenseScheduleRequest request) {
+        return ApiResponse.<List<DefenseScheduleResponse>>builder()
+                .message("Defense schedules created successfully")
+                .result(defenseScheduleService.createBulk(periodId, request))
+                .build();
+    }
+
     @PostMapping("/defense-periods/{periodId}/schedules/validate")
     public ApiResponse<DefenseScheduleValidationResponse> validate(
             @PathVariable Long periodId, @Valid @RequestBody DefenseScheduleRequest request) {
@@ -54,6 +65,14 @@ public class DefenseScheduleControler {
             @RequestParam(required = false) Integer size) {
         return ApiResponse.<PageResponse<DefenseScheduleResponse>>builder()
                 .result(defenseScheduleService.getByPeriod(periodId, date, committeeId, room, status, page, size))
+                .build();
+    }
+
+    @GetMapping("/defense-schedules/reviewer/me")
+    public ApiResponse<PageResponse<DefenseScheduleResponse>> getReviewerSchedules(
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return ApiResponse.<PageResponse<DefenseScheduleResponse>>builder()
+                .result(defenseScheduleService.getReviewerSchedules(page, size))
                 .build();
     }
 
@@ -97,6 +116,14 @@ public class DefenseScheduleControler {
         return ApiResponse.<DefenseScheduleResponse>builder()
                 .message("Defense schedule postponed successfully")
                 .result(defenseScheduleService.postpone(scheduleId, request))
+                .build();
+    }
+
+    @PatchMapping("/defense-schedules/{scheduleId}/resume")
+    public ApiResponse<DefenseScheduleResponse> resume(@PathVariable Long scheduleId) {
+        return ApiResponse.<DefenseScheduleResponse>builder()
+                .message("Defense schedule resumed successfully")
+                .result(defenseScheduleService.resume(scheduleId))
                 .build();
     }
 

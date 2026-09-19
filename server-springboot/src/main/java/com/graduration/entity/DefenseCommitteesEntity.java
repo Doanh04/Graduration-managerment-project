@@ -51,12 +51,8 @@ public class DefenseCommitteesEntity {
     @JoinColumn(name = "created_by")
     UserEntity createdBy;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "academic_id", nullable = false)
-    AcademicYearEntity academicYear;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_defense")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_defense", nullable = false)
     DefensePeriodEntity defensePeriod;
 
     @OneToMany(mappedBy = "defenseCommittees", cascade = CascadeType.ALL, orphanRemoval = true)
