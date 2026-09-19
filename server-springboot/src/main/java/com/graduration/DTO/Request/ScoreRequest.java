@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import lombok.*;
@@ -21,5 +22,6 @@ public class ScoreRequest {
     @DecimalMax(value = "10.00", message = "SCORE_VALUE_INVALID")
     BigDecimal score;
 
+    @NotBlank(message = "SCORE_COMMENT_NOT_BLANK")
     String comment;
 }

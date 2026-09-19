@@ -37,13 +37,18 @@ export const ResourceService = {
 
   async getOne(endpoint, params = {}) {
     const response = await httpClient.get(endpoint, { params });
-    return response?.result ?? response;
+    // Giữ nguyên giá trị null do API trả về (ví dụ chưa có điểm nháp),
+    // không biến nó thành toàn bộ envelope phản hồi.
+    return response && Object.prototype.hasOwnProperty.call(response, 'result')
+      ? response.result
+      : response;
   },
 
+  // Không tự đặt Content-Type cho FormData; interceptor để Axios tự thêm boundary.
   create(endpoint, payload) { return httpClient.post(endpoint, payload); },
   update(endpoint, payload, method = 'put') { return httpClient.request({ url: endpoint, method, data: payload }); },
   remove(endpoint) { return httpClient.delete(endpoint); },
-  importFile(endpoint, file) { const data = new FormData(); data.append('file', file); return httpClient.post(endpoint, data, { headers: { 'Content-Type': 'multipart/form-data' } }); },
+  importFile(endpoint, file) { const data = new FormData(); data.append('file', file); return httpClient.post(endpoint, data); },
   downloadFile(endpoint, params = {}) { return httpClient.get(endpoint, { params, responseType: 'blob' }); },
 };
 

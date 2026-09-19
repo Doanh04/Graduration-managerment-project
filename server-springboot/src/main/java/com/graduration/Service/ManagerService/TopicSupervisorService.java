@@ -2,7 +2,6 @@ package com.graduration.Service.ManagerService;
 
 import java.time.LocalDateTime;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,11 +45,10 @@ public class TopicSupervisorService {
     final UserRepository userRepository;
     final TopicSupervisorMapper supervisorMapper;
 
-    @Value("${app.supervision.max-topics-per-period:5}")
-    int maxTopicsPerPeriod;
-
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm assign: Nhận dữ liệu đầu vào của assign, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản ghi
+    // nghiệp vụ rồi lưu repository để trả kết quả cho API.
     public TopicSupervisorResponse assign(Long topicId, AssignTopicSupervisorRequest request) {
         TopicEntity topic = findApprovedAssignableTopic(topicId);
         LectureEntity lecture = findLecturer(request.getLectureId());
@@ -60,13 +58,6 @@ public class TopicSupervisorService {
             throw new AppException(ErrorCode.TOPIC_SUPERVISOR_ALREADY_ASSIGNED);
         }
         requirePrimaryAvailable(topicId, SupervisorRoleConstain.PRIMARY, null);
-        long assignments = supervisorRepository.countActiveAssignments(
-                lecture.getLectureId(),
-                topic.getDefensePeriod().getID_Defense(),
-                SupervisorAssignmentStatusConstain.ACTIVE);
-        if (assignments >= maxTopicsPerPeriod) {
-            throw new AppException(ErrorCode.TOPIC_SUPERVISOR_LIMIT_REACHED);
-        }
         TopicSuperVisorEntity assignment = TopicSuperVisorEntity.builder()
                 .topic(topic)
                 .lecture(lecture)
@@ -81,6 +72,8 @@ public class TopicSupervisorService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm getByTopic: Nhận các tham số lọc/phân trang của getByTopic, truy vấn dữ liệu phù hợp từ repository, ánh xạ
+    // từng entity sang DTO và trả về cho giao diện.
     public PageResponse<TopicSupervisorResponse> getByTopic(Long topicId, Integer page, Integer size) {
         if (!topicRepository.existsById(topicId)) {
             throw new AppException(ErrorCode.TOPIC_NOT_FOUND);
@@ -92,6 +85,8 @@ public class TopicSupervisorService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getAll: Nhận các tham số lọc/phân trang của getAll, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public PageResponse<TopicSupervisorResponse> getAll(Integer page, Integer size) {
         return PageResponse.from(
                 supervisorRepository.findAll(PaginationSupport.pageRequest(page, size)), supervisorMapper::toResponse);
@@ -99,6 +94,8 @@ public class TopicSupervisorService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getByLecturer: Nhận các tham số lọc/phân trang của getByLecturer, truy vấn dữ liệu phù hợp từ repository, ánh
+    // xạ từng entity sang DTO và trả về cho giao diện.
     public PageResponse<TopicSupervisorResponse> getByLecturer(String lectureId, Integer page, Integer size) {
         if (!lectureRepository.existsById(lectureId)) {
             throw new AppException(ErrorCode.USER_NOT_FOUND);
@@ -108,6 +105,8 @@ public class TopicSupervisorService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_SUPERVISOR', 'ROLE_FACULTY', 'ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getMine: Nhận các tham số lọc/phân trang của getMine, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public PageResponse<TopicSupervisorResponse> getMine(Integer page, Integer size) {
         LectureEntity lecture = lectureRepository
                 .findByUser_UserId(currentAuthentication().getName())
@@ -117,6 +116,8 @@ public class TopicSupervisorService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm update: Nhận mã bản ghi cùng dữ liệu cập nhật của update, tải bản ghi hiện có, kiểm tra trạng thái và ràng
+    // buộc rồi ghi các giá trị mới xuống repository.
     public TopicSupervisorResponse update(Long assignmentId, UpdateTopicSupervisorRequest request) {
         TopicSuperVisorEntity assignment = findAssignment(assignmentId);
         requireActive(assignment);
@@ -129,6 +130,8 @@ public class TopicSupervisorService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm deactivate: Nhận mã đối tượng cùng lý do vô hiệu hóa; kiểm tra trạng thái hiện tại và ràng buộc đang sử dụng,
+    // ghi lý do, đổi sang INACTIVE rồi lưu.
     public TopicSupervisorResponse deactivate(Long assignmentId, DeactivateTopicSupervisorRequest request) {
         TopicSuperVisorEntity assignment = findAssignment(assignmentId);
         requireActive(assignment);
@@ -143,6 +146,8 @@ public class TopicSupervisorService {
         return supervisorMapper.toResponse(supervisorRepository.save(assignment));
     }
 
+    // Hàm activeByLecturer: Nhận lectureId cùng tham số phân trang; truy vấn các phân công hướng dẫn ACTIVE của giảng
+    // viên và ánh xạ thành PageResponse.
     private PageResponse<TopicSupervisorResponse> activeByLecturer(String lectureId, Integer page, Integer size) {
         return PageResponse.from(
                 supervisorRepository.findByLecture_LectureIdAndStatus(
@@ -152,6 +157,8 @@ public class TopicSupervisorService {
                 supervisorMapper::toResponse);
     }
 
+    // Hàm findAssignableTopic: Nhận mã hoặc điều kiện tìm kiếm của findAssignableTopic, truy vấn bản ghi/quan hệ tương
+    // ứng, báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicEntity findAssignableTopic(Long topicId) {
         TopicEntity topic =
                 topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
@@ -165,6 +172,8 @@ public class TopicSupervisorService {
         return topic;
     }
 
+    // Hàm findApprovedAssignableTopic: Nhận mã hoặc điều kiện tìm kiếm của findApprovedAssignableTopic, truy vấn bản
+    // ghi/quan hệ tương ứng, báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicEntity findApprovedAssignableTopic(Long topicId) {
         TopicEntity topic = findAssignableTopic(topicId);
         if (topic.getStatus() != TopicStatusConstain.APPROVED
@@ -175,6 +184,7 @@ public class TopicSupervisorService {
         return topic;
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireActiveLecturer(LectureEntity lecture) {
         StatusConstain status =
                 lecture.getUser() == null ? null : lecture.getUser().getStatus();
@@ -183,6 +193,8 @@ public class TopicSupervisorService {
         }
     }
 
+    // Hàm findLecturer: Nhận mã hoặc điều kiện tìm kiếm của findLecturer, truy vấn bản ghi/quan hệ tương ứng, báo lỗi
+    // khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private LectureEntity findLecturer(String identifier) {
         return lectureRepository
                 .findById(identifier)
@@ -190,6 +202,7 @@ public class TopicSupervisorService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requirePrimaryAvailable(Long topicId, SupervisorRoleConstain role, Long excludedAssignmentId) {
         if (role != SupervisorRoleConstain.PRIMARY) {
             return;
@@ -207,24 +220,31 @@ public class TopicSupervisorService {
         }
     }
 
+    // Hàm findAssignment: Nhận mã hoặc điều kiện tìm kiếm của findAssignment, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicSuperVisorEntity findAssignment(Long assignmentId) {
         return supervisorRepository
                 .findById(assignmentId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOPIC_SUPERVISOR_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireActive(TopicSuperVisorEntity assignment) {
         if (assignment.getStatus() != SupervisorAssignmentStatusConstain.ACTIVE) {
             throw new AppException(ErrorCode.SUPERVISOR_ASSIGNMENT_NOT_ACTIVE);
         }
     }
 
+    // Hàm currentUser: Lấy userId của tài khoản đang đăng nhập từ Authentication, truy vấn UserEntity tương ứng và trả
+    // về người thực hiện để gắn vào bản ghi.
     private UserEntity currentUser() {
         return userRepository
                 .findById(currentAuthentication().getName())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // Hàm currentAuthentication: Đọc Authentication từ SecurityContext của request hiện tại; từ chối khi chưa đăng nhập
+    // và trả về đối tượng xác thực để lấy userId cùng quyền.
     private Authentication currentAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -233,10 +253,14 @@ public class TopicSupervisorService {
         return authentication;
     }
 
+    // Hàm normalize: Nhận ghi chú phân công giảng viên hướng dẫn; chuyển ghi chú trống thành null và trim nội dung để
+    // lưu TopicSuperVisorEntity.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    // Hàm appendReason: Nhận ghi chú hiện có và lý do vô hiệu hóa; trim lý do rồi nối vào ghi chú theo dấu phân cách để
+    // bảo toàn lịch sử nguyên nhân.
     private String appendReason(String note, String reason) {
         String normalizedReason = reason.trim();
         return note == null || note.isBlank()

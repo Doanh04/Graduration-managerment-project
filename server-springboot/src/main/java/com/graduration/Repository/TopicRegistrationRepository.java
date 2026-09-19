@@ -28,4 +28,9 @@ public interface TopicRegistrationRepository extends JpaRepository<TopicRegistra
     List<TopicRegistrationEntity> findByTeam_IdTeamOrderBySubmittedAtDesc(Long teamId);
 
     Optional<TopicRegistrationEntity> findByEnrollment_EnrollmentIdAndPriority(Long enrollmentId, Integer priority);
+
+    List<TopicRegistrationEntity> findByTopic_IdTopicAndStatus(Long topicId, TopicRegistrationStatusConstain status);
+
+    Optional<TopicRegistrationEntity> findFirstByTopic_IdTopicAndStatusOrderBySubmittedAtDesc(
+            Long topicId, TopicRegistrationStatusConstain status);
 }

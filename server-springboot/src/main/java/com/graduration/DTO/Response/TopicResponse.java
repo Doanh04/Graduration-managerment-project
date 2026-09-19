@@ -1,6 +1,8 @@
 package com.graduration.DTO.Response;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.graduration.Constain.CategoryTopicConstain;
 import com.graduration.Constain.TopicStatusConstain;
@@ -33,4 +35,12 @@ public class TopicResponse {
     String academicYear;
     Long teamId;
     String teamName;
+    boolean hasActiveSupervisor;
+    String fileName;
+    String contentType;
+    Long fileSize;
+
+    /** Danh sách sinh viên thuộc nhóm được gửi kèm đề xuất hoặc nhóm thực hiện đề tài. */
+    @Builder.Default
+    List<TeamResponse.StudentSummary> proposedStudents = new ArrayList<>();
 }

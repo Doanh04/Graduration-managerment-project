@@ -16,7 +16,7 @@ spring:
     password: doanh@123
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: true
   data:
     mongodb:
@@ -30,5 +30,3 @@ jwt:
 app:
   cookie:
     secure: false
-  storage:
-    root: ${APP_STORAGE_ROOT:./storage}

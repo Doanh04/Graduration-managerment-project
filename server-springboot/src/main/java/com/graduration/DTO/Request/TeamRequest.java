@@ -26,5 +26,7 @@ public class TeamRequest {
     @Size(max = 100, message = "INVALID_KEY")
     String role;
 
+    Long defensePeriodId;
+
     Long topicId;
 }

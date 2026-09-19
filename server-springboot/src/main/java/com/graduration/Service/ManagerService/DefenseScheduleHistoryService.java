@@ -32,6 +32,8 @@ public class DefenseScheduleHistoryService {
     DefenseScheduleRepository scheduleRepository;
 
     @Transactional
+    // Hàm record: Nhận lịch bảo vệ, thao tác, snapshot trước/sau, lý do và người thực hiện; sao chép toàn bộ thay đổi
+    // trạng thái/lịch vào bản ghi lịch sử rồi lưu.
     public void record(
             DefenseSchedulesEntity schedule,
             DefenseScheduleHistoryActionConstain action,
@@ -66,6 +68,8 @@ public class DefenseScheduleHistoryService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getHistory: Nhận mã hoặc điều kiện tìm kiếm của getHistory, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi
+    // không tồn tại và trả về dữ liệu đã ánh xạ.
     public PageResponse<DefenseScheduleHistoryResponse> getHistory(Long scheduleId, Integer page, Integer size) {
         if (!scheduleRepository.existsById(scheduleId)) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_NOT_FOUND);
@@ -75,10 +79,21 @@ public class DefenseScheduleHistoryService {
                 this::toResponse);
     }
 
+    // Hàm hasHistory: Nhận mã lịch bảo vệ; kiểm tra repository có bản ghi lịch sử tương ứng để quyết định lịch có được
+    // phép xóa hay không.
     public boolean hasHistory(Long scheduleId) {
         return historyRepository.existsBySchedule_IdDefenseScheduce(scheduleId);
     }
 
+    /** Xóa các bản ghi lịch sử đi kèm lịch nháp trước khi xóa lịch để không vi phạm khóa ngoại. */
+    @Transactional
+    public void deleteHistory(Long scheduleId) {
+        historyRepository.deleteBySchedule_IdDefenseScheduce(scheduleId);
+        historyRepository.flush();
+    }
+
+    // Hàm snapshot: Nhận entity lịch bảo vệ; trích xuất ngày, giờ, phòng, địa điểm, hội đồng và trạng thái tại một thời
+    // điểm để so sánh trước/sau.
     public Snapshot snapshot(DefenseSchedulesEntity schedule) {
         return new Snapshot(
                 schedule.getDefenseDate(),
@@ -95,6 +110,8 @@ public class DefenseScheduleHistoryService {
                 schedule.getStatus());
     }
 
+    // Hàm toResponse: Nhận entity nghiệp vụ; lấy các quan hệ liên quan và ánh xạ mã, tên, trạng thái, thời gian cùng
+    // thông tin hiển thị sang DTO response cho API.
     private DefenseScheduleHistoryResponse toResponse(DefenseScheduleHistoryEntity history) {
         return DefenseScheduleHistoryResponse.builder()
                 .historyId(history.getHistoryId())
@@ -131,6 +148,8 @@ public class DefenseScheduleHistoryService {
                 .build();
     }
 
+    // Hàm toResponseSnapshot: Nhận các trường lịch cũ/mới; trả về object snapshot lồng trong response hoặc null khi
+    // không có dữ liệu thay đổi.
     private DefenseScheduleHistoryResponse.ScheduleSnapshot toResponseSnapshot(
             LocalDate date,
             LocalTime start,
@@ -153,10 +172,14 @@ public class DefenseScheduleHistoryService {
                 .build();
     }
 
+    // Hàm normalize: Nhận lý do thay đổi lịch; chuyển lý do null/rỗng thành null và trim nội dung trước khi ghi vào
+    // lịch sử.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    // Hàm Snapshot: Là value object chứa toàn bộ trạng thái lịch (ngày, giờ, phòng, địa điểm, hội đồng, trạng thái) tại
+    // trước hoặc sau một thao tác.
     public record Snapshot(
             LocalDate defenseDate,
             LocalTime startTime,

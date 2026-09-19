@@ -3,6 +3,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Clock3, Eye, Inbox, LoaderCircl
 import API_ENDPOINTS from '../../config/endpoints.js';
 import ResourceService from '../../services/ResourceService.jsx';
 import getApiErrorMessage from '../../utils/apiError.js';
+import { formatDateTimeDisplay } from '../../utils/dateFormat.js';
 import '../../style/AuditLogPage.scss';
 
 const PAGE_SIZE = 10;
@@ -71,7 +72,7 @@ function AuditDetail({ log, loading, onClose }) {
 
 function AuditState({ icon: Icon, text, action, spin }) { return <div className="data-state"><Icon className={spin ? 'spin' : ''} size={28} /><strong>{text}</strong>{action && <button onClick={action}>Thử lại</button>}</div>; }
 function normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim(); }
-function formatDate(value) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium' }).format(date); }
+function formatDate(value) { return formatDateTimeDisplay(value, { includeSeconds: true }); }
 function actionLabel(value) { const action = String(value || '').toUpperCase(); const labels = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa', IMPORT: 'Import', ASSIGN: 'Phân công', DEACTIVATE: 'Ngừng hoạt động', SELECT: 'Lựa chọn', SUBMIT: 'Gửi duyệt', APPROVE: 'Phê duyệt', REJECT: 'Từ chối', UPLOAD: 'Tải lên', REVIEW: 'Đánh giá', REVISE: 'Yêu cầu chỉnh sửa', CANCEL: 'Hủy', OPEN: 'Mở', CLOSE: 'Đóng', PUBLISH: 'Công bố', START: 'Bắt đầu', ADD: 'Thêm', REMOVE: 'Gỡ bỏ', RESET: 'Đặt lại', REGISTER: 'Đăng ký', FINISH: 'Kết thúc' }; const prefix = Object.keys(labels).find((key) => action === key || action.startsWith(`${key}_`)); return prefix ? labels[prefix] : value || 'Không xác định'; }
 function actionClass(value) { const action = String(value || '').toLowerCase(); return action.includes('delete') || action.includes('deactivate') ? 'danger' : action.includes('create') || action.includes('import') ? 'success' : 'info'; }
 function resourceLabel(value) { if (!value) return 'Không xác định'; return String(value).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' '); }

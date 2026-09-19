@@ -59,6 +59,8 @@ public class AuditTrailAspect {
                     + "execution(public * com.graduration.Service..*.publish*(..)) || "
                     + "execution(public * com.graduration.Service..*.start*(..))",
             returning = "result")
+    // Hàm recordSuccessfulChange: Nhận thông tin invocation và kết quả sau khi transaction thành công; tạo audit log mô
+    // tả thao tác thay đổi và lưu vào MongoDB.
     public void recordSuccessfulChange(JoinPoint joinPoint, Object result) {
         String className = joinPoint.getTarget().getClass().getName();
         if (className.contains(".AuthenticationService.")
@@ -76,6 +78,8 @@ public class AuditTrailAspect {
         saveAfterCommit(auditLog);
     }
 
+    // Hàm buildAuditLog: Nhận thông tin method, actor, resource, request và kết quả; tổng hợp thành AuditLogEntity gồm
+    // hành động, dữ liệu trước/sau, IP và thời điểm.
     private AuditLogDocument buildAuditLog(JoinPoint joinPoint, Object result) {
         String serviceName = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
@@ -106,11 +110,15 @@ public class AuditTrailAspect {
                 .build();
     }
 
+    // Hàm saveAfterCommit: Nhận dữ liệu đầu vào của saveAfterCommit, kiểm tra các trường bắt buộc và quan hệ liên quan,
+    // tạo bản ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
     private void saveAfterCommit(AuditLogDocument auditLog) {
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
+                // Hàm afterCommit: Được gọi sau khi transaction commit; thực hiện lưu audit log ngoài transaction chính
+                // và ghi cảnh báo nếu MongoDB không xác thực hoặc lưu thất bại.
                 public void afterCommit() {
                     saveSafely(auditLog);
                 }
@@ -120,6 +128,8 @@ public class AuditTrailAspect {
         saveSafely(auditLog);
     }
 
+    // Hàm saveSafely: Nhận AuditLogDocument sau giao dịch; thử lưu vào MongoDB tối đa ba lần, ghi cảnh báo cho từng lần
+    // lỗi và ghi error cuối cùng nếu không thể lưu nhật ký.
     private void saveSafely(AuditLogDocument auditLog) {
         RuntimeException lastException = null;
         for (int attempt = 1; attempt <= 3; attempt++) {
@@ -134,11 +144,15 @@ public class AuditTrailAspect {
         log.error("Audit log was lost for {}.{}", auditLog.getResourceType(), auditLog.getAction(), lastException);
     }
 
+    // Hàm resolveResourceId: Nhận mã hoặc điều kiện tìm kiếm của resolveResourceId, truy vấn bản ghi/quan hệ tương ứng,
+    // báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private String resolveResourceId(Object[] arguments, Object result) {
         String argumentId = extractResourceId(arguments);
         return argumentId != null ? argumentId : extractResultId(result);
     }
 
+    // Hàm extractResultId: Nhận entity hoặc dữ liệu trung gian của extractResultId, chọn các trường cần thiết, biến đổi
+    // chúng sang cấu trúc đích và trả về dữ liệu cho bước nghiệp vụ tiếp theo.
     private String extractResultId(Object result) {
         if (result == null) {
             return null;
@@ -178,6 +192,8 @@ public class AuditTrailAspect {
         return null;
     }
 
+    // Hàm resolveUserName: Nhận mã hoặc điều kiện tìm kiếm của resolveUserName, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private String resolveUserName(Authentication authentication, String fallback) {
         if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {
             String userName = jwtAuthentication.getToken().getClaimAsString("userName");
@@ -186,6 +202,8 @@ public class AuditTrailAspect {
         return fallback;
     }
 
+    // Hàm extractResourceId: Nhận entity hoặc dữ liệu trung gian của extractResourceId, chọn các trường cần thiết, biến
+    // đổi chúng sang cấu trúc đích và trả về dữ liệu cho bước nghiệp vụ tiếp theo.
     private String extractResourceId(Object[] arguments) {
         if (arguments == null) {
             return null;
@@ -201,6 +219,8 @@ public class AuditTrailAspect {
         return null;
     }
 
+    // Hàm resolveIpAddress: Nhận mã hoặc điều kiện tìm kiếm của resolveIpAddress, truy vấn bản ghi/quan hệ tương ứng,
+    // báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private String resolveIpAddress() {
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
             return null;
@@ -213,6 +233,8 @@ public class AuditTrailAspect {
         return request.getRemoteAddr();
     }
 
+    // Hàm addRequestMetadata: Nhận map metadata của audit; đọc HTTP method và request URI từ request hiện tại rồi thêm
+    // vào map để truy vết thao tác.
     private void addRequestMetadata(Map<String, Object> metadata) {
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
             return;
@@ -222,6 +244,8 @@ public class AuditTrailAspect {
         metadata.put("requestPath", request.getRequestURI());
     }
 
+    // Hàm toAction: Nhận entity hoặc dữ liệu trung gian của toAction, chọn các trường cần thiết, biến đổi chúng sang
+    // cấu trúc đích và trả về dữ liệu cho bước nghiệp vụ tiếp theo.
     private String toAction(String methodName) {
         return methodName.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toUpperCase();
     }

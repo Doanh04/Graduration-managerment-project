@@ -1,6 +1,7 @@
 package com.graduration.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,4 +44,12 @@ public interface ScoreRepository extends JpaRepository<ScoreEntity, Long> {
 				where score.topic.defensePeriod.ID_Defense = :defensePeriodId
 				""")
     Page<ScoreEntity> findByDefensePeriod(@Param("defensePeriodId") Long defensePeriodId, Pageable pageable);
+
+    @Query("""
+            select score from ScoreEntity score
+            where score.student.idStudent = :studentId
+            and score.topic.defensePeriod.ID_Defense = :defensePeriodId
+            """)
+    List<ScoreEntity> findByStudentAndDefensePeriod(
+            @Param("studentId") String studentId, @Param("defensePeriodId") Long defensePeriodId);
 }

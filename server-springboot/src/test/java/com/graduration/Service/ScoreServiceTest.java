@@ -89,6 +89,7 @@ class ScoreServiceTest {
         ArgumentCaptor<ScoreEntity> captor = ArgumentCaptor.forClass(ScoreEntity.class);
         verify(scoreRepository).save(captor.capture());
         assertEquals(new BigDecimal("8.50"), captor.getValue().getScore());
+        assertEquals("Đánh giá đạt yêu cầu", captor.getValue().getComment());
         assertEquals(ScoreStatusConstain.DRAFT, captor.getValue().getStatus());
     }
 
@@ -129,7 +130,10 @@ class ScoreServiceTest {
     }
 
     private ScoreRequest request(String score) {
-        return ScoreRequest.builder().score(new BigDecimal(score)).build();
+        return ScoreRequest.builder()
+                .score(new BigDecimal(score))
+                .comment("Đánh giá đạt yêu cầu")
+                .build();
     }
 
     private Fixture fixture() {

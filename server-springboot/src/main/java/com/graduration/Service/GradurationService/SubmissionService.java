@@ -1,10 +1,15 @@
 package com.graduration.Service.GradurationService;
 
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
 
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -13,8 +18,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.Configuration.PaginationSupport;
@@ -53,12 +56,14 @@ public class SubmissionService {
     TeamRepository teamRepository;
     StudentRepository studentRepository;
     GraduationEnrollmentRepository enrollmentRepository;
-    FileStorageService fileStorageService;
     SubmissionMapper submissionMapper;
     CommentService commentService;
+    GraduationEnrollmentService graduationEnrollmentService;
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional
+    // Hàm upload: Nhận tệp nộp, mã mốc tiến độ và ghi chú; kiểm tra quyền, định dạng, thời hạn và phiên bản, lưu tệp
+    // rồi tạo SubmissionEntity liên kết với nhóm/mốc.
     public SubmissionResponse upload(
             Long milestoneId, Long teamId, String note, MultipartFile file, LocalDateTime submittedAt) {
         validateFilePresent(file);
@@ -79,17 +84,14 @@ public class SubmissionService {
             throw new AppException(ErrorCode.SUBMISSION_ALREADY_APPROVED);
         }
 
-        FileStorageService.StoredFile stored = fileStorageService.store(
-                file, milestone.getDefensePeriod().getID_Defense(), teamId, milestoneId, extension);
-        registerRollbackCleanup(stored.relativePath());
+        byte[] fileData = readFileData(file);
         String originalName = safeOriginalName(file.getOriginalFilename());
         SubmistionEntity submission = SubmistionEntity.builder()
-                .filePath(stored.relativePath())
                 .fileName(originalName)
-                .storedFileName(stored.storedName())
                 .contentType(file.getContentType())
                 .fileSize(file.getSize())
-                .checksum(stored.checksum())
+                .checksum(checksum(fileData))
+                .fileData(fileData)
                 .isLate(now.isAfter(milestone.getDeadLine()))
                 .note(normalize(note))
                 .submittedAt(now)
@@ -105,6 +107,8 @@ public class SubmissionService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm getSubmission: Nhận mã hoặc điều kiện tìm kiếm của getSubmission, truy vấn bản ghi/quan hệ tương ứng, báo lỗi
+    // khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public SubmissionResponse getSubmission(Long submissionId) {
         SubmistionEntity submission = findSubmission(submissionId);
         requireReadAccess(submission);
@@ -113,6 +117,8 @@ public class SubmissionService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm getSubmissions: Nhận mã hoặc điều kiện tìm kiếm của getSubmissions, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public PageResponse<SubmissionResponse> getSubmissions(
             Long teamId, Long milestoneId, SubmissionStatusConstain status, Boolean late, Integer page, Integer size) {
         Specification<SubmistionEntity> specification = Specification.where(null);
@@ -141,6 +147,8 @@ public class SubmissionService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm getVersionHistory: Nhận các tham số lọc/phân trang của getVersionHistory, truy vấn dữ liệu phù hợp từ
+    // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public PageResponse<SubmissionResponse> getVersionHistory(
             Long teamId, Long milestoneId, Integer page, Integer size) {
         TeamEntity team = findTeam(teamId);
@@ -154,21 +162,25 @@ public class SubmissionService {
 
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    // Hàm download: Nhận mã bài nộp; kiểm tra quyền xem, đọc tệp từ kho lưu trữ và trả về nội dung cùng tên tệp cho
+    // client tải xuống.
     public DownloadedSubmission download(Long submissionId) {
         SubmistionEntity submission = findSubmission(submissionId);
         requireReadAccess(submission);
         return new DownloadedSubmission(
-                fileStorageService.load(submission.getFilePath()),
-                submission.getFileName(),
-                submission.getContentType());
+                new ByteArrayResource(submission.getFileData()), submission.getFileName(), submission.getContentType());
     }
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional
+    // Hàm withdraw: Nhận mã bài nộp; kiểm tra người thao tác và trạng thái cho phép, đánh dấu rút bài/cập nhật thời
+    // gian để bài không còn được dùng trong quy trình chấm.
     public SubmissionResponse withdraw(Long submissionId) {
         SubmistionEntity submission = findSubmission(submissionId);
         StudentEntity student = currentStudent();
         requireTeamMember(submission.getTeam(), student);
+        graduationEnrollmentService.requireParticipationAllowed(
+                student.getIdStudent(), submission.getMilesStone().getDefensePeriod().getID_Defense());
         SubmistionEntity latest = submissionRepository
                 .findFirstByTeam_IdTeamAndMilesStone_IdMilesStoneOrderByVersionDesc(
                         submission.getTeam().getIdTeam(),
@@ -184,6 +196,8 @@ public class SubmissionService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional
+    // Hàm startReview: Nhận mã bản ghi và thông tin thao tác của startReview, kiểm tra trạng thái hiện tại cùng quyền
+    // thực hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public SubmissionResponse startReview(Long submissionId) {
         SubmistionEntity submission = findSubmission(submissionId);
         requireReviewAccess(submission);
@@ -194,6 +208,8 @@ public class SubmissionService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional
+    // Hàm requestRevision: Nhận assignment và yêu cầu chỉnh sửa; kiểm tra người sở hữu cùng trạng thái, lưu ghi chú/lý
+    // do yêu cầu bổ sung và chuyển assignment về trạng thái cần xử lý lại.
     public SubmissionResponse requestRevision(Long submissionId, String comment) {
         return reviewWithComment(
                 submissionId,
@@ -204,6 +220,8 @@ public class SubmissionService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional
+    // Hàm approve: Nhận mã bản ghi và thông tin thao tác của approve, kiểm tra trạng thái hiện tại cùng quyền thực
+    // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public SubmissionResponse approve(Long submissionId, String comment) {
         return reviewWithComment(
                 submissionId, comment, SubmissionStatusConstain.APPROVED, CommentTypeConstain.APPROVAL);
@@ -211,11 +229,15 @@ public class SubmissionService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR')")
     @Transactional
+    // Hàm reject: Nhận mã bản ghi và thông tin thao tác của reject, kiểm tra trạng thái hiện tại cùng quyền thực hiện,
+    // cập nhật trạng thái/lý do và lưu thay đổi.
     public SubmissionResponse reject(Long submissionId, String comment) {
         return reviewWithComment(
                 submissionId, comment, SubmissionStatusConstain.REJECTED, CommentTypeConstain.REJECTION);
     }
 
+    // Hàm reviewWithComment: Nhận bài nộp, trạng thái đánh giá và nội dung nhận xét; kiểm tra quyền giảng viên, cập
+    // nhật trạng thái review và lưu comment gắn với phiên bản.
     private SubmissionResponse reviewWithComment(
             Long submissionId, String comment, SubmissionStatusConstain target, CommentTypeConstain commentType) {
         validateComment(comment);
@@ -230,6 +252,7 @@ public class SubmissionService {
         return submissionMapper.toResponse(submissionRepository.save(submission));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateSubmissionWindow(MilesStoneEntity milestone, LocalDateTime now) {
         if (milestone.getStatus() != MilesStoneStatusConstain.OPEN) {
             throw new AppException(ErrorCode.SUBMISSION_NOT_OPEN);
@@ -242,12 +265,30 @@ public class SubmissionService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateFilePresent(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.SUBMISSION_FILE_REQUIRED);
         }
     }
 
+    private byte[] readFileData(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException exception) {
+            throw new AppException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+    }
+
+    private String checksum(byte[] fileData) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(fileData));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new AppException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+    }
+
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateFile(MilesStoneEntity milestone, MultipartFile file, String extension) {
         if (milestone.getMaxFileSize() != null && file.getSize() > milestone.getMaxFileSize()) {
             throw new AppException(ErrorCode.SUBMISSION_FILE_TOO_LARGE);
@@ -268,8 +309,10 @@ public class SubmissionService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireSameDefensePeriod(TeamEntity team, StudentEntity student, MilesStoneEntity milestone) {
         Long periodId = milestone.getDefensePeriod().getID_Defense();
+        graduationEnrollmentService.requireParticipationAllowed(student.getIdStudent(), periodId);
         if (team.getTopic() != null) {
             if (!periodId.equals(team.getTopic().getDefensePeriod().getID_Defense())) {
                 throw new AppException(ErrorCode.SUBMISSION_PERIOD_MISMATCH);
@@ -282,6 +325,7 @@ public class SubmissionService {
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireReadAccess(SubmistionEntity submission) {
         if (isManager() || isTeamMember(submission.getTeam()) || isAssignedSupervisor(submission.getTeam())) {
             return;
@@ -289,6 +333,7 @@ public class SubmissionService {
         throw new AppException(ErrorCode.ACCESS_DENIED);
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireTeamReadAccess(TeamEntity team) {
         if (isManager() || isTeamMember(team) || isAssignedSupervisor(team)) {
             return;
@@ -296,6 +341,7 @@ public class SubmissionService {
         throw new AppException(ErrorCode.ACCESS_DENIED);
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireReviewAccess(SubmistionEntity submission) {
         if (isManager() || isAssignedSupervisor(submission.getTeam())) {
             return;
@@ -303,6 +349,8 @@ public class SubmissionService {
         throw new AppException(ErrorCode.ACCESS_DENIED);
     }
 
+    // Hàm accessSpecification: Nhận bài nộp và Authentication; xây dựng quy tắc truy cập cho admin, giảng viên hướng
+    // dẫn/phản biện và sinh viên thuộc nhóm.
     private Specification<SubmistionEntity> accessSpecification() {
         if (isManager()) {
             return Specification.where(null);
@@ -321,6 +369,8 @@ public class SubmissionService {
         };
     }
 
+    // Hàm isAssignedSupervisor: Kiểm tra danh sách phân công của đề tài có giảng viên hiện tại ở trạng thái ACTIVE, từ
+    // đó xác định quyền giảng viên hướng dẫn.
     private boolean isAssignedSupervisor(TeamEntity team) {
         String userId = currentAuthentication().getName();
         return team.getTopic() != null
@@ -332,6 +382,8 @@ public class SubmissionService {
                                         supervisor.getLecture().getUser().getUserId()));
     }
 
+    // Hàm isTeamMember: Đối chiếu userId hiện tại với danh sách sinh viên của nhóm đề tài để xác định người dùng có
+    // thuộc nhóm hay không.
     private boolean isTeamMember(TeamEntity team) {
         String userId = currentAuthentication().getName();
         return team.getStudentEntities().stream()
@@ -339,6 +391,7 @@ public class SubmissionService {
                         && userId.equals(student.getUserEntity().getUserId()));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireTeamMember(TeamEntity team, StudentEntity student) {
         if (team.getStudentEntities().stream()
                 .noneMatch(member -> member.getIdStudent().equals(student.getIdStudent()))) {
@@ -346,21 +399,29 @@ public class SubmissionService {
         }
     }
 
+    // Hàm currentStudent: Dùng userId hiện tại truy vấn UserEntity, kiểm tra tài khoản có hồ sơ sinh viên rồi trả về
+    // StudentEntity cho các nghiệp vụ dành cho sinh viên.
     private StudentEntity currentStudent() {
         return studentRepository
                 .findByUserEntity_UserId(currentAuthentication().getName())
                 .orElseThrow(() -> new AppException(ErrorCode.STUDENT_PROFILE_NOT_FOUND));
     }
 
+    // Hàm isManager: Kiểm tra Authentication hiện tại có quyền ROLE_ADMIN hoặc ROLE_FACULTY hay không để xác định người
+    // dùng có quyền quản lý dữ liệu.
     private boolean isManager() {
         return hasAuthority("ROLE_ADMIN") || hasAuthority("ROLE_FACULTY");
     }
 
+    // Hàm hasAuthority: Nhận tên quyền cần kiểm tra; so sánh với danh sách GrantedAuthority của tài khoản hiện tại và
+    // trả về true nếu tài khoản có quyền đó.
     private boolean hasAuthority(String authority) {
         return currentAuthentication().getAuthorities().stream()
                 .anyMatch(item -> item.getAuthority().equals(authority));
     }
 
+    // Hàm currentAuthentication: Đọc Authentication từ SecurityContext của request hiện tại; từ chối khi chưa đăng nhập
+    // và trả về đối tượng xác thực để lấy userId cùng quyền.
     private Authentication currentAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -369,36 +430,46 @@ public class SubmissionService {
         return authentication;
     }
 
+    // Hàm findMilestone: Nhận mã hoặc điều kiện tìm kiếm của findMilestone, truy vấn bản ghi/quan hệ tương ứng, báo lỗi
+    // khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private MilesStoneEntity findMilestone(Long milestoneId) {
         return milestoneRepository
                 .findById(milestoneId)
                 .orElseThrow(() -> new AppException(ErrorCode.MILESTONE_NOT_FOUND));
     }
 
+    // Hàm findTeam: Nhận mã hoặc điều kiện tìm kiếm của findTeam, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi không
+    // tồn tại và trả về dữ liệu đã ánh xạ.
     private TeamEntity findTeam(Long teamId) {
         return teamRepository
                 .findWithDetailsByIdTeam(teamId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
     }
 
+    // Hàm findSubmission: Nhận mã hoặc điều kiện tìm kiếm của findSubmission, truy vấn bản ghi/quan hệ tương ứng, báo
+    // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private SubmistionEntity findSubmission(Long submissionId) {
         return submissionRepository
                 .findById(submissionId)
                 .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireStatus(SubmistionEntity submission, SubmissionStatusConstain status) {
         if (submission.getStatus() != status) {
             throw new AppException(ErrorCode.SUBMISSION_OPERATION_NOT_ALLOWED);
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateComment(String comment) {
         if (comment == null || comment.isBlank()) {
             throw new AppException(ErrorCode.SUBMISSION_COMMENT_NOT_BLANK);
         }
     }
 
+    // Hàm safeOriginalName: Nhận tên tệp gốc do trình duyệt gửi lên; loại đường dẫn nguy hiểm và ký tự không an toàn,
+    // sau đó trả về tên chỉ dùng làm metadata hiển thị.
     private String safeOriginalName(String originalName) {
         if (originalName == null || originalName.isBlank()) {
             return "submission";
@@ -409,29 +480,21 @@ public class SubmissionService {
         return fileName.isBlank() ? "submission" : fileName;
     }
 
+    // Hàm extension: Nhận tên tệp; lấy phần mở rộng cuối cùng sau dấu chấm, chuyển về chữ thường để đối chiếu với danh
+    // sách định dạng được phép.
     private String extension(String originalName) {
         String safeName = safeOriginalName(originalName);
         int index = safeName.lastIndexOf('.');
         return index < 0 ? "" : safeName.substring(index + 1).toLowerCase(Locale.ROOT);
     }
 
+    // Hàm normalize: Nhận ghi chú của bài nộp từ form sinh viên; chuyển null hoặc chuỗi trắng thành null, trim nội dung
+    // còn lại để lưu cùng SubmissionEntity.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private void registerRollbackCleanup(String relativePath) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                if (status != TransactionSynchronization.STATUS_COMMITTED) {
-                    fileStorageService.deleteQuietly(relativePath);
-                }
-            }
-        });
-    }
-
+    // Hàm DownloadedSubmission: Đóng gói Resource của tệp bài nộp cùng tên tệp và content type để controller trả
+    // response tải xuống.
     public record DownloadedSubmission(Resource resource, String fileName, String contentType) {}
 }

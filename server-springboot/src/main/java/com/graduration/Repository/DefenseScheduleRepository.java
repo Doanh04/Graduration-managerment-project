@@ -19,9 +19,26 @@ import com.graduration.entity.DefenseSchedulesEntity;
 @Repository
 public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedulesEntity, Long> {
     @Override
-    @EntityGraph(attributePaths = {"topic", "topic.defensePeriod", "topic.team", "defenseCommittees", "createdBy"})
+    @EntityGraph(
+            attributePaths = {
+                "topic",
+                "topic.defensePeriod",
+                "topic.defensePeriod.academicYear",
+                "topic.team",
+                "defenseCommittees",
+                "createdBy"
+            })
     Optional<DefenseSchedulesEntity> findById(Long scheduleId);
 
+    @EntityGraph(
+            attributePaths = {
+                "topic",
+                "topic.defensePeriod",
+                "topic.defensePeriod.academicYear",
+                "topic.team",
+                "defenseCommittees",
+                "createdBy"
+            })
     @Query(
             value =
                     """
@@ -49,6 +66,62 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
             @Param("room") String room,
             @Param("status") DefenseScheduleStatusConstain status,
             Pageable pageable);
+
+    @EntityGraph(
+            attributePaths = {
+                "topic",
+                "topic.defensePeriod",
+                "topic.defensePeriod.academicYear",
+                "topic.team",
+                "defenseCommittees",
+                "createdBy"
+            })
+    @Query(
+            value =
+                    """
+					select distinct schedule from DefenseSchedulesEntity schedule
+					join schedule.defenseCommittees committee
+					join committee.comitteesMember member
+					where member.lecture.lectureId = :lectureId
+					and member.status = :memberStatus
+					and schedule.status <> :cancelled
+					order by schedule.defenseDate, schedule.startTime
+					""",
+            countQuery =
+                    """
+					select count(distinct schedule) from DefenseSchedulesEntity schedule
+					join schedule.defenseCommittees committee
+					join committee.comitteesMember member
+					where member.lecture.lectureId = :lectureId
+					and member.status = :memberStatus
+					and schedule.status <> :cancelled
+					""")
+    Page<DefenseSchedulesEntity> findByCommitteeMember(
+            @Param("lectureId") String lectureId,
+            @Param("memberStatus") CommitteeMemberStatusConstain memberStatus,
+            @Param("cancelled") DefenseScheduleStatusConstain cancelled,
+            Pageable pageable);
+
+    /**
+     * Kiểm tra một giảng viên có đang là thành viên ACTIVE của hội đồng được
+     * gắn với đề tài trong lịch bảo vệ hay không.
+     */
+    @Query(
+            """
+			select count(schedule) > 0
+			from DefenseSchedulesEntity schedule
+			join schedule.defenseCommittees committee
+			join committee.comitteesMember member
+			where schedule.topic.idTopic = :topicId
+			and member.lecture.lectureId = :lectureId
+			and member.status = :memberStatus
+			and schedule.status <> :cancelled
+			""")
+    boolean existsActiveCommitteeMemberForTopic(
+            @Param("topicId") Long topicId,
+            @Param("lectureId") String lectureId,
+            @Param("memberStatus") CommitteeMemberStatusConstain memberStatus,
+            @Param("cancelled") DefenseScheduleStatusConstain cancelled);
 
     @Query(
             """

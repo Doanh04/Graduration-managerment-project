@@ -35,19 +35,23 @@ const menus = {
     { label: 'Nhật ký hoạt động', path: '/admin/audit-logs', icon: ScrollText, allowedRoles: ['ADMIN'] },
     { label: 'Bài nộp & nhận xét', path: '/admin/submissions', icon: FileText },
     { label: 'Duyệt đăng ký đề tài', path: '/admin/topic-registrations', icon: ClipboardCheck },
+    { label: 'Ghi danh đồ án', path: '/admin/graduation-enrollments', icon: UserRoundCheck },
   ],
   lecturer: [
     { label: 'Tổng quan', path: '/lecturer', icon: LayoutDashboard, end: true },
     { label: 'Sinh viên hướng dẫn', path: '/lecturer/supervision', icon: Users },
-    { label: 'Duyệt báo cáo', path: '/lecturer/submissions', icon: ClipboardCheck },
+    { label: 'Tiến độ đồ án', path: '/lecturer/submissions', icon: ClipboardCheck },
     { label: 'Phản biện', path: '/lecturer/reviews', icon: BookOpen },
-    { label: 'Lịch hội đồng', path: '/lecturer/schedules', icon: CalendarDays },
+    { label: 'Bảo vệ đồ án', path: '/lecturer/schedules', icon: CalendarDays },
     { label: 'Chấm điểm', path: '/lecturer/scores', icon: Star },
+    { label: 'Biểu mẫu', path: '/lecturer/templates', icon: FileText },
+    { label: 'Thư viện đề tài', path: '/lecturer/library-topics', icon: BookOpen },
   ],
   student: [
     { label: 'Trang chức năng', path: '/student', icon: LayoutDashboard, end: true },
     { label: 'Nhóm của tôi', path: '/student/team', icon: Users },
     { label: 'Đề tài', path: '/student/topics', icon: BookOpen },
+    { label: 'Hồ sơ ghi danh', path: '/student/enrollment', icon: UserRoundCheck },
     { label: 'Tiến độ & nộp bài', path: '/student/progress', icon: ClipboardCheck },
     { label: 'Lịch bảo vệ', path: '/student/schedule', icon: CalendarDays },
     { label: 'Kết quả', path: '/student/results', icon: Star },
@@ -61,9 +65,9 @@ const sectionNames = { admin: 'BAN QUẢN LÝ KHOA', lecturer: 'KHÔNG GIAN GI�
 const adminMenuGroups = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard, items: menus.admin.slice(0, 1), standalone: true },
   { id: 'accounts', label: 'Tài khoản & quyền', icon: Users, items: [menus.admin[1], menus.admin[2], menus.admin[16]] },
-  { id: 'education', label: 'Dữ liệu đào tạo', icon: School, items: [menus.admin[3], menus.admin[4], menus.admin[5], menus.admin[6]] },
-  { id: 'projects', label: 'Quản lý đồ án', icon: BookOpen, items: [menus.admin[7], menus.admin[8], menus.admin[9], menus.admin[10], menus.admin[18], menus.admin[19]] },
-  { id: 'defense', label: 'Tổ chức bảo vệ', icon: ShieldCheck, items: [menus.admin[11], menus.admin[12]] },
+  { id: 'education', label: 'Dữ liệu đào tạo', icon: School, items: [menus.admin[3], menus.admin[5], menus.admin[6]] },
+  { id: 'projects', label: 'Quản lý đồ án', icon: BookOpen, items: [menus.admin[7], menus.admin[8], menus.admin[9], menus.admin[18], menus.admin[19], menus.admin[20]] },
+  { id: 'defense', label: 'Tổ chức bảo vệ', icon: ShieldCheck, items: [menus.admin[4], menus.admin[10], menus.admin[11], menus.admin[12]] },
   { id: 'resources', label: 'Tài nguyên & lịch sử', icon: FileText, items: [menus.admin[13], menus.admin[14], menus.admin[15], menus.admin[17]] },
 ];
 

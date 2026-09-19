@@ -35,9 +35,22 @@ public class TeamEntity {
     @Column(name = "role")
     String role;
 
-    @OneToMany(mappedBy = "team")
+    /**
+     * Thành viên được lưu theo nhóm, thay vì chỉ bằng khóa ngoại hiện thời trên
+     * student. Nhờ đó một sinh viên có thể có nhóm khác ở các đợt bảo vệ khác
+     * mà vẫn giữ nguyên lịch sử nhóm cũ.
+     */
+    @ManyToMany
+    @JoinTable(
+            name = "team_student",
+            joinColumns = @JoinColumn(name = "team_id"),
+            inverseJoinColumns = @JoinColumn(name = "student_id"))
     @Builder.Default
     List<StudentEntity> studentEntities = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "defense_period_id")
+    DefensePeriodEntity defensePeriod;
 
     @OneToOne
     @JoinColumn(name = "id_topic", referencedColumnName = "id_topic")

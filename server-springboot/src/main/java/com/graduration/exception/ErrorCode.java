@@ -56,7 +56,8 @@ public enum ErrorCode {
     TEAM_NOT_FOUND(1041, "Team not found", HttpStatus.NOT_FOUND),
     TEAM_NAME_NOT_BLANK(1042, "Team name not blank", HttpStatus.BAD_REQUEST),
     TEAM_ALREADY_EXISTS(1043, "Team name already exists", HttpStatus.CONFLICT),
-    STUDENT_ALREADY_IN_TEAM(1044, "Sinh viên này đã thuộc một nhóm khác", HttpStatus.CONFLICT),
+    STUDENT_ALREADY_IN_TEAM(
+            1044, "Sinh viên này đã thuộc một nhóm khác trong đợt bảo vệ đang chọn", HttpStatus.CONFLICT),
     TOPIC_ALREADY_ASSIGNED(1045, "Topic already belongs to another team", HttpStatus.CONFLICT),
     ACADEMIC_YEAR_NOT_FOUND(1046, "Academic year not found", HttpStatus.NOT_FOUND),
     ACADEMIC_YEAR_NOT_BLANK(1047, "Academic year not blank", HttpStatus.BAD_REQUEST),
@@ -72,19 +73,23 @@ public enum ErrorCode {
     DEFENSE_PERIOD_IN_USE(1056, "Đợt bảo vệ đang chứa đề tài hoặc mốc tiến độ nên chưa thể xóa", HttpStatus.CONFLICT),
     START_DATE_NOT_BLANK(1057, "Start date not blank", HttpStatus.BAD_REQUEST),
     END_DATE_NOT_BLANK(1058, "End date not blank", HttpStatus.BAD_REQUEST),
+    DEFENSE_PERIOD_PROJECT_TYPE_NOT_BLANK(1195, "Loại đồ án không được để trống", HttpStatus.BAD_REQUEST),
     LIBRARY_TOPIC_NOT_FOUND(1059, "Library topic not found", HttpStatus.NOT_FOUND),
     LIBRARY_TOPIC_TITLE_NOT_BLANK(1060, "Library topic title not blank", HttpStatus.BAD_REQUEST),
     LIBRARY_TOPIC_ALREADY_EXISTS(1061, "Library topic title already exists", HttpStatus.CONFLICT),
     TEMPLATE_NOT_FOUND(1062, "Template not found", HttpStatus.NOT_FOUND),
     TEMPLATE_NAME_NOT_BLANK(1063, "Template name not blank", HttpStatus.BAD_REQUEST),
     TEMPLATE_ALREADY_EXISTS(1064, "Template name already exists", HttpStatus.CONFLICT),
+    TEMPLATE_FILE_REQUIRED(1190, "Vui lòng chọn tệp biểu mẫu", HttpStatus.BAD_REQUEST),
+    TEMPLATE_FILE_TYPE_NOT_ALLOWED(1191, "Chỉ hỗ trợ tệp PDF, DOC hoặc DOCX", HttpStatus.BAD_REQUEST),
+    TEMPLATE_FILE_TOO_LARGE(1192, "Tệp biểu mẫu không được vượt quá 10 MB", HttpStatus.BAD_REQUEST),
     AUDIT_LOG_NOT_FOUND(1065, "Audit log not found", HttpStatus.NOT_FOUND),
     AUDIT_LOG_ACTION_NOT_BLANK(1066, "Audit log action not blank", HttpStatus.BAD_REQUEST),
     AUDIT_LOG_USER_ID_NOT_BLANK(1067, "Audit log user id not blank", HttpStatus.BAD_REQUEST),
     CLASS_IN_USE(1068, "Class contains students and cannot be deleted", HttpStatus.CONFLICT),
     MAJOR_IN_USE(1069, "Major contains classes and cannot be deleted", HttpStatus.CONFLICT),
     ENDPOINT_NOT_FOUND(1070, "Endpoint not found", HttpStatus.NOT_FOUND),
-    METHOD_NOT_ALLOWED(1071, "HTTP method not allowed", HttpStatus.METHOD_NOT_ALLOWED),
+    METHOD_NOT_ALLOWED(1071, "Phương thức yêu cầu không được hỗ trợ cho API này", HttpStatus.METHOD_NOT_ALLOWED),
     DATA_CONFLICT(1072, "Data conflicts with an existing record", HttpStatus.CONFLICT),
     ACCOUNT_INACTIVE(1073, "Tài khoản đã dừng hoạt động", HttpStatus.UNAUTHORIZED),
     TOPIC_NOT_FOUND(1074, "Không tìm thấy đề tài", HttpStatus.NOT_FOUND),
@@ -132,6 +137,7 @@ public enum ErrorCode {
     COMMENT_OPERATION_NOT_ALLOWED(1111, "Không thể thực hiện thao tác với nhận xét này", HttpStatus.CONFLICT),
     SCORE_NOT_FOUND(1120, "Score not found", HttpStatus.NOT_FOUND),
     SCORE_VALUE_INVALID(1122, "Score must be between 0 and 10", HttpStatus.BAD_REQUEST),
+    SCORE_COMMENT_NOT_BLANK(1123, "Nhận xét khi chấm điểm không được để trống", HttpStatus.BAD_REQUEST),
     SCORE_OPERATION_NOT_ALLOWED(1124, "Operation is not allowed for the current score status", HttpStatus.CONFLICT),
     SCORE_STUDENT_TOPIC_MISMATCH(1125, "Student does not belong to the topic team", HttpStatus.CONFLICT),
     TOPIC_SUPERVISOR_NOT_FOUND(1126, "Topic supervisor assignment not found", HttpStatus.NOT_FOUND),
@@ -193,7 +199,20 @@ public enum ErrorCode {
             1176, "Không thể thực hiện thao tác với đăng ký đề tài này", HttpStatus.CONFLICT),
     TOPIC_REGISTRATION_REJECTION_REASON_REQUIRED(1177, "Vui lòng nhập lý do từ chối đăng ký", HttpStatus.BAD_REQUEST),
     STUDENT_TEAM_REQUIRED(
-            1178, "Sinh viên phải thuộc một nhóm trước khi đăng ký hoặc đề xuất đề tài", HttpStatus.CONFLICT);
+            1178, "Sinh viên phải thuộc một nhóm trước khi đăng ký hoặc đề xuất đề tài", HttpStatus.CONFLICT),
+    ENROLLMENT_NOT_FOUND(1179, "Không tìm thấy hồ sơ ghi danh đồ án", HttpStatus.NOT_FOUND),
+    ENROLLMENT_ALREADY_EXISTS(1180, "Sinh viên đã được ghi danh vào đợt bảo vệ này", HttpStatus.CONFLICT),
+    ENROLLMENT_OPERATION_NOT_ALLOWED(
+            1181, "Không thể chuyển hồ sơ ghi danh sang trạng thái đã chọn", HttpStatus.CONFLICT),
+    ENROLLMENT_STUDENT_TEAM_REQUIRED(
+            1182, "Sinh viên phải thuộc một nhóm trước khi được ghi danh vào đợt bảo vệ", HttpStatus.CONFLICT),
+    ENROLLMENT_WITHDRAWN(
+            1196, "Sinh viên đã bị hủy tư cách thi trong đợt bảo vệ này", HttpStatus.FORBIDDEN),
+    TEAM_DEFENSE_PERIOD_REQUIRED(
+            1183, "Nhóm chưa được gắn đợt bảo vệ. Hãy cập nhật nhóm trước khi thêm thành viên", HttpStatus.CONFLICT),
+    TEAM_DEFENSE_PERIOD_IMMUTABLE(1184, "Không thể chuyển nhóm sang một đợt bảo vệ khác", HttpStatus.CONFLICT),
+    TOPIC_FILE_TYPE_NOT_ALLOWED(1193, "Chỉ hỗ trợ tệp PDF, DOC hoặc DOCX", HttpStatus.BAD_REQUEST),
+    TOPIC_FILE_TOO_LARGE(1194, "Tệp đề tài không được vượt quá 10 MB", HttpStatus.BAD_REQUEST);
 
     ErrorCode(int code, String mesage, HttpStatusCode statusCode) {
         this.code = code;

@@ -3,6 +3,7 @@ package com.graduration.Service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,7 @@ import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.DefenseScheduleConflictTypeConstain;
 import com.graduration.Constain.DefenseScheduleStatusConstain;
 import com.graduration.Constain.SupervisorAssignmentStatusConstain;
+import com.graduration.Constain.SupervisorRoleConstain;
 import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.DTO.Request.DefenseScheduleRequest;
 import com.graduration.DTO.Request.ScheduleReasonRequest;
@@ -122,6 +124,31 @@ class DefenseScheduleServiceTest {
         assertFalse(result.isValid());
         assertEquals(
                 DefenseScheduleConflictTypeConstain.ROOM_CONFLICT,
+                result.getConflicts().get(0).getType());
+    }
+
+    @Test
+    void validate_acceptsLegacyApprovedTopicThatAlreadyHasTeam() {
+        Fixture fixture = fixture();
+        fixture.topic.setStatus(TopicStatusConstain.APPROVED);
+        stubEntities(fixture);
+
+        DefenseScheduleValidationResponse result = scheduleService.validate(2L, request());
+
+        assertTrue(result.isValid());
+    }
+
+    @Test
+    void validate_rejectsTopicWithoutActivePrimarySupervisor() {
+        Fixture fixture = fixture();
+        fixture.topic.getTopicSuperVisorEntities().clear();
+        stubEntities(fixture);
+
+        DefenseScheduleValidationResponse result = scheduleService.validate(2L, request());
+
+        assertFalse(result.isValid());
+        assertEquals(
+                DefenseScheduleConflictTypeConstain.TOPIC_NOT_ELIGIBLE,
                 result.getConflicts().get(0).getType());
     }
 
@@ -242,6 +269,12 @@ class DefenseScheduleServiceTest {
                 .defensePeriod(period)
                 .team(team)
                 .build();
+        topic.getTopicSuperVisorEntities()
+                .add(TopicSuperVisorEntity.builder()
+                        .topic(topic)
+                        .status(SupervisorAssignmentStatusConstain.ACTIVE)
+                        .supervisorRole(SupervisorRoleConstain.PRIMARY)
+                        .build());
         DefenseCommitteesEntity committee = DefenseCommitteesEntity.builder()
                 .idComittees(3L)
                 .status(DefenseCommitteeStatusConstain.ACTIVE)

@@ -30,12 +30,16 @@ public class UserRoleService {
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getUsers: Nhận mã hoặc điều kiện tìm kiếm của getUsers, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi không
+    // tồn tại và trả về dữ liệu đã ánh xạ.
     public List<UserRoleResponse> getUsers() {
         return userRepository.findAll().stream().map(this::toResponse).toList();
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm updateRoles: Nhận mã bản ghi cùng dữ liệu cập nhật của updateRoles, tải bản ghi hiện có, kiểm tra trạng thái
+    // và ràng buộc rồi ghi các giá trị mới xuống repository.
     public UserRoleResponse updateRoles(String userId, UpdateUserRolesRequest request) {
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         var roleIds = request == null || request.getRoles() == null ? new HashSet<RoleConstain>() : request.getRoles();
@@ -47,6 +51,8 @@ public class UserRoleService {
         return toResponse(userRepository.save(user));
     }
 
+    // Hàm toResponse: Nhận UserEntity cùng role hiện có; ánh xạ username, hồ sơ hiển thị và danh sách role sang DTO
+    // phục vụ màn hình phân quyền.
     private UserRoleResponse toResponse(UserEntity user) {
         String fullName = user.getStudent() != null
                 ? user.getStudent().getFullNameStudent()

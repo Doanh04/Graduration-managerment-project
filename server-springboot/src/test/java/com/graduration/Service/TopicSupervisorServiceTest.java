@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.StatusConstain;
@@ -68,7 +67,6 @@ class TopicSupervisorServiceTest {
         SecurityContextHolder.getContext()
                 .setAuthentication(new UsernamePasswordAuthenticationToken(
                         "admin", null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
-        ReflectionTestUtils.setField(supervisorService, "maxTopicsPerPeriod", 5);
     }
 
     @AfterEach
@@ -151,17 +149,23 @@ class TopicSupervisorServiceTest {
     }
 
     @Test
-    void assign_rejectsLecturerAtPeriodLimit() {
+    void assign_allowsLecturerToSuperviseMultipleTopicsInSamePeriod() {
         Fixture fixture = fixture();
+        TopicEntity secondTopic = TopicEntity.builder()
+                .idTopic(10L)
+                .status(TopicStatusConstain.APPROVED)
+                .defensePeriod(fixture.topic.getDefensePeriod())
+                .build();
         when(topicRepository.findById(9L)).thenReturn(Optional.of(fixture.topic));
+        when(topicRepository.findById(10L)).thenReturn(Optional.of(secondTopic));
         when(lectureRepository.findById("lecture-1")).thenReturn(Optional.of(fixture.lecture));
-        when(supervisorRepository.countActiveAssignments("lecture-1", 2L, SupervisorAssignmentStatusConstain.ACTIVE))
-                .thenReturn(5L);
+        when(userRepository.findById("admin")).thenReturn(Optional.of(fixture.admin));
+        when(supervisorRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AppException exception = assertThrows(
-                AppException.class, () -> supervisorService.assign(9L, request(SupervisorRoleConstain.CO_SUPERVISOR)));
+        supervisorService.assign(9L, request(SupervisorRoleConstain.PRIMARY));
+        supervisorService.assign(10L, request(SupervisorRoleConstain.PRIMARY));
 
-        assertEquals(ErrorCode.TOPIC_SUPERVISOR_LIMIT_REACHED, exception.getErrorCode());
+        verify(supervisorRepository, org.mockito.Mockito.times(2)).save(any(TopicSuperVisorEntity.class));
     }
 
     @Test

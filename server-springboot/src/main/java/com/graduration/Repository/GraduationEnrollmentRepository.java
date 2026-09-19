@@ -4,13 +4,15 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.graduration.entity.GraduationEnrollmentEntity;
 import com.graduration.entity.StudentEntity;
 
-public interface GraduationEnrollmentRepository extends JpaRepository<GraduationEnrollmentEntity, Long> {
+public interface GraduationEnrollmentRepository
+        extends JpaRepository<GraduationEnrollmentEntity, Long>, JpaSpecificationExecutor<GraduationEnrollmentEntity> {
     @Query(
             """
 			select case when count(enrollment) > 0 then true else false end
@@ -41,4 +43,6 @@ public interface GraduationEnrollmentRepository extends JpaRepository<Graduation
 			order by student.fullNameStudent, student.studentCode
 			""")
     List<StudentEntity> findDistinctStudentsByAcademicYearId(@Param("academicYearId") Integer academicYearId);
+
+    List<GraduationEnrollmentEntity> findByStudent_UserEntity_UserIdOrderByEnrolledAtDesc(String userId);
 }

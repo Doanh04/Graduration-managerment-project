@@ -7,6 +7,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -54,10 +56,21 @@ public class RegisterStudentControler {
     }
 
     @GetMapping(value = "/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    public ResponseEntity<byte[]> exportStudents(@org.springframework.web.bind.annotation.RequestParam Integer year) {
-        byte[] file = userStudentService.exportStudentsByCreationYear(year);
+    public ResponseEntity<byte[]> exportStudents(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer year,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer academicYearId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long defensePeriodId) {
+        boolean exportByDefensePeriod = academicYearId != null || defensePeriodId != null;
+        byte[] file = exportByDefensePeriod
+                ? userStudentService.exportStudentsByAcademicYearAndDefensePeriod(academicYearId, defensePeriodId)
+                : userStudentService.exportStudentsByCreationYear(year);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=student-graduation-" + year + ".xlsx")
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        exportByDefensePeriod
+                                ? "attachment; filename=student-graduation-" + academicYearId + "-" + defensePeriodId
+                                        + ".xlsx"
+                                : "attachment; filename=student-graduation-" + year + ".xlsx")
                 .body(file);
     }
 
@@ -72,12 +85,20 @@ public class RegisterStudentControler {
     public ApiResponse<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>> getAllStudents(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer academicYearId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long defensePeriodId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String classCode) {
         return ApiResponse.<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>>builder()
-                .result(
-                        keyword == null
-                                ? userStudentService.getAllStudentsPage(page, size)
-                                : userStudentService.getAllStudentsPage(page, size, keyword))
+                .result(userStudentService.getAllStudentsPage(page, size, keyword, academicYearId, defensePeriodId, classCode))
+                .build();
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasAuthority('ROLE_STUDENT')")
+    public ApiResponse<RegisterStudentResponse> getCurrentStudent(Authentication authentication) {
+        return ApiResponse.<RegisterStudentResponse>builder()
+                .result(userStudentService.getCurrentStudentProfile(authentication.getName()))
                 .build();
     }
 

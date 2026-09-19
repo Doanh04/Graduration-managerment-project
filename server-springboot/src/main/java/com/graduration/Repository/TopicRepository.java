@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.graduration.Constain.SupervisorAssignmentStatusConstain;
+import com.graduration.Constain.SupervisorRoleConstain;
 import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.entity.TopicEntity;
 
@@ -16,15 +18,42 @@ public interface TopicRepository extends JpaRepository<TopicEntity, Long>, JpaSp
 
     boolean existsByCreatedByAndStatusIn(String createdBy, Collection<TopicStatusConstain> statuses);
 
-    boolean existsByProposedTeam_IdTeamAndStatusIn(Long teamId, Collection<TopicStatusConstain> statuses);
+    /**
+     * Loads only topics that can be placed on a defense schedule. A real team,
+     * an active primary supervisor and an unscheduled topic are required; this
+     * keeps the schedule form consistent with the same rules enforced on save.
+     */
+    @Query(
+            """
+			select distinct topic from TopicEntity topic
+			join fetch topic.team
+			join fetch topic.defensePeriod period
+			left join fetch period.academicYear
+			join fetch topic.topicSuperVisorEntities supervisor
+			where period.ID_Defense = :periodId
+			and topic.status in :statuses
+			and supervisor.status = :supervisorStatus
+			and supervisor.supervisorRole = :supervisorRole
+			and not exists (
+				select schedule.idDefenseScheduce
+				from DefenseSchedulesEntity schedule
+				where schedule.topic.idTopic = topic.idTopic
+			)
+			order by topic.createdAt desc
+			""")
+    List<TopicEntity> findEligibleForDefenseSchedule(
+            @Param("periodId") Long periodId,
+            @Param("statuses") Collection<TopicStatusConstain> statuses,
+            @Param("supervisorStatus") SupervisorAssignmentStatusConstain supervisorStatus,
+            @Param("supervisorRole") SupervisorRoleConstain supervisorRole);
 
     @Query(
             """
 			select distinct topic from TopicEntity topic
 			where topic.categoryTopic = com.graduration.Constain.CategoryTopicConstain.STUDENT
-			and (topic.proposedTeam.idTeam = :teamId or topic.createdBy in (
-				select student.userEntity.userId from StudentEntity student where student.team.idTeam = :teamId
-			))
+			and topic.createdBy in (
+				select student.userEntity.userId from TeamEntity team join team.studentEntities student where team.idTeam = :teamId
+			)
 			order by topic.createdAt desc
 			""")
     List<TopicEntity> findStudentProposalsByTeam(@Param("teamId") Long teamId);

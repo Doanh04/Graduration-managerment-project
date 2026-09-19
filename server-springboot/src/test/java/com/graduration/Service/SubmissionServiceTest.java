@@ -3,7 +3,6 @@ package com.graduration.Service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,7 +36,6 @@ import com.graduration.Repository.MilestoneRepository;
 import com.graduration.Repository.StudentRepository;
 import com.graduration.Repository.SubmissionRepository;
 import com.graduration.Repository.TeamRepository;
-import com.graduration.Service.GradurationService.FileStorageService;
 import com.graduration.Service.GradurationService.SubmissionService;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.MilesStoneEntity;
@@ -74,9 +72,6 @@ class SubmissionServiceTest {
     CommentRepository commentRepository;
 
     @Mock
-    FileStorageService fileStorageService;
-
-    @Mock
     SubmissionMapper submissionMapper;
 
     @InjectMocks
@@ -98,8 +93,6 @@ class SubmissionServiceTest {
     void upload_createsFirstVersionAndMetadata() {
         Fixture fixture = fixture();
         stubFixture(fixture);
-        when(fileStorageService.store(any(), any(), any(), any(), any()))
-                .thenReturn(new FileStorageService.StoredFile("relative/file.pdf", "uuid.pdf", "sha256"));
         when(submissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         submissionService.upload(5L, 10L, " First report ", pdf(), LocalDateTime.of(2026, 9, 10, 8, 0));
@@ -111,7 +104,8 @@ class SubmissionServiceTest {
         assertEquals(SubmissionStatusConstain.SUBMITTED, submission.getStatus());
         assertEquals(false, submission.getIsLate());
         assertEquals("First report", submission.getNote());
-        assertEquals("sha256", submission.getChecksum());
+        assertEquals(64, submission.getChecksum().length());
+        assertEquals(3, submission.getFileData().length);
     }
 
     @Test
@@ -124,8 +118,6 @@ class SubmissionServiceTest {
                         .version(2)
                         .status(SubmissionStatusConstain.REVISION_REQUIRED)
                         .build()));
-        when(fileStorageService.store(any(), any(), any(), any(), any()))
-                .thenReturn(new FileStorageService.StoredFile("relative/file.pdf", "uuid.pdf", "sha256"));
         when(submissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         submissionService.upload(5L, 10L, null, pdf(), LocalDateTime.of(2026, 9, 16, 8, 0));
@@ -147,7 +139,6 @@ class SubmissionServiceTest {
                 () -> submissionService.upload(5L, 10L, null, pdf(), LocalDateTime.of(2026, 9, 16, 8, 0)));
 
         assertEquals(ErrorCode.SUBMISSION_DEADLINE_PASSED, exception.getErrorCode());
-        verify(fileStorageService, never()).store(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -179,7 +170,6 @@ class SubmissionServiceTest {
                 () -> submissionService.upload(5L, 10L, null, pdf(), LocalDateTime.of(2026, 9, 10, 8, 0)));
 
         assertEquals(ErrorCode.SUBMISSION_ALREADY_APPROVED, exception.getErrorCode());
-        verify(fileStorageService, never()).store(any(), any(), any(), any(), any());
     }
 
     private void stubFixture(Fixture fixture) {

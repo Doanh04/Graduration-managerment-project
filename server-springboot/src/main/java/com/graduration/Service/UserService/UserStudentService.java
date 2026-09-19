@@ -58,6 +58,8 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm registerStudent: Nhận RegisterStudentRequest; chuẩn hóa và kiểm tra dữ liệu, tải role STUDENT/lớp học, tạo
+    // UserEntity cùng StudentEntity và lưu tài khoản sinh viên.
     public RegisterStudentResponse registerStudent(RegisterStudentRequest request) {
         normalizeRequest(request);
         validateRequest(request);
@@ -66,9 +68,7 @@ public class UserStudentService {
         Roles studentRole = roleRepository
                 .findById(RoleConstain.STUDENT)
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-        ClassEntity studentClass = classRepository
-                .findById(request.getClassId())
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        ClassEntity studentClass = findClass(request.getClassCode(), request.getClassId());
 
         UserEntity user = userMaper.toUserEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -86,8 +86,32 @@ public class UserStudentService {
         return userMaper.toStudentResponse(user, student);
     }
 
+    @Transactional(readOnly = true)
+    // Lấy hồ sơ sinh viên gắn với tài khoản đang đăng nhập để dashboard hiển thị dữ liệu từ cơ sở dữ liệu.
+    public RegisterStudentResponse getCurrentStudentProfile(String userName) {
+        if (userName == null || userName.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_USERNAME);
+        }
+
+        String identifier = userName.trim();
+        // Truy vấn từ StudentRepository để luôn đi qua quan hệ student.userEntity và lấy được
+        // student_code, email, số điện thoại cùng class.major thay vì phụ thuộc vào chiều ngược
+        // UserEntity.student (có thể chưa được khởi tạo trong phiên Hibernate hiện tại).
+        StudentEntity student = studentRepository
+                .findByUserEntity_UserName(identifier)
+                .orElseGet(() ->
+                        studentRepository.findByUserEntity_UserId(identifier).orElse(null));
+        if (student == null || student.getUserEntity() == null) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        return userMaper.toStudentResponse(student.getUserEntity(), student);
+    }
+
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getStudentByUserName: Nhận mã hoặc điều kiện tìm kiếm của getStudentByUserName, truy vấn bản ghi/quan hệ
+    // tương ứng, báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public RegisterStudentResponse getStudentByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
@@ -106,20 +130,26 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllStudents: Nhận các tham số lọc/phân trang của getAllStudents, truy vấn dữ liệu phù hợp từ repository,
+    // ánh xạ từng entity sang DTO và trả về cho giao diện.
     public List<RegisterStudentResponse> getAllStudents() {
         return getAllStudents(0, PaginationSupport.DEFAULT_SIZE);
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllStudents: Nhận các tham số lọc/phân trang của getAllStudents, truy vấn dữ liệu phù hợp từ repository,
+    // ánh xạ từng entity sang DTO và trả về cho giao diện.
     public List<RegisterStudentResponse> getAllStudents(Integer page, Integer size) {
         return studentRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(student -> userMaper.toStudentResponse(student.getUserEntity(), student))
                 .toList();
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllStudentsPage: Nhận các tham số lọc/phân trang của getAllStudentsPage, truy vấn dữ liệu phù hợp từ
+    // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
             Integer page, Integer size) {
         return getAllStudentsPage(page, size, null);
@@ -127,18 +157,31 @@ public class UserStudentService {
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getAllStudentsPage: Nhận các tham số lọc/phân trang của getAllStudentsPage, truy vấn dữ liệu phù hợp từ
+    // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
             Integer page, Integer size, String keyword) {
+        return getAllStudentsPage(page, size, keyword, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    // Hàm getAllStudentsPage: Nhận từ khóa, năm học và đợt bảo vệ từ màn hình quản lý sinh viên; truy vấn các sinh viên
+    // có ghi danh phù hợp với bộ lọc, phân trang kết quả và ánh xạ sang dữ liệu hiển thị cho frontend.
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPERVISOR')")
+    public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
+            Integer page, Integer size, String keyword, Integer academicYearId, Long defensePeriodId, String classCode) {
         var pageable = PaginationSupport.pageRequest(page, size);
-        var students = keyword == null || keyword.isBlank()
-                ? studentRepository.findAll(pageable)
-                : studentRepository.searchByNameOrCode(keyword.trim(), pageable);
+        var students = studentRepository.searchByKeywordAndAcademicYearAndDefensePeriod(
+                keyword == null ? null : keyword.trim(), academicYearId, defensePeriodId,
+                classCode == null || classCode.isBlank() ? null : classCode.trim(), pageable);
         return com.graduration.DTO.Response.PageResponse.from(
                 students, student -> userMaper.toStudentResponse(student.getUserEntity(), student));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm resetPasswordByUserName: Nhận username sinh viên; tìm tài khoản có hồ sơ sinh viên, sinh mật khẩu tạm, mã hóa
+    // và cập nhật mật khẩu rồi trả thông tin đặt lại.
     public PasswordResetResponse resetPasswordByUserName(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
@@ -161,6 +204,8 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm updateStudent: Nhận mã bản ghi cùng dữ liệu cập nhật của updateStudent, tải bản ghi hiện có, kiểm tra trạng
+    // thái và ràng buộc rồi ghi các giá trị mới xuống repository.
     public RegisterStudentResponse updateStudent(String userId, UpdateStudentRequest request) {
         if (request == null) {
             throw new AppException(ErrorCode.INVALID_KEY);
@@ -179,7 +224,9 @@ public class UserStudentService {
         if (userName == null || userName.isBlank()) throw new AppException(ErrorCode.USERNAME_NOT_BLANK);
         if (studentCode == null || studentCode.isBlank()) throw new AppException(ErrorCode.STUDENT_NOT_BLANK);
         if (fullName == null || fullName.isBlank()) throw new AppException(ErrorCode.FULLNAME_NOT_BLANK);
-        if (request.getClassId() == null) throw new AppException(ErrorCode.INVALID_KEY);
+        if ((request.getClassCode() == null || request.getClassCode().isBlank()) && request.getClassId() == null) {
+            throw new AppException(ErrorCode.CLASS_CODE_NOT_BLANK);
+        }
 
         if (userRepository.existsByUserNameAndUserIdNot(userName, userId))
             throw new AppException(ErrorCode.USERNAME_IS_EXITED);
@@ -190,9 +237,7 @@ public class UserStudentService {
         if (phone != null && studentRepository.existsByPhoneStudentAndIdStudentNot(phone, student.getIdStudent()))
             throw new AppException(ErrorCode.PHONE_IS_EXITED);
 
-        ClassEntity studentClass = classRepository
-                .findById(request.getClassId())
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        ClassEntity studentClass = findClass(request.getClassCode(), request.getClassId());
         user.setUserName(userName);
         student.setStudentCode(studentCode);
         student.setFullNameStudent(fullName);
@@ -206,6 +251,8 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional
+    // Hàm deleteStudentAccount: Nhận mã bản ghi của deleteStudentAccount, kiểm tra quyền và các quan hệ đang sử dụng,
+    // sau đó xóa hoặc chuyển bản ghi sang trạng thái tương ứng.
     public void deleteStudentAccount(String userName) {
         if (userName == null || userName.isBlank()) {
             throw new AppException(ErrorCode.INVALID_USERNAME);
@@ -221,6 +268,8 @@ public class UserStudentService {
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    // Hàm importStudents: Nhận tệp hoặc dòng dữ liệu đầu vào của importStudents, đọc các ô, kiểm tra định dạng và lỗi
+    // nghiệp vụ rồi tạo danh sách dữ liệu hợp lệ để lưu.
     public ImportStudentResult importStudents(MultipartFile file) {
         validateExcelFile(file);
 
@@ -232,9 +281,10 @@ public class UserStudentService {
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter formatter = new DataFormatter();
-            validateExcelHeader(sheet.getRow(0), formatter);
+            int headerRowIndex = findExcelHeaderRow(sheet, formatter);
+            boolean legacyClassIdColumn = validateExcelHeader(sheet.getRow(headerRowIndex), formatter);
 
-            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+            for (int rowIndex = headerRowIndex + 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 if (row == null || isEmptyRow(row, formatter)) {
                     continue;
@@ -242,7 +292,8 @@ public class UserStudentService {
 
                 totalRows++;
                 try {
-                    pendingImports.add(new PendingStudentImport(rowIndex + 1, readRequest(row, formatter)));
+                    pendingImports.add(
+                            new PendingStudentImport(rowIndex + 1, readRequest(row, formatter, legacyClassIdColumn)));
                 } catch (RuntimeException exception) {
                     errors.add(
                             new ImportStudentError(rowIndex + 1, cellValue(row, 0, formatter), exception.getMessage()));
@@ -270,6 +321,8 @@ public class UserStudentService {
         return new ImportStudentResult(totalRows, importedStudents.size(), errors.size(), importedStudents, errors);
     }
 
+    // Hàm ensureStudentsDoNotExist: Nhận đối tượng và điều kiện nghiệp vụ của ensureStudentsDoNotExist, đối chiếu các
+    // quan hệ/trạng thái cần thiết và trả kết quả hoặc ném lỗi khi điều kiện không đạt.
     private void ensureStudentsDoNotExist(List<PendingStudentImport> pendingImports) {
         Set<String> userNames = new HashSet<>();
         Set<String> studentCodes = new HashSet<>();
@@ -291,10 +344,13 @@ public class UserStudentService {
         }
     }
 
+    // Hàm isDuplicate: Nhận đối tượng và điều kiện nghiệp vụ của isDuplicate, đối chiếu các quan hệ/trạng thái cần
+    // thiết và trả kết quả hoặc ném lỗi khi điều kiện không đạt.
     private boolean isDuplicate(Set<String> values, String value) {
         return value != null && !values.add(value.toLowerCase(Locale.ROOT));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateRequest(RegisterStudentRequest request) {
         if (request == null) {
             throw new AppException(ErrorCode.INVALID_KEY);
@@ -311,11 +367,12 @@ public class UserStudentService {
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new AppException(ErrorCode.FULLNAME_NOT_BLANK);
         }
-        if (request.getClassId() == null) {
-            throw new AppException(ErrorCode.INVALID_KEY);
+        if ((request.getClassCode() == null || request.getClassCode().isBlank()) && request.getClassId() == null) {
+            throw new AppException(ErrorCode.CLASS_CODE_NOT_BLANK);
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateUniqueness(RegisterStudentRequest request) {
         if (userRepository.existsByUserName(request.getUserName())) {
             throw new AppException(ErrorCode.USERNAME_IS_EXITED);
@@ -332,6 +389,8 @@ public class UserStudentService {
         }
     }
 
+    // Hàm normalizeRequest: Nhận RegisterStudentRequest; trim username, mã sinh viên và họ tên, chuẩn hóa email/số điện
+    // thoại trống thành null rồi dùng DTO này để kiểm tra và tạo tài khoản.
     private void normalizeRequest(RegisterStudentRequest request) {
         if (request == null) {
             return;
@@ -341,16 +400,22 @@ public class UserStudentService {
         request.setFullName(trim(request.getFullName()));
         request.setEmail(normalize(request.getEmail()));
         request.setPhone(normalize(request.getPhone()));
+        request.setClassCode(normalize(request.getClassCode()));
     }
 
+    // Hàm trim: Nhận chuỗi mã hoặc tên từ request/ô Excel; giữ nguyên null và loại bỏ khoảng trắng đầu/cuối để dùng cho
+    // kiểm tra trùng và ghi cơ sở dữ liệu.
     private String trim(String value) {
         return value == null ? null : value.trim();
     }
 
+    // Hàm normalize: Nhận email hoặc số điện thoại tùy chọn của sinh viên; chuyển giá trị null/rỗng thành null và trim
+    // phần có nội dung trước khi kiểm tra/lưu.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void validateExcelFile(MultipartFile file) {
         if (file == null
                 || file.isEmpty()
@@ -360,47 +425,111 @@ public class UserStudentService {
         }
     }
 
-    private void validateExcelHeader(Row header, DataFormatter formatter) {
-        String[] expectedHeaders = {"userName", "password", "studentCode", "fullName", "email", "phone", "classId"};
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
+    private boolean validateExcelHeader(Row header, DataFormatter formatter) {
+        String[] expectedHeaders = {"userName", "password", "studentCode", "fullName", "email", "phone"};
 
         if (header == null) {
             throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
         }
 
         for (int column = 0; column < expectedHeaders.length; column++) {
-            String actualHeader =
-                    formatter.formatCellValue(header.getCell(column)).trim();
-            if (!expectedHeaders[column].equalsIgnoreCase(actualHeader)) {
+            String actualHeader = normalizeExcelHeader(formatter.formatCellValue(header.getCell(column)));
+            if (!normalizeExcelHeader(expectedHeaders[column]).equals(actualHeader)) {
                 throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
             }
         }
+
+        String classHeader = normalizeExcelHeader(formatter.formatCellValue(header.getCell(6)));
+        if ("classcode".equals(classHeader)) {
+            return false;
+        }
+        if ("classid".equals(classHeader)) {
+            return true;
+        }
+        throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
     }
 
-    private RegisterStudentRequest readRequest(Row row, DataFormatter formatter) {
-        String classId = cellValue(row, 6, formatter);
-        if (classId == null) {
+    /**
+     * Tìm hàng tiêu đề đầu tiên trong phần đầu của sheet, cho phép file Excel có
+     * thêm một vài dòng tiêu đề/trống phía trên mà không làm sai vị trí dữ liệu.
+     */
+    private int findExcelHeaderRow(Sheet sheet, DataFormatter formatter) {
+        int lastHeaderCandidate = Math.min(sheet.getLastRowNum(), 10);
+        for (int rowIndex = 0; rowIndex <= lastHeaderCandidate; rowIndex++) {
+            Row candidate = sheet.getRow(rowIndex);
+            if (candidate == null) {
+                continue;
+            }
+            try {
+                validateExcelHeader(candidate, formatter);
+                return rowIndex;
+            } catch (AppException ignored) {
+                // Thử hàng kế tiếp để hỗ trợ file có dòng tiêu đề phụ ở đầu sheet.
+            }
+        }
+        throw new AppException(ErrorCode.INVALID_EXCEL_FILE);
+    }
+
+    /** Chuẩn hóa tên cột Excel bằng cách bỏ BOM, khoảng trắng và dấu phân cách thừa do phần mềm bảng tính thêm vào. */
+    private String normalizeExcelHeader(String value) {
+        return value == null
+                ? ""
+                : value.replace("\uFEFF", "").replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+    }
+
+    // Hàm readRequest: Nhận một dòng Excel sinh viên; đọc username, mật khẩu, mã sinh viên, họ tên, email, điện thoại
+    // và mã lớp (classCode) để tạo RegisterStudentRequest; chỉ chuyển cột classId sang số khi đọc file cũ.
+    private RegisterStudentRequest readRequest(Row row, DataFormatter formatter, boolean legacyClassIdColumn) {
+        String classValue = cellValue(row, 6, formatter);
+        if (classValue == null) {
             throw new AppException(ErrorCode.INVALID_KEY);
         }
 
-        try {
-            return RegisterStudentRequest.builder()
-                    .userName(cellValue(row, 0, formatter))
-                    .password(cellValue(row, 1, formatter))
-                    .studentCode(cellValue(row, 2, formatter))
-                    .fullName(cellValue(row, 3, formatter))
-                    .email(cellValue(row, 4, formatter))
-                    .phone(cellValue(row, 5, formatter))
-                    .classId(Long.valueOf(classId))
-                    .build();
-        } catch (NumberFormatException exception) {
-            throw new AppException(ErrorCode.INVALID_KEY);
+        RegisterStudentRequest.RegisterStudentRequestBuilder builder = RegisterStudentRequest.builder()
+                .userName(cellValue(row, 0, formatter))
+                .password(cellValue(row, 1, formatter))
+                .studentCode(cellValue(row, 2, formatter))
+                .fullName(cellValue(row, 3, formatter))
+                .email(cellValue(row, 4, formatter))
+                .phone(cellValue(row, 5, formatter));
+        if (legacyClassIdColumn) {
+            try {
+                builder.classId(Long.valueOf(classValue));
+            } catch (NumberFormatException exception) {
+                throw new AppException(ErrorCode.INVALID_KEY);
+            }
+        } else {
+            builder.classCode(classValue);
         }
+        return builder.build();
     }
 
+    /**
+     * Tra cứu lớp theo mã lớp do người dùng gửi; chỉ dùng classId cũ khi request
+     * chưa được nâng cấp để bảo đảm các client hiện hữu vẫn hoạt động.
+     */
+    private ClassEntity findClass(String classCode, Long legacyClassId) {
+        String normalizedClassCode = normalize(classCode);
+        if (normalizedClassCode != null) {
+            return classRepository
+                    .findByClassCodeIgnoreCase(normalizedClassCode)
+                    .orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        }
+        if (legacyClassId != null) {
+            return classRepository.findById(legacyClassId).orElseThrow(() -> new AppException(ErrorCode.INVALID_KEY));
+        }
+        throw new AppException(ErrorCode.CLASS_CODE_NOT_BLANK);
+    }
+
+    // Hàm cellValue: Nhận ô Excel danh sách sinh viên; đọc đúng kiểu dữ liệu và chuyển thành chuỗi dùng để tạo
+    // RegisterStudentRequest hoặc báo lỗi dòng.
     private String cellValue(Row row, int column, DataFormatter formatter) {
         return normalize(formatter.formatCellValue(row.getCell(column)));
     }
 
+    // Hàm isEmptyRow: Nhận một dòng Excel; kiểm tra toàn bộ ô có rỗng hoặc chỉ chứa khoảng trắng hay không để bỏ qua
+    // dòng không có dữ liệu.
     private boolean isEmptyRow(Row row, DataFormatter formatter) {
         for (int column = 0; column <= 6; column++) {
             if (!formatter.formatCellValue(row.getCell(column)).isBlank()) {
@@ -412,11 +541,30 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm exportStudentsByCreationYear: Nhận năm tạo tài khoản; truy vấn sinh viên trong khoảng năm đó rồi tạo file
+    // Excel danh sách để giữ tương thích với các client cũ.
     public byte[] exportStudentsByCreationYear(Integer year) {
         if (year == null || year < 2000 || year > 2100) throw new AppException(ErrorCode.INVALID_KEY);
         List<StudentEntity> students = studentRepository.findForExportByCreatedAt(
                 LocalDateTime.of(year, 1, 1, 0, 0), LocalDateTime.of(year + 1, 1, 1, 0, 0));
+        return exportStudentsToExcel(students, "Năm tạo tài khoản: " + year);
+    }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    @Transactional(readOnly = true)
+    // Hàm exportStudentsByAcademicYearAndDefensePeriod: Nhận mã năm học và đợt bảo vệ từ modal xuất Excel, lấy các
+    // sinh viên đã ghi danh đúng đợt rồi tạo file chỉ chứa danh sách của phạm vi được chọn.
+    public byte[] exportStudentsByAcademicYearAndDefensePeriod(Integer academicYearId, Long defensePeriodId) {
+        if (academicYearId == null || academicYearId <= 0 || defensePeriodId == null || defensePeriodId <= 0) {
+            throw new AppException(ErrorCode.INVALID_KEY);
+        }
+        List<StudentEntity> students =
+                studentRepository.findForExportByAcademicYearAndDefensePeriod(academicYearId, defensePeriodId);
+        return exportStudentsToExcel(
+                students, "Năm học ID: " + academicYearId + " - Đợt bảo vệ ID: " + defensePeriodId);
+    }
+
+    private byte[] exportStudentsToExcel(List<StudentEntity> students, String scopeLabel) {
         try (Workbook workbook = new XSSFWorkbook();
                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Danh sách sinh viên");
@@ -442,7 +590,7 @@ public class UserStudentService {
             headingStyle.setFont(headingFont);
             headingStyle.setAlignment(HorizontalAlignment.CENTER);
             createMergedTitle(sheet, 3, 0, 5, "DANH SÁCH SINH VIÊN THAM GIA ĐỒ ÁN TỐT NGHIỆP", headingStyle);
-            createMergedTitle(sheet, 4, 0, 5, "Năm học: " + year, organizationStyle);
+            createMergedTitle(sheet, 4, 0, 5, scopeLabel, organizationStyle);
 
             CellStyle headerStyle = borderedStyle(workbook);
             headerStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
@@ -488,16 +636,22 @@ public class UserStudentService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
     @Transactional(readOnly = true)
+    // Hàm getStudentCreationYears: Nhận mã hoặc điều kiện tìm kiếm của getStudentCreationYears, truy vấn bản ghi/quan
+    // hệ tương ứng, báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public List<Integer> getStudentCreationYears() {
         return studentRepository.findDistinctCreationYears();
     }
 
+    // Hàm createMergedTitle: Nhận dữ liệu đầu vào của createMergedTitle, kiểm tra các trường bắt buộc và quan hệ liên
+    // quan, tạo bản ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
     private void createMergedTitle(
             Sheet sheet, int rowIndex, int firstColumn, int lastColumn, String value, CellStyle style) {
         Row row = sheet.createRow(rowIndex);
         createMergedCell(sheet, row, rowIndex, firstColumn, lastColumn, value, style);
     }
 
+    // Hàm createMergedCell: Nhận dữ liệu đầu vào của createMergedCell, kiểm tra các trường bắt buộc và quan hệ liên
+    // quan, tạo bản ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
     private void createMergedCell(
             Sheet sheet, int rowIndex, int firstColumn, int lastColumn, String value, CellStyle style) {
         Row row = sheet.getRow(rowIndex);
@@ -505,6 +659,8 @@ public class UserStudentService {
         createMergedCell(sheet, row, rowIndex, firstColumn, lastColumn, value, style);
     }
 
+    // Hàm createMergedCell: Nhận dữ liệu đầu vào của createMergedCell, kiểm tra các trường bắt buộc và quan hệ liên
+    // quan, tạo bản ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
     private void createMergedCell(
             Sheet sheet, Row row, int rowIndex, int firstColumn, int lastColumn, String value, CellStyle style) {
         Cell cell = row.createCell(firstColumn);
@@ -513,6 +669,8 @@ public class UserStudentService {
         sheet.addMergedRegion(new CellRangeAddress(rowIndex, rowIndex, firstColumn, lastColumn));
     }
 
+    // Hàm borderedStyle: Nhận Workbook; tạo CellStyle với viền bốn cạnh và căn giữa theo chiều dọc để định dạng các ô
+    // trong tệp Excel xuất.
     private CellStyle borderedStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         style.setBorderBottom(BorderStyle.THIN);
@@ -523,6 +681,8 @@ public class UserStudentService {
         return style;
     }
 
+    // Hàm ImportStudentResult: Đóng gói tổng số dòng, số dòng import thành công/thất bại, danh sách sinh viên tạo được
+    // và lỗi từng dòng để trả về sau import.
     public record ImportStudentResult(
             int totalRows,
             int successRows,
@@ -530,7 +690,11 @@ public class UserStudentService {
             List<RegisterStudentResponse> importedStudents,
             List<ImportStudentError> errors) {}
 
+    // Hàm ImportStudentError: Đóng gói số dòng, username và thông báo lỗi của một dòng Excel không thể import để giao
+    // diện hiển thị chi tiết.
     public record ImportStudentError(int row, String userName, String message) {}
 
+    // Hàm PendingStudentImport: Đóng gói dữ liệu sinh viên đã đọc từ một dòng Excel nhưng chưa lưu, dùng để kiểm tra
+    // trùng và xử lý import theo từng dòng.
     private record PendingStudentImport(int row, RegisterStudentRequest request) {}
 }

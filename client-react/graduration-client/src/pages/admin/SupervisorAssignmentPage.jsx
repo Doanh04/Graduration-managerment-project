@@ -4,6 +4,7 @@ import ResourceService from '../../services/ResourceService.jsx';
 import API_ENDPOINTS from '../../config/endpoints.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import getApiErrorMessage from '../../utils/apiError.js';
+import { formatDateTimeDisplay } from '../../utils/dateFormat.js';
 import ConfirmModal from '../../components/feedback/ConfirmModal.jsx';
 import '../../style/Search.scss';
 
@@ -115,4 +116,4 @@ function State({ icon: Icon, text, action, spin }) { return <div className="data
 function roleLabel() { return 'Giảng viên hướng dẫn'; }
 function statusLabel(value) { return value === 'ACTIVE' ? 'Đang hoạt động' : value === 'INACTIVE' ? 'Đã ngừng' : value || '—'; }
 function normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim(); }
-function formatDate(value) { if (!value) return '—'; return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)); }
+function formatDate(value) { return formatDateTimeDisplay(value); }

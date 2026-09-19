@@ -25,34 +25,28 @@ public class TopicSchemaMigration implements ApplicationRunner {
 				and column_name = 'proposed_team_id'
 				""",
                 Integer.class);
-        if (columnCount == null || columnCount == 0) {
-            jdbcTemplate.execute("alter table topic add column proposed_team_id bigint null");
+        if (columnCount != null && columnCount > 0) {
+            jdbcTemplate
+                    .queryForList(
+                            "select constraint_name from information_schema.key_column_usage "
+                                    + "where table_schema = database() and table_name = 'topic' "
+                                    + "and column_name = 'proposed_team_id' and referenced_table_name is not null",
+                            String.class)
+                    .forEach(constraint ->
+                            jdbcTemplate.execute("alter table topic drop foreign key `" + constraint + "`"));
+            jdbcTemplate.execute("alter table topic drop column proposed_team_id");
         }
 
-        Integer indexCount = jdbcTemplate.queryForObject(
+        Integer fileColumnCount = jdbcTemplate.queryForObject(
                 """
-				select count(*) from information_schema.statistics
+				select count(*) from information_schema.columns
 				where table_schema = database()
 				and table_name = 'topic'
-				and index_name = 'idx_topic_proposed_team'
+				and column_name = 'file_data'
 				""",
                 Integer.class);
-        if (indexCount == null || indexCount == 0) {
-            jdbcTemplate.execute("create index idx_topic_proposed_team on topic (proposed_team_id)");
-        }
-
-        Integer foreignKeyCount = jdbcTemplate.queryForObject(
-                """
-				select count(*) from information_schema.table_constraints
-				where constraint_schema = database()
-				and table_name = 'topic'
-				and constraint_name = 'fk_topic_proposed_team'
-				and constraint_type = 'FOREIGN KEY'
-				""",
-                Integer.class);
-        if (foreignKeyCount == null || foreignKeyCount == 0) {
-            jdbcTemplate.execute("alter table topic add constraint fk_topic_proposed_team "
-                    + "foreign key (proposed_team_id) references team(id_team) on delete set null");
+        if (fileColumnCount == null || fileColumnCount == 0) {
+            jdbcTemplate.execute("alter table topic add column file_data LONGBLOB null");
         }
     }
 }

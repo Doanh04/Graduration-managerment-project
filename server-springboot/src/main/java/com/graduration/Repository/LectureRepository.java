@@ -41,6 +41,19 @@ public interface LectureRepository extends JpaRepository<LectureEntity, String> 
     @EntityGraph(attributePaths = {"user", "user.roles", "user.roles.permission"})
     Optional<LectureEntity> findByUser_UserName(String userName);
 
+    /** Tra cứu tên giảng viên theo mọi định danh có thể được lưu trong topic (user, hồ sơ hoặc mã giảng viên). */
+    @Query(
+            """
+			select lecturer.fullNameLecture
+			from LectureEntity lecturer
+			left join lecturer.user user
+			where lecturer.lectureId = :identifier
+			or lower(lecturer.lectureCode) = lower(:identifier)
+			or user.userId = :identifier
+			or lower(user.userName) = lower(:identifier)
+			""")
+    Optional<String> findDisplayNameByAnyIdentifier(@Param("identifier") String identifier);
+
     boolean existsByLectureCodeAndLectureIdNot(String lectureCode, String lectureId);
 
     boolean existsByEmaillectureAndLectureIdNot(String email, String lectureId);

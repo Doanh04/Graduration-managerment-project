@@ -37,9 +37,6 @@ public class TemplateEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     String description;
 
-    @Column(name = "file_path", columnDefinition = "TEXT")
-    String filePath;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "template_type")
     TemplateTypeConstain templateType;
@@ -60,6 +57,12 @@ public class TemplateEntity {
     @Column(name = "file_size")
     Long fileSize;
 
+    /** Nội dung nhị phân của tệp biểu mẫu, lưu trực tiếp trong database thay vì lưu trên filesystem. */
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    byte[] fileData;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by")
     UserEntity uploadedBy;
@@ -77,6 +80,7 @@ public class TemplateEntity {
         updatedAt = now;
         version = version == null ? 1 : version;
         status = status == null ? TemplateStatusConstain.ACTIVE : status;
+        templateType = templateType == null ? TemplateTypeConstain.OTHER : templateType;
     }
 
     @PreUpdate

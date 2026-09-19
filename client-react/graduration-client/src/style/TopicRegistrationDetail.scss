@@ -75,9 +75,140 @@
   font-size: 16px;
 }
 
+.proposed-students-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposed-student-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e4eaf0;
+  border-radius: 9px;
+  background: #f8fbfd;
+}
+
+.proposed-student-row > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.proposed-student-row strong {
+  color: #273246;
+  font-size: 10px;
+}
+
+.proposed-student-row small {
+  color: #7c8b9d;
+  font-size: 8px;
+}
+
+.detail-empty {
+  color: #7c8b9d !important;
+}
+
+.registration-file-section h4 {
+  color: #087fa7;
+}
+
+.registration-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 12px;
+  border: 1px solid #dce8ef;
+  border-radius: 9px;
+  background: #f5fbfd;
+}
+
+.registration-file-name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.registration-file-name strong {
+  overflow: hidden;
+  color: #273246;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registration-file-name small {
+  color: #7c8b9d;
+  font-size: 8px;
+}
+
+.registration-file-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+}
+
+.registration-file-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #bfe2ed;
+  border-radius: 8px;
+  color: #087fa7;
+  background: #eaf8fc;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.registration-file-actions button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.registration-file-actions .file-close-preview {
+  color: #5f6f83;
+  border-color: #dce3ea;
+  background: #fff;
+}
+
+.registration-file-preview {
+  height: 360px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid #dce5ec;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.registration-file-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.registration-file-error {
+  margin: 9px 0 0;
+  color: #bc4034;
+  font-size: 9px;
+}
+
 @media (max-width: 600px) {
   .registration-detail-summary,
   .registration-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .registration-file-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

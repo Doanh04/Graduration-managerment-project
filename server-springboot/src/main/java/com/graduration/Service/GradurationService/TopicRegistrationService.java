@@ -46,9 +46,12 @@ public class TopicRegistrationService {
     TeamRepository teamRepository;
     LectureRepository lectureRepository;
     UserRepository userRepository;
+    GraduationEnrollmentService graduationEnrollmentService;
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional
+    // Hàm register: Nhận dữ liệu đầu vào của register, kiểm tra các trường bắt buộc và quan hệ liên quan, tạo bản ghi
+    // nghiệp vụ rồi lưu repository để trả kết quả cho API.
     public TopicRegistrationResponse register(CreateTopicRegistrationRequest request) {
         StudentEntity student = currentStudent();
         TeamEntity team = teamRepository
@@ -67,6 +70,8 @@ public class TopicRegistrationService {
                 .findByStudent_IdStudentAndDefensePeriod_ID_Defense(
                         student.getIdStudent(), topic.getDefensePeriod().getID_Defense())
                 .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_PERIOD_MISMATCH));
+        graduationEnrollmentService.requireParticipationAllowed(
+                student.getIdStudent(), topic.getDefensePeriod().getID_Defense());
         if (registrationRepository.existsByEnrollment_EnrollmentIdAndStatus(
                         enrollment.getEnrollmentId(), TopicRegistrationStatusConstain.PENDING)
                 || !registrationRepository
@@ -105,6 +110,8 @@ public class TopicRegistrationService {
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional(readOnly = true)
+    // Hàm getMine: Nhận các tham số lọc/phân trang của getMine, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public List<TopicRegistrationResponse> getMine() {
         TeamEntity team = teamRepository
                 .findByStudentEntities_UserEntity_UserId(currentUserId())
@@ -116,6 +123,8 @@ public class TopicRegistrationService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional(readOnly = true)
+    // Hàm getAll: Nhận các tham số lọc/phân trang của getAll, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
+    // entity sang DTO và trả về cho giao diện.
     public PageResponse<TopicRegistrationResponse> getAll(
             TopicRegistrationStatusConstain status, Integer page, Integer size) {
         var pageable = PaginationSupport.pageRequest(page, size);
@@ -127,6 +136,8 @@ public class TopicRegistrationService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm approve: Nhận mã bản ghi và thông tin thao tác của approve, kiểm tra trạng thái hiện tại cùng quyền thực
+    // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public TopicRegistrationResponse approve(Long registrationId) {
         TopicRegistrationEntity registration = findRegistration(registrationId);
         requirePending(registration);
@@ -140,9 +151,11 @@ public class TopicRegistrationService {
         }
         team.setTopic(topic);
         topic.setTeam(team);
-        topic.setStatus(TopicStatusConstain.REGISTERED);
+        topic.setStatus(TopicStatusConstain.APPROVED);
         topicRepository.save(topic);
         teamRepository.save(team);
+        graduationEnrollmentService.autoEnrollStudents(
+                team.getStudentEntities(), topic.getDefensePeriod(), "Tự động ghi danh khi Admin duyệt đăng ký đề tài");
         registration.setStatus(TopicRegistrationStatusConstain.APPROVED);
         review(registration, null);
         registrationRepository
@@ -158,6 +171,8 @@ public class TopicRegistrationService {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
+    // Hàm reject: Nhận mã bản ghi và thông tin thao tác của reject, kiểm tra trạng thái hiện tại cùng quyền thực hiện,
+    // cập nhật trạng thái/lý do và lưu thay đổi.
     public TopicRegistrationResponse reject(Long registrationId, String reason) {
         if (reason == null || reason.isBlank()) {
             throw new AppException(ErrorCode.TOPIC_REGISTRATION_REJECTION_REASON_REQUIRED);
@@ -171,6 +186,8 @@ public class TopicRegistrationService {
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional
+    // Hàm cancel: Nhận mã bản ghi của cancel, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
+    // ghi sang trạng thái tương ứng.
     public TopicRegistrationResponse cancel(Long registrationId) {
         TopicRegistrationEntity registration = findRegistration(registrationId);
         if (!registration
@@ -181,11 +198,16 @@ public class TopicRegistrationService {
                 .equals(currentUserId())) {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
+        graduationEnrollmentService.requireParticipationAllowed(
+                registration.getEnrollment().getStudent().getIdStudent(),
+                registration.getEnrollment().getDefensePeriod().getID_Defense());
         requirePending(registration);
         registration.setStatus(TopicRegistrationStatusConstain.CANCELLED);
         return toResponse(registrationRepository.save(registration));
     }
 
+    // Hàm review: Nhận đăng ký đề tài và lý do; ghi thời điểm duyệt, người duyệt hiện tại và lý do từ chối vào bản ghi
+    // đăng ký.
     private void review(TopicRegistrationEntity registration, String reason) {
         registration.setReviewedAt(LocalDateTime.now());
         registration.setReviewedBy(
@@ -193,22 +215,28 @@ public class TopicRegistrationService {
         registration.setRejectionReason(reason);
     }
 
+    // Hàm findRegistration: Nhận mã hoặc điều kiện tìm kiếm của findRegistration, truy vấn bản ghi/quan hệ tương ứng,
+    // báo lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicRegistrationEntity findRegistration(Long id) {
         return registrationRepository
                 .findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TOPIC_REGISTRATION_NOT_FOUND));
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requirePending(TopicRegistrationEntity registration) {
         if (registration.getStatus() != TopicRegistrationStatusConstain.PENDING) {
             throw new AppException(ErrorCode.TOPIC_REGISTRATION_OPERATION_NOT_ALLOWED);
         }
     }
 
+    // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireTeamWithoutTopic(TeamEntity team) {
         if (team.getTopic() != null) throw new AppException(ErrorCode.TEAM_ALREADY_HAS_TOPIC);
     }
 
+    // Hàm currentStudent: Dùng userId hiện tại truy vấn UserEntity, kiểm tra tài khoản có hồ sơ sinh viên rồi trả về
+    // StudentEntity cho các nghiệp vụ dành cho sinh viên.
     private StudentEntity currentStudent() {
         UserEntity user =
                 userRepository.findById(currentUserId()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -216,6 +244,8 @@ public class TopicRegistrationService {
         return user.getStudent();
     }
 
+    // Hàm currentUserId: Lấy tên định danh của tài khoản đã đăng nhập từ SecurityContext; dùng định danh này để truy
+    // vấn hồ sơ và giới hạn dữ liệu theo người dùng hiện tại.
     private String currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated())
@@ -223,10 +253,14 @@ public class TopicRegistrationService {
         return authentication.getName();
     }
 
+    // Hàm normalize: Nhận ghi chú hoặc lý do đăng ký đề tài; chuyển chuỗi null/rỗng thành null và trim phần còn lại
+    // trước khi lưu.
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    // Hàm toResponse: Nhận TopicRegistrationEntity; lấy đề tài, nhóm, sinh viên, đợt bảo vệ và giảng viên ưu tiên rồi
+    // ánh xạ đầy đủ sang DTO duyệt đăng ký.
     private TopicRegistrationResponse toResponse(TopicRegistrationEntity item) {
         StudentEntity student = item.getEnrollment().getStudent();
         LectureEntity lecturer = item.getPreferredSupervisor();

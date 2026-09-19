@@ -3,6 +3,7 @@ import { AlertCircle, Archive, BookOpen, CalendarDays, ChevronDown, Eye, Inbox, 
 import ResourceService from '../../services/ResourceService.jsx';
 import API_ENDPOINTS from '../../config/endpoints.js';
 import getApiErrorMessage from '../../utils/apiError.js';
+import { formatDateDisplay } from '../../utils/dateFormat.js';
 import '../../style/ProjectHistory.scss';
 
 const statusLabels = { DRAFT: 'Bản nháp', PENDING_APPROVAL: 'Chờ phê duyệt', APPROVED: 'Đã phê duyệt', REJECTED: 'Đã từ chối', REGISTERED: 'Đã đăng ký', PENDING: 'Chờ diễn ra', ONGOING: 'Đang diễn ra', FINISHED: 'Đã kết thúc' };
@@ -41,4 +42,4 @@ export default function ProjectHistoryPage() {
 
 function HistoryState({ icon: Icon, text, action, spin }) { return <div className="history-state"><Icon className={spin ? 'spin' : ''} size={30} /><strong>{text}</strong>{action && <button onClick={action}>Thử lại</button>}</div>; }
 function normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
-function formatDate(value) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('vi-VN').format(date); }
+function formatDate(value) { return formatDateDisplay(value); }

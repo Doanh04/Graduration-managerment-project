@@ -5,6 +5,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
+import com.graduration.Constain.SupervisorAssignmentStatusConstain;
+import com.graduration.Constain.SupervisorRoleConstain;
 import com.graduration.DTO.Request.CreateTopicRequest;
 import com.graduration.DTO.Request.UpdateTopicRequest;
 import com.graduration.DTO.Response.TopicResponse;
@@ -19,7 +21,6 @@ public interface TopicMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "team", ignore = true)
-    @Mapping(target = "proposedTeam", ignore = true)
     @Mapping(target = "defensePeriod", ignore = true)
     @Mapping(target = "topicSuperVisorEntities", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
@@ -35,7 +36,6 @@ public interface TopicMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "team", ignore = true)
-    @Mapping(target = "proposedTeam", ignore = true)
     @Mapping(target = "defensePeriod", ignore = true)
     @Mapping(target = "topicSuperVisorEntities", ignore = true)
     @Mapping(target = "reviewAssignment", ignore = true)
@@ -51,5 +51,15 @@ public interface TopicMapper {
     @Mapping(source = "defensePeriod.academicYear.academicYear", target = "academicYear")
     @Mapping(source = "team.idTeam", target = "teamId")
     @Mapping(source = "team.nameTeam", target = "teamName")
+    @Mapping(target = "proposedStudents", ignore = true)
+    @Mapping(target = "hasActiveSupervisor", expression = "java(hasActivePrimarySupervisor(topic))")
     TopicResponse toResponse(TopicEntity topic);
+
+    default boolean hasActivePrimarySupervisor(TopicEntity topic) {
+        return topic != null
+                && topic.getTopicSuperVisorEntities() != null
+                && topic.getTopicSuperVisorEntities().stream()
+                        .anyMatch(assignment -> assignment.getStatus() == SupervisorAssignmentStatusConstain.ACTIVE
+                                && assignment.getSupervisorRole() == SupervisorRoleConstain.PRIMARY);
+    }
 }

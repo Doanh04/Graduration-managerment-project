@@ -1,0 +1,51 @@
+.member-modal {
+  width: min(850px, calc(100vw - 28px));
+  height: auto !important;
+  max-height: calc(100vh - 30px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.member-modal > header,
+.member-modal > footer,
+.member-modal > .workflow-error,
+.member-add {
+  flex: none;
+}
+
+.member-modal > .workflow-error {
+  margin: 12px 22px 0;
+}
+
+.member-add {
+  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-areas: 'lecturer role' 'note action';
+}
+
+.member-add > label:nth-child(1) { grid-area: lecturer; }
+.member-add > label:nth-child(2) { grid-area: role; }
+.member-add .wide { grid-area: note; }
+.member-add > button { grid-area: action; }
+
+.member-list {
+  min-height: 0;
+  flex: 1;
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.member-list article {
+  flex: none;
+  background: #fff;
+}
+
+.member-modal > footer { background: #fff; }
+
+@media (max-width: 700px) {
+  .member-add {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'lecturer' 'role' 'note' 'action';
+  }
+}
