@@ -107,8 +107,8 @@ export default function SupervisorWorkspacePage() {
     setProposalModal(true);
   };
 
-  // Sinh viên được chọn trước khi tạo nhóm/ghi danh đợt. Vì vậy lọc theo lớp/khóa
-  // đã có ngay từ lúc tạo tài khoản, không lọc theo đợt bảo vệ.
+  // Danh sách vẫn lọc theo lớp/khóa. Khi đã chọn đợt bảo vệ, đối chiếu thêm
+  // các nhóm trong chính đợt đó để khóa sinh viên đã có nhóm; nhóm ở đợt khác không ảnh hưởng.
   useEffect(() => {
     if (!proposalModal || !proposal.classCode) {
       setProposalStudents([]);
@@ -119,11 +119,51 @@ export default function SupervisorWorkspacePage() {
       setProposalLoading(true);
       setProposalError('');
       try {
-        const students = await ResourceService.getAll(API_ENDPOINTS.students.list, {
-          classCode: proposal.classCode,
-          size: 500,
+        const [students, teams] = await Promise.all([
+          ResourceService.getAll(API_ENDPOINTS.students.list, {
+            classCode: proposal.classCode,
+            size: 500,
+          }),
+          proposal.defensePeriodId
+            ? ResourceService.getAll(API_ENDPOINTS.teams.list, {
+                defensePeriodId: proposal.defensePeriodId,
+                size: 500,
+              })
+            : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+
+        const assignedTeamsByStudent = new Map();
+        (Array.isArray(teams) ? teams : []).forEach((team) => {
+          (Array.isArray(team.students) ? team.students : []).forEach((student) => {
+            assignedTeamsByStudent.set(
+              String(student.studentCode || '').trim().toUpperCase(),
+              team.nameTeam || `Nhóm #${team.idTeam}`,
+            );
+          });
         });
-        if (!cancelled) setProposalStudents(Array.isArray(students) ? students : []);
+
+        const unavailableCodes = new Set(assignedTeamsByStudent.keys());
+        setProposalStudents((Array.isArray(students) ? students : []).map((student) => ({
+          ...student,
+          assignedTeamInPeriod: assignedTeamsByStudent.get(
+            String(student.studentCode || '').trim().toUpperCase(),
+          ) || '',
+        })));
+        if (proposal.defensePeriodId && unavailableCodes.size) {
+          setProposal((current) => {
+            const studentCodes = current.studentCodes.filter(
+              (code) => !unavailableCodes.has(String(code || '').trim().toUpperCase()),
+            );
+            const selectedStudentNames = Object.fromEntries(Object.entries(current.selectedStudentNames)
+              .filter(([code]) => studentCodes.includes(code)));
+            if (studentCodes.length === 1) {
+              const code = studentCodes[0];
+              return { ...current, studentCodes, selectedStudentNames, teamName: `Nhóm ${selectedStudentNames[code] || code}`, teamNameAuto: true };
+            }
+            return { ...current, studentCodes, selectedStudentNames, teamName: current.teamNameAuto ? '' : current.teamName, teamNameAuto: false };
+          });
+        }
       } catch (requestError) {
         if (!cancelled) setProposalError(getApiErrorMessage(requestError, 'Không thể tải danh sách sinh viên của lớp đã chọn.'));
       } finally {
@@ -132,12 +172,15 @@ export default function SupervisorWorkspacePage() {
     };
     loadStudentsForClass();
     return () => { cancelled = true; };
-  }, [proposalModal, proposal.classCode]);
+  }, [proposalModal, proposal.classCode, proposal.defensePeriodId, setProposal]);
 
   const submitProposal = async (event) => {
     event.preventDefault();
-    if (!proposal.title.trim() || !proposal.teamName.trim() || !proposal.defensePeriodId || !proposal.studentCodes.length) {
-      setProposalError('Vui lòng nhập tên đề tài, tên nhóm, đợt bảo vệ và chọn ít nhất một sinh viên.');
+    const multipleStudents = proposal.studentCodes.length > 1;
+    if (!proposal.title.trim() || !proposal.defensePeriodId || !proposal.studentCodes.length || (multipleStudents && !proposal.teamName.trim())) {
+      setProposalError(multipleStudents
+        ? 'Vui lòng nhập tên đề tài, tên nhóm, đợt bảo vệ và chọn sinh viên.'
+        : 'Vui lòng nhập tên đề tài, chọn đợt bảo vệ và ít nhất một sinh viên.');
       return;
     }
     if (proposal.file) {
@@ -156,7 +199,7 @@ export default function SupervisorWorkspacePage() {
     try {
       const data = new FormData();
       data.append('title', proposal.title.trim());
-      data.append('teamName', proposal.teamName.trim());
+      if (proposal.teamName.trim()) data.append('teamName', proposal.teamName.trim());
       data.append('defensePeriodId', String(Number(proposal.defensePeriodId)));
       ['description', 'objective', 'technology'].forEach((field) => {
         if (proposal[field]?.trim()) data.append(field, proposal[field].trim());
@@ -199,13 +242,38 @@ export default function SupervisorWorkspacePage() {
       else requests.push(Promise.resolve([]));
       if (item.topic?.teamId) requests.push(ResourceService.getAll(API_ENDPOINTS.submissions.byTeam(item.topic.teamId), { size: 500 }));
       else requests.push(Promise.resolve([]));
-      const [teamResult, milestonesResult, submissionsResult] = await Promise.allSettled(requests);
+      requests.push(ResourceService.getAll(API_ENDPOINTS.graduationEnrollments.list).catch(() => []));
+      const [teamResult, milestonesResult, submissionsResult, enrollmentResult] = await Promise.allSettled(requests);
+      const rawTeam = teamResult.status === 'fulfilled' ? teamResult.value : null;
+      const enrollments = enrollmentResult.status === 'fulfilled' && Array.isArray(enrollmentResult.value)
+        ? enrollmentResult.value.filter(Boolean)
+        : [];
+      const enrollmentByCode = new Map();
+      enrollments.forEach((enrollment) => {
+        const code = String(enrollment.studentCode || '').trim().toUpperCase();
+        if (!code) return;
+        const samePeriod = String(enrollment.defensePeriodId || '') === String(item.topic?.defensePeriodId || '');
+        const withdrawn = String(enrollment.status || '').toUpperCase() === 'WITHDRAWN';
+        const current = enrollmentByCode.get(code);
+        const currentSamePeriod = current && String(current.defensePeriodId || '') === String(item.topic?.defensePeriodId || '');
+        const currentWithdrawn = current && String(current.status || '').toUpperCase() === 'WITHDRAWN';
+        if (!current || (samePeriod && !currentSamePeriod) || (withdrawn && !currentWithdrawn)) enrollmentByCode.set(code, enrollment);
+      });
+      const team = rawTeam ? {
+        ...rawTeam,
+        students: (rawTeam.students || []).filter(Boolean).map((student) => {
+          const enrollment = enrollmentByCode.get(String(student.studentCode || '').trim().toUpperCase());
+          if (!enrollment) return student;
+          const enrollmentStatus = String(enrollment.status || '').toUpperCase();
+          return { ...student, enrollmentStatus, defenseEligible: enrollmentStatus !== 'WITHDRAWN' };
+        }),
+      } : null;
       setDetail((current) => current ? {
         ...current,
         loading: false,
-        team: teamResult.status === 'fulfilled' ? teamResult.value : null,
-        milestones: milestonesResult.status === 'fulfilled' ? milestonesResult.value : [],
-        submissions: submissionsResult.status === 'fulfilled' ? submissionsResult.value : [],
+        team,
+        milestones: milestonesResult.status === 'fulfilled' && Array.isArray(milestonesResult.value) ? milestonesResult.value.filter(Boolean) : [],
+        submissions: submissionsResult.status === 'fulfilled' && Array.isArray(submissionsResult.value) ? submissionsResult.value.filter(Boolean) : [],
         error: teamResult.status === 'rejected' && milestonesResult.status === 'rejected' && submissionsResult.status === 'rejected'
           ? 'Không thể tải thông tin nhóm, mốc tiến độ và bài nộp.' : '',
       } : current);
@@ -226,9 +294,9 @@ export default function SupervisorWorkspacePage() {
       <div>
         <span className="page-kicker">PHẠM VI HƯỚNG DẪN</span>
         <h2>Sinh viên hướng dẫn</h2>
-        <p>Chỉ xem và xử lý các đề tài, nhóm sinh viên được phân công hướng dẫn đang hoạt động.</p>
+        <p>Xem các đề tài và nhóm sinh viên được phân công hướng dẫn theo từng đợt bảo vệ.</p>
       </div>
-      <div className="supervisor-heading-actions"><button className="primary-button" onClick={openProposal}><Plus size={15} /> Đề xuất đề tài</button><div className="supervisor-scope-badge"><CheckCircle2 size={16} /><span>Phân công ACTIVE</span></div></div>
+      <div className="supervisor-heading-actions"><button className="primary-button" onClick={openProposal}><Plus size={15} /> Đề xuất đề tài</button><div className="supervisor-scope-badge"><CheckCircle2 size={16} /><span>Phân công</span></div></div>
     </section>
 
     <section className="supervisor-summary">
@@ -251,12 +319,13 @@ export default function SupervisorWorkspacePage() {
               <div className="table-scroll"><table><thead><tr><th>Đề tài</th><th>Nhóm sinh viên</th><th>Đợt bảo vệ</th><th>Phân công</th><th>Trạng thái</th><th /></tr></thead><tbody>
                 {filtered.map((item) => {
                   const topic = item.topic || {};
+                  const completed = !item.isProposal && isFinishedDefensePeriod(topic);
                   return <tr key={item.assignmentId}>
                     <td data-label="Đề tài"><strong>{topic.title || item.topicTitle || `Đề tài #${item.topicId}`}</strong><small>{topic.technology || `Mã đề tài: ${item.topicId}`}</small></td>
                     <td data-label="Nhóm sinh viên"><strong>{topic.teamName || 'Chưa có nhóm'}</strong><small>{topic.teamId ? `Nhóm #${topic.teamId}` : 'Chưa được gán nhóm'}</small></td>
                     <td data-label="Đợt bảo vệ"><strong>{topic.defensePeriodName || '—'}</strong><small>{topic.academicYear || ''}</small></td>
                     <td data-label={item.isProposal ? 'Ngày gửi' : 'Phân công'}>{formatDateDisplay(item.assignedAt)}</td>
-                    <td data-label="Trạng thái"><span className={`status-badge ${item.isProposal ? topicStatusClass(topic.status) : 'success'}`}>{item.isProposal ? topicStatusLabel(topic.status) : 'Đang hoạt động'}</span></td>
+                    <td data-label="Trạng thái"><span className={`status-badge ${item.isProposal ? topicStatusClass(topic.status) : completed ? 'muted' : 'success'}`}>{item.isProposal ? topicStatusLabel(topic.status) : completed ? 'Đã hoàn thành' : 'Đang hoạt động'}</span></td>
                     <td className="table-actions"><div className="inline-actions"><button className="view" onClick={() => openDetail(item)} title="Xem đề tài, nhóm và sinh viên"><Eye size={15} /></button><button className="view" onClick={() => showSubmissions(item)} title="Xem bài nộp và nhận xét"><FileText size={15} /></button></div></td>
                   </tr>;
                 })}
@@ -269,7 +338,7 @@ export default function SupervisorWorkspacePage() {
   </div>;
 }
 
-const emptySupervisorProposal = { title: '', description: '', objective: '', technology: '', defensePeriodId: '', classCode: '', teamName: '', studentCodes: [], file: null };
+const emptySupervisorProposal = { title: '', description: '', objective: '', technology: '', defensePeriodId: '', classCode: '', teamName: '', teamNameAuto: false, selectedStudentNames: {}, studentCodes: [], file: null };
 
 function SupervisorProposalModal({ proposal, setProposal, students, periods, classes, loading, saving, error, onSubmit, onClose }) {
   const [studentQuery, setStudentQuery] = useState('');
@@ -278,19 +347,30 @@ function SupervisorProposalModal({ proposal, setProposal, students, periods, cla
     if (!query) return students;
     return students.filter((student) => normalize(`${student.fullName} ${student.studentCode} ${student.classCode}`).includes(query));
   }, [studentQuery, students]);
-  const toggleStudent = (studentCode) => setProposal((current) => ({
-    ...current,
-    studentCodes: current.studentCodes.includes(studentCode)
-      ? current.studentCodes.filter((code) => code !== studentCode)
-      : [...current.studentCodes, studentCode],
-  }));
+  const toggleStudent = (student) => {
+    if (student.assignedTeamInPeriod) return;
+    setProposal((current) => {
+      const selected = current.studentCodes.includes(student.studentCode);
+      const studentCodes = selected
+        ? current.studentCodes.filter((code) => code !== student.studentCode)
+        : [...current.studentCodes, student.studentCode];
+      const selectedStudentNames = { ...current.selectedStudentNames };
+      if (selected) delete selectedStudentNames[student.studentCode];
+      else selectedStudentNames[student.studentCode] = student.fullName || student.studentCode;
+      if (studentCodes.length === 1) {
+        const code = studentCodes[0];
+        return { ...current, studentCodes, selectedStudentNames, teamName: `Nhóm ${selectedStudentNames[code] || code}`, teamNameAuto: true };
+      }
+      return { ...current, studentCodes, selectedStudentNames, teamName: current.teamNameAuto ? '' : current.teamName, teamNameAuto: false };
+    });
+  };
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !saving && onClose()}>
     <section className="supervisor-proposal-modal" role="dialog" aria-modal="true">
       <header><div><span>ĐỀ XUẤT ĐỀ TÀI</span><h3>Đề xuất đề tài kèm nhóm</h3></div><button type="button" onClick={onClose} aria-label="Đóng"><X size={20} /></button></header>
       <form onSubmit={onSubmit}>
         <div className="supervisor-proposal-grid">
           <label>Tên đề tài<b>*</b><input required value={proposal.title} onChange={(event) => setProposal({ ...proposal, title: event.target.value })} placeholder="Nhập tên đề tài" /></label>
-          <label>Tên nhóm<b>*</b><input required value={proposal.teamName} onChange={(event) => setProposal({ ...proposal, teamName: event.target.value })} placeholder="Nhập tên nhóm" /></label>
+          <label>Tên nhóm{proposal.studentCodes.length > 1 && <b>*</b>}<input required={proposal.studentCodes.length > 1} disabled={proposal.studentCodes.length <= 1} value={proposal.teamName} onChange={(event) => setProposal({ ...proposal, teamName: event.target.value, teamNameAuto: false })} placeholder={proposal.studentCodes.length === 1 ? 'Tên nhóm được tạo theo tên sinh viên' : proposal.studentCodes.length > 1 ? 'Nhập tên nhóm' : 'Chọn sinh viên trước'} />{proposal.studentCodes.length === 1 && <small className="proposal-class-help">Tên nhóm được tạo tự động theo sinh viên đã chọn.</small>}</label>
           <label>Đợt bảo vệ<b>*</b><select required value={proposal.defensePeriodId} onChange={(event) => setProposal({ ...proposal, defensePeriodId: event.target.value })}><option value="">Chọn đợt bảo vệ</option>{periods.map((period) => <option key={period.defensePeriodId} value={period.defensePeriodId}>{period.periodName} · {period.academicYear}</option>)}</select></label>
           <ClassSearchChoice value={proposal.classCode} classes={classes} onChange={(classCode) => { setStudentQuery(''); setProposal({ ...proposal, classCode }); }} />
           <label>Công nghệ<input value={proposal.technology} onChange={(event) => setProposal({ ...proposal, technology: event.target.value })} placeholder="Ví dụ: Spring Boot, React" /></label>
@@ -301,7 +381,7 @@ function SupervisorProposalModal({ proposal, setProposal, students, periods, cla
             {proposal.file && <small className="proposal-file-selected">{formatFileSize(proposal.file.size)} · Nhấn để thay tệp</small>}
           </label>
         </div>
-        <div className="supervisor-student-picker"><div className="picker-heading"><span>Chọn sinh viên vào nhóm<b>*</b></span><strong>Đã chọn {proposal.studentCodes.length}</strong></div>{!proposal.classCode ? <div className="proposal-option-state">Chọn lớp/khóa để tải danh sách sinh viên. Bạn có thể đổi lớp để chọn thêm sinh viên khác.</div> : loading ? <div className="proposal-option-state">Đang tải danh sách sinh viên...</div> : students.length ? <><label className="proposal-student-search"><Search size={15} /><input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Tìm theo họ tên hoặc MSSV..." /></label><div className="proposal-student-list">{filteredStudents.map((student) => <label key={student.studentCode} className={proposal.studentCodes.includes(student.studentCode) ? 'selected' : ''}><input type="checkbox" checked={proposal.studentCodes.includes(student.studentCode)} onChange={() => toggleStudent(student.studentCode)} /><span><strong>{student.fullName || 'Chưa cập nhật họ tên'}</strong><small>{student.studentCode} · {student.classCode || 'Chưa cập nhật lớp'}</small></span></label>)}{filteredStudents.length === 0 && <div className="proposal-option-state">Không tìm thấy sinh viên phù hợp.</div>}</div></> : <div className="proposal-option-state">Lớp/khóa này chưa có sinh viên.</div>}</div>
+        <div className="supervisor-student-picker"><div className="picker-heading"><span>Chọn sinh viên vào nhóm<b>*</b></span><strong>Đã chọn {proposal.studentCodes.length}</strong></div>{!proposal.classCode ? <div className="proposal-option-state">Chọn lớp/khóa để tải danh sách sinh viên. Bạn có thể đổi lớp để chọn thêm sinh viên khác.</div> : loading ? <div className="proposal-option-state">Đang tải danh sách sinh viên...</div> : students.length ? <><label className="proposal-student-search"><Search size={15} /><input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Tìm theo họ tên hoặc MSSV..." /></label><div className="proposal-student-list">{filteredStudents.map((student) => { const selected = proposal.studentCodes.includes(student.studentCode); const unavailable = Boolean(student.assignedTeamInPeriod); return <label key={student.studentCode} className={`${selected ? 'selected' : ''} ${unavailable ? 'unavailable' : ''}`.trim()} title={unavailable ? `Sinh viên đã thuộc ${student.assignedTeamInPeriod} trong đợt bảo vệ này` : undefined}><input type="checkbox" checked={selected} disabled={unavailable} onChange={() => toggleStudent(student)} /><span><strong>{student.fullName || 'Chưa cập nhật họ tên'}</strong><small>{student.studentCode} · {student.classCode || 'Chưa cập nhật lớp'}</small>{unavailable && <small className="student-team-warning">Đã có nhóm trong đợt này · {student.assignedTeamInPeriod}</small>}</span></label>; })}{filteredStudents.length === 0 && <div className="proposal-option-state">Không tìm thấy sinh viên phù hợp.</div>}</div></> : <div className="proposal-option-state">Lớp/khóa này chưa có sinh viên.</div>}</div>
         {error && <div className="workflow-error"><AlertCircle size={16} />{error}</div>}
         <footer><button type="button" className="secondary-button" onClick={onClose} disabled={saving}>Hủy</button><button type="submit" className="primary-button" disabled={saving || loading}>{saving ? 'Đang gửi...' : 'Gửi đề xuất'}</button></footer>
       </form>
@@ -337,9 +417,11 @@ function ClassSearchChoice({ value, classes, onChange }) {
 function SupervisorWorkspaceDetail({ detail, onClose, onSubmissions }) {
   const { item, topic, team, milestones, submissions = [], loading, error } = detail;
   const isProposal = Boolean(item.isProposal);
+  const completed = !isProposal && isFinishedDefensePeriod(topic);
   const students = Array.isArray(team?.students) ? team.students : [];
+  const bannedStudentCount = students.filter((student) => student.defenseEligible === false || student.enrollmentStatus === 'WITHDRAWN').length;
   const latestSubmissionByMilestone = new Map();
-  submissions.filter((submission) => String(submission.status || '').toUpperCase() !== 'WITHDRAWN').forEach((submission) => {
+  submissions.filter((submission) => submission && String(submission.status || '').toUpperCase() !== 'WITHDRAWN').forEach((submission) => {
     const key = String(submission.milestoneId);
     const current = latestSubmissionByMilestone.get(key);
     if (!current || Number(submission.version || 0) > Number(current.version || 0) || (Number(submission.version || 0) === Number(current.version || 0) && String(submission.submittedAt || '') > String(current.submittedAt || ''))) latestSubmissionByMilestone.set(key, submission);
@@ -348,11 +430,11 @@ function SupervisorWorkspaceDetail({ detail, onClose, onSubmissions }) {
     <section className="supervisor-workspace-detail" role="dialog" aria-modal="true">
       <header><div><span>{isProposal ? 'ĐỀ XUẤT ĐỀ TÀI' : 'ĐỀ TÀI ĐƯỢC PHÂN CÔNG'}</span><h3>{topic?.title || item.topicTitle || `Đề tài #${item.topicId}`}</h3></div><button onClick={onClose} aria-label="Đóng"><X size={20} /></button></header>
       {loading ? <State icon={LoaderCircle} text="Đang tải thông tin đề tài và nhóm..." spin /> : error ? <State icon={AlertCircle} text={error} /> : <div className="supervisor-workspace-detail-body">
-        <section className="assignment-overview"><article><span>{isProposal ? 'Trạng thái đề xuất' : 'Trạng thái phân công'}</span><strong className={isProposal ? `text-${topicStatusClass(topic?.status)}` : 'text-success'}>{isProposal ? topicStatusLabel(topic?.status) : 'Đang hoạt động'}</strong></article><article><span>Đợt bảo vệ</span><strong>{topic?.defensePeriodName || '—'}</strong></article><article><span>{isProposal ? 'Ngày gửi đề xuất' : 'Ngày phân công'}</span><strong>{formatDateDisplay(item.assignedAt)}</strong></article></section>
+        <section className="assignment-overview"><article><span>{isProposal ? 'Trạng thái đề xuất' : 'Trạng thái phân công'}</span><strong className={isProposal ? `text-${topicStatusClass(topic?.status)}` : completed ? 'text-muted' : 'text-success'}>{isProposal ? topicStatusLabel(topic?.status) : completed ? 'Đã hoàn thành' : 'Đang hoạt động'}</strong></article><article><span>Đợt bảo vệ</span><strong>{topic?.defensePeriodName || '—'}</strong></article><article><span>{isProposal ? 'Ngày gửi đề xuất' : 'Ngày phân công'}</span><strong>{formatDateDisplay(item.assignedAt)}</strong></article></section>
         <section className="detail-card"><div className="detail-card-title"><BookOpen size={19} /><div><span>THÔNG TIN ĐỀ TÀI</span><h4>{topic?.title || item.topicTitle}</h4></div></div><div className="topic-detail-grid"><div><span>Mô tả</span><p>{topic?.description || 'Chưa có mô tả.'}</p></div><div><span>Mục tiêu</span><p>{topic?.objective || 'Chưa cập nhật mục tiêu.'}</p></div><div><span>Công nghệ</span><strong>{topic?.technology || 'Chưa cập nhật'}</strong></div><div><span>Ghi chú phân công</span><p>{item.note || 'Không có ghi chú.'}</p></div></div></section>
         {isProposal && String(topic?.status || '').toUpperCase() === 'PENDING_APPROVAL' && <PendingProposalPdf topic={topic} />}
         {isProposal && String(topic?.status || '').toUpperCase() === 'REJECTED' && topic?.rejectionReason && <section className="detail-card proposal-rejection-reason"><div className="detail-card-title"><AlertCircle size={19} /><div><span>PHẢN HỒI TỪ BAN QUẢN LÝ</span><h4>Lý do từ chối đề xuất</h4></div></div><p>{topic.rejectionReason}</p></section>}
-        <section className="detail-card"><div className="detail-card-title"><Users size={19} /><div><span>NHÓM SINH VIÊN</span><h4>{team?.nameTeam || topic?.teamName || 'Chưa có nhóm'} · {students.length} sinh viên</h4></div></div>{students.length ? <div className="supervised-student-list">{students.map((student, index) => <article key={student.studentCode || index}><span className="student-number">{index + 1}</span><div><strong>{student.fullName || 'Chưa cập nhật họ tên'}</strong><small>{student.studentCode || 'Chưa có mã sinh viên'}</small></div><div><span>{student.email || 'Chưa có email'}</span><small>{student.phone || 'Chưa có số điện thoại'}</small></div></article>)}</div> : <div className="detail-empty"><Users size={22} /><span>Đề tài chưa có nhóm sinh viên.</span></div>}</section>
+        <section className="detail-card"><div className="detail-card-title"><Users size={19} /><div><span>NHÓM SINH VIÊN</span><h4>{team?.nameTeam || topic?.teamName || 'Chưa có nhóm'} · {students.length} sinh viên{bannedStudentCount ? ` · ${bannedStudentCount} sinh viên bị cấm bảo vệ` : ''}</h4></div></div>{students.length ? <div className="supervised-student-list">{students.map((student, index) => { const banned = student.defenseEligible === false || student.enrollmentStatus === 'WITHDRAWN'; return <article className={banned ? 'defense-ineligible-student' : ''} key={student.studentCode || index}><span className="student-number">{index + 1}</span><div><strong>{student.fullName || 'Chưa cập nhật họ tên'}{banned && <em className="defense-ineligible-badge">Sinh viên bị cấm thi</em>}</strong><small>{student.studentCode || 'Chưa có mã sinh viên'}</small></div><div><span>{student.email || 'Chưa có email'}</span><small>{student.phone || 'Chưa có số điện thoại'}</small></div></article>; })}</div> : <div className="detail-empty"><Users size={22} /><span>Đề tài chưa có nhóm sinh viên.</span></div>}</section>
         <section className="detail-card"><div className="detail-card-title"><ClipboardCheck size={19} /><div><span>MỐC TIẾN ĐỘ</span><h4>{milestones.length} mốc trong đợt bảo vệ · {latestSubmissionByMilestone.size} mốc đã nộp</h4></div></div>{milestones.length ? <div className="supervisor-milestone-list">{milestones.map((milestone) => { const submission = latestSubmissionByMilestone.get(String(milestone.milestoneId)); const submissionStatus = String(submission?.status || '').toUpperCase(); return <article className={submission ? `has-submission ${submissionStatus === 'APPROVED' ? 'approved' : ''}` : ''} key={milestone.milestoneId}><div><strong>{milestone.milestoneName}</strong><small>{milestone.description || 'Không có mô tả.'}</small>{submission&&<small className="milestone-submitter">{submission.submittedByName || 'Sinh viên'}{submission.studentCode ? ` · ${submission.studentCode}` : ''} · Nộp {formatDateTimeDisplay(submission.submittedAt)}</small>}</div><div className="milestone-progress-state"><span>{milestoneStatusLabel(milestone.status)} · Hạn {formatDateTimeDisplay(milestone.deadline)}</span>{submission?<strong className={`submission-state ${submissionStatus.toLowerCase()}`}>{submissionStatusLabel(submissionStatus)} · Phiên bản {submission.version}</strong>:<em>Chưa nộp</em>}</div></article>; })}</div> : <div className="detail-empty"><ClipboardCheck size={22} /><span>Chưa có mốc tiến độ cho đợt này.</span></div>}</section>
       </div>}
       <footer><button className="secondary-button" onClick={onClose}>Đóng</button><button className="primary-button" onClick={onSubmissions} disabled={loading || isProposal || !topic?.teamId}><FileText size={15} /> Xem bài nộp & nhận xét</button></footer>
@@ -409,4 +491,5 @@ function milestoneStatusLabel(status) { return { DRAFT: 'Bản nháp', OPEN: 'Đ
 function submissionStatusLabel(status) { return { SUBMITTED: 'Đã nộp', UNDER_REVIEW: 'Đang duyệt', REVISION_REQUIRED: 'Cần chỉnh sửa', APPROVED: 'Đã phê duyệt', REJECTED: 'Đã từ chối' }[status] || 'Đã nộp'; }
 function topicStatusLabel(status) { return { DRAFT: 'Bản nháp', PENDING_APPROVAL: 'Chờ duyệt', APPROVED: 'Đã duyệt', REGISTERED: 'Đã đăng ký', REJECTED: 'Từ chối' }[String(status || '').toUpperCase()] || 'Chưa xác định'; }
 function topicStatusClass(status) { return { DRAFT: 'warning', PENDING_APPROVAL: 'warning', APPROVED: 'success', REGISTERED: 'success', REJECTED: 'danger' }[String(status || '').toUpperCase()] || 'muted'; }
+function isFinishedDefensePeriod(topic) { return String(topic?.defensePeriodStatus || '').toUpperCase() === 'FINISHED'; }
 function formatFileSize(bytes) { if (!bytes) return '0 B'; if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }

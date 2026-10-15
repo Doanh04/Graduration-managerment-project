@@ -2,8 +2,10 @@ package com.graduration.Service.AcademicService;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +33,7 @@ public class DefensePeriodService {
     DefensePeriodRepository defensePeriodRepository;
     AcademicYearRepository academicYearRepository;
     DefensePeriodMapper defensePeriodMapper;
-    Clock clock = Clock.systemDefaultZone();
+    Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
@@ -44,6 +46,7 @@ public class DefensePeriodService {
 
         DefensePeriodEntity defensePeriod = defensePeriodMapper.toDefensePeriodEntity(request);
         defensePeriod.setAcademicYear(academicYear);
+        defensePeriod.synchronizeStatus(LocalDate.now(clock));
         return defensePeriodMapper.toDefensePeriodResponse(defensePeriodRepository.save(defensePeriod));
     }
 
@@ -113,12 +116,14 @@ public class DefensePeriodService {
     // tra trạng thái và ràng buộc rồi ghi các giá trị mới xuống repository.
     public DefensePeriodResponse updateDefensePeriod(Long defensePeriodId, DefensePeriodRequest request) {
         DefensePeriodEntity defensePeriod = findDefensePeriod(defensePeriodId);
+        requireOpenPeriod(defensePeriod);
         validateAndNormalize(request);
         AcademicYearEntity academicYear = findAcademicYear(request.getAcademicId());
         validateUniqueName(request, defensePeriodId);
 
         defensePeriodMapper.updateDefensePeriod(request, defensePeriod);
         defensePeriod.setAcademicYear(academicYear);
+        defensePeriod.synchronizeStatus(LocalDate.now(clock));
         return defensePeriodMapper.toDefensePeriodResponse(defensePeriodRepository.save(defensePeriod));
     }
 
@@ -128,6 +133,7 @@ public class DefensePeriodService {
     // đó xóa hoặc chuyển bản ghi sang trạng thái tương ứng.
     public void deleteDefensePeriod(Long defensePeriodId) {
         DefensePeriodEntity defensePeriod = findDefensePeriod(defensePeriodId);
+        requireOpenPeriod(defensePeriod);
         if (!defensePeriod.getTopic().isEmpty()
                 || !defensePeriod.getMilesStone().isEmpty()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_IN_USE);
@@ -140,6 +146,16 @@ public class DefensePeriodService {
     // FINISHED và lưu để các nghiệp vụ khác không tiếp tục sử dụng.
     public int finishExpiredPeriods() {
         return defensePeriodRepository.markExpiredPeriodsFinished(LocalDate.now(clock), DefensePeriodConstain.FINISHED);
+    }
+
+    @Scheduled(cron = "0 0 0 * * *", zone = "${app.time-zone:Asia/Ho_Chi_Minh}")
+    @Transactional
+    public int synchronizeStatuses() {
+        LocalDate today = LocalDate.now(clock);
+        int updated = defensePeriodRepository.markUpcomingPeriodsPending(today, DefensePeriodConstain.PENDING);
+        updated += defensePeriodRepository.markCurrentPeriodsOngoing(today, DefensePeriodConstain.ONGOING);
+        updated += defensePeriodRepository.markExpiredPeriodsFinished(today, DefensePeriodConstain.FINISHED);
+        return updated;
     }
 
     // Hàm findDefensePeriod: Nhận mã hoặc điều kiện tìm kiếm của findDefensePeriod, truy vấn bản ghi/quan hệ tương ứng,
@@ -184,15 +200,26 @@ public class DefensePeriodService {
                 || request.getStartDate() == null
                 || request.getEndDate() == null
                 || request.getProjectType() == null
-                || request.getProjectType().isBlank()
-                || request.getStatus() == null) {
+                || request.getProjectType().isBlank()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_INVALID);
         }
         if (request.getEndDate().isBefore(request.getStartDate())) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_INVALID_DATE);
         }
+        if (request.getFinalSubmissionDeadline() == null) {
+            request.setFinalSubmissionDeadline(request.getEndDate().atTime(23, 59, 59));
+        }
+        if (request.getFinalSubmissionDeadline().isBefore(request.getStartDate().atStartOfDay())) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_INVALID_DATE);
+        }
         request.setPeriodName(request.getPeriodName().trim());
         request.setProjectType(normalize(request.getProjectType()));
+    }
+
+    private void requireOpenPeriod(DefensePeriodEntity defensePeriod) {
+        if (defensePeriod.resolveStatus(LocalDate.now(clock)) == DefensePeriodConstain.FINISHED) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
+        }
     }
 
     // Hàm normalize: Nhận tên, mô tả hoặc địa điểm của đợt bảo vệ; chuyển null/rỗng thành null và trim chuỗi có nội

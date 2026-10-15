@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.TopicRegistrationStatusConstain;
 import com.graduration.Constain.TopicStatusConstain;
+import com.graduration.Constain.NotificationTypeConstain;
 import com.graduration.DTO.Request.TeamRequest;
 import com.graduration.DTO.Response.TeamResponse;
 import com.graduration.Repository.DefensePeriodRepository;
@@ -30,6 +31,9 @@ import com.graduration.Repository.StudentRepository;
 import com.graduration.Repository.TeamRepository;
 import com.graduration.Repository.TopicRegistrationRepository;
 import com.graduration.Repository.TopicRepository;
+import com.graduration.Service.GradurationService.GraduationEnrollmentService;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.StudentEntity;
 import com.graduration.entity.TeamEntity;
@@ -37,7 +41,6 @@ import com.graduration.entity.TopicEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
 import com.graduration.mapper.TeamMapper;
-import com.graduration.Service.GradurationService.GraduationEnrollmentService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +57,8 @@ public class TeamService {
     TopicRegistrationRepository topicRegistrationRepository;
     TeamMapper teamMapper;
     GraduationEnrollmentService graduationEnrollmentService;
+    NotificationService notificationService;
+    NotificationRecipientService notificationRecipientService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
@@ -77,6 +82,7 @@ public class TeamService {
             topicRepository.save(selectedTopic);
             graduationEnrollmentService.autoEnrollStudents(
                     savedTeam.getStudentEntities(), defensePeriod, "Tự động ghi danh khi nhóm được gán đề tài");
+            notifyTopicAssigned(savedTeam, selectedTopic);
         }
         return teamMapper.toTeamResponse(savedTeam);
     }
@@ -160,6 +166,7 @@ public class TeamService {
     // ràng buộc rồi ghi các giá trị mới xuống repository.
     public TeamResponse updateTeam(Long teamId, TeamRequest request) {
         TeamEntity team = findTeam(teamId);
+        requireOpenDefensePeriod(team);
         normalizeRequest(request);
         DefensePeriodEntity defensePeriod = resolveDefensePeriodForUpdate(team, request.getDefensePeriodId());
         if (teamRepository.existsByNameAndDefensePeriodAndIdNot(
@@ -177,7 +184,9 @@ public class TeamService {
         teamMapper.updateTeam(request, team);
         team.setTopic(selectedTopic);
         synchronizeTopicAssignment(team, previousTopic, selectedTopic);
-        return teamMapper.toTeamResponse(teamRepository.save(team));
+        TeamEntity saved = teamRepository.save(team);
+        if (selectedTopic != null && previousTopic == null) notifyTopicAssigned(saved, selectedTopic);
+        return teamMapper.toTeamResponse(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -186,6 +195,7 @@ public class TeamService {
     // dùng, sau đó liên kết hai entity và hủy các đăng ký chờ của nhóm.
     public TeamResponse selectTopic(Long teamId, Long topicId) {
         TeamEntity team = findTeam(teamId);
+        requireOpenDefensePeriod(team);
         requireTeamMemberOrManager(team);
 
         if (team.getTopic() != null) {
@@ -211,7 +221,19 @@ public class TeamService {
                 team.getStudentEntities(), team.getDefensePeriod(), "Tự động ghi danh khi nhóm được gán đề tài");
         cancelPendingRegistrations(team);
         topicRepository.save(topic);
-        return teamMapper.toTeamResponse(teamRepository.save(team));
+        TeamEntity saved = teamRepository.save(team);
+        notifyTopicAssigned(saved, topic);
+        return teamMapper.toTeamResponse(saved);
+    }
+
+    private void notifyTopicAssigned(TeamEntity team, TopicEntity topic) {
+        notificationService.notifyUsers(
+                notificationRecipientService.studentUserIdsForTeam(team.getIdTeam()),
+                "Nhóm đã được gán đề tài",
+                "Nhóm " + team.getNameTeam() + " đã được gán đề tài \"" + topic.getTitle() + "\".",
+                NotificationTypeConstain.TOPIC_ASSIGNED,
+                "TOPIC",
+                topic.getIdTopic());
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -220,6 +242,7 @@ public class TeamService {
     // chuyển bản ghi sang trạng thái tương ứng.
     public void deleteTeam(Long teamId) {
         TeamEntity team = findTeam(teamId);
+        requireOpenDefensePeriod(team);
         team.getStudentEntities().forEach(student -> {
             student.getTeamMemberships().remove(team);
         });
@@ -237,6 +260,7 @@ public class TeamService {
     // quan hệ và lưu hồ sơ sinh viên.
     public TeamResponse addStudent(Long teamId, String studentCode) {
         TeamEntity team = findTeam(teamId);
+        requireOpenDefensePeriod(team);
         StudentEntity student = findStudentByCode(studentCode);
         attachStudent(team, student);
         studentRepository.save(student);
@@ -255,6 +279,7 @@ public class TeamService {
         }
 
         TeamEntity team = findTeam(teamId);
+        requireOpenDefensePeriod(team);
         Set<String> uniqueCodes = studentCodes.stream()
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -272,6 +297,7 @@ public class TeamService {
     // chuyển bản ghi sang trạng thái tương ứng.
     public TeamResponse removeStudent(Long teamId, String studentCode) {
         TeamEntity team = findTeam(teamId);
+        requireOpenDefensePeriod(team);
         StudentEntity student = findStudentByCode(studentCode);
         if (team.getStudentEntities().stream()
                 .noneMatch(member -> member.getIdStudent().equals(student.getIdStudent()))) {
@@ -438,7 +464,7 @@ public class TeamService {
                 && !defensePeriod
                         .getID_Defense()
                         .equals(topic.getDefensePeriod().getID_Defense())) {
-            throw new AppException(ErrorCode.SUBMISSION_PERIOD_MISMATCH);
+            throw new AppException(ErrorCode.TEAM_TOPIC_DEFENSE_PERIOD_MISMATCH);
         }
         return topic;
     }
@@ -487,7 +513,7 @@ public class TeamService {
         DefensePeriodEntity period = defensePeriodRepository
                 .findById(defensePeriodId)
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND));
-        if (period.getStatus() == com.graduration.Constain.DefensePeriodConstain.FINISHED) {
+        if (period.isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         return period;
@@ -498,6 +524,12 @@ public class TeamService {
             throw new AppException(ErrorCode.TEAM_DEFENSE_PERIOD_REQUIRED);
         }
         return team.getDefensePeriod();
+    }
+
+    private void requireOpenDefensePeriod(TeamEntity team) {
+        if (requireDefensePeriod(team).isFinished()) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
+        }
     }
 
     private DefensePeriodEntity resolveDefensePeriodForUpdate(TeamEntity team, Long requestedPeriodId) {

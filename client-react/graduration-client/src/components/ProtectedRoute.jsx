@@ -1,4 +1,5 @@
 import React from 'react';
+import { hasRole } from '../utils/roles.js';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import PageLoadingSkeleton from './feedback/PageLoadingSkeleton.jsx';
@@ -44,7 +45,7 @@ export default function ProtectedRoute({ children, allowedAccountTypes = [], all
 
   if (allowedRoles.length > 0) {
     const userRoles = user.roles || [];
-    if (!allowedRoles.some((role) => userRoles.includes(role))) {
+    if (!allowedRoles.some((role) => hasRole(userRoles, role))) {
       return <Navigate to="/access-denied" replace />;
     }
   }

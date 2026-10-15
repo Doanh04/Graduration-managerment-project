@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.graduration.Configuration.PaginationSupport;
-import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.DefenseScheduleStatusConstain;
 import com.graduration.Constain.ReviewAssignmentStatusConstain;
 import com.graduration.Constain.ReviewRecommendationConstain;
@@ -23,6 +22,7 @@ import com.graduration.DTO.Request.SubmitReviewRequest;
 import com.graduration.DTO.Response.PageResponse;
 import com.graduration.DTO.Response.ReviewAssignmentResponse;
 import com.graduration.Repository.LectureRepository;
+import com.graduration.Repository.DefenseCommitteeRepository;
 import com.graduration.Repository.ReviewAssignmentRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.Repository.UserRepository;
@@ -47,6 +47,8 @@ public class ReviewAssignmentService {
     final LectureRepository lectureRepository;
     final UserRepository userRepository;
     final ReviewAssignmentMapper reviewMapper;
+    final DefenseCommitteeRepository committeeRepository;
+    final ReviewAssignmentProvisioningService reviewProvisioning;
 
     @Value("${app.review.max-reviewers-per-topic:1}")
     int maxReviewersPerTopic;
@@ -64,6 +66,18 @@ public class ReviewAssignmentService {
                 .findById(request.getLectureId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         requireActiveLecturer(lecture);
+        var committee = committeeRepository.findById(request.getCommitteeId())
+                .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_COMMITTEE_NOT_FOUND));
+        if (committee.getDefensePeriod() == null
+                || !topic.getDefensePeriod().getID_Defense().equals(committee.getDefensePeriod().getID_Defense())) {
+            throw new AppException(ErrorCode.COMMITTEE_PERIOD_MISMATCH);
+        }
+        boolean assignedReviewer = committee.getComitteesMember().stream()
+                .anyMatch(member -> member.getStatus() == com.graduration.Constain.CommitteeMemberStatusConstain.ACTIVE
+                        && member.getRole() == com.graduration.Constain.CommitteeMemberRoleConstain.REVIEWER
+                        && member.getLecture() != null
+                        && lecture.getLectureId().equals(member.getLecture().getLectureId()));
+        if (!assignedReviewer) throw new AppException(ErrorCode.ACCESS_DENIED);
         requireValidDeadline(topic, request.getDeadline());
         if (isActiveSupervisor(topic, lecture.getLectureId())) {
             throw new AppException(ErrorCode.REVIEW_SUPERVISOR_CONFLICT);
@@ -85,6 +99,7 @@ public class ReviewAssignmentService {
         ReviewAssignmentEntity assignment = ReviewAssignmentEntity.builder()
                 .topic(topic)
                 .lecture(lecture)
+                .defenseCommittee(committee)
                 .deadline(request.getDeadline())
                 .status(ReviewAssignmentStatusConstain.ASSIGNED)
                 .assignedAt(LocalDateTime.now())
@@ -120,14 +135,18 @@ public class ReviewAssignmentService {
         return pageByLecturer(lectureId, status, page, size);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_ADMIN', 'ROLE_FACULTY')")
-    @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_SUPERVISOR', 'ROLE_ADMIN', 'ROLE_FACULTY')")
+    @Transactional
     // Hàm getMine: Nhận các tham số lọc/phân trang của getMine, truy vấn dữ liệu phù hợp từ repository, ánh xạ từng
     // entity sang DTO và trả về cho giao diện.
     public PageResponse<ReviewAssignmentResponse> getMine(
             ReviewAssignmentStatusConstain status, Integer page, Integer size) {
-        LectureEntity lecture = currentLecturer();
-        return pageByLecturer(lecture.getLectureId(), status, page, size);
+        String userId = currentAuthentication().getName();
+        reviewProvisioning.provisionForReviewerUser(userId);
+        return PageResponse.from(
+                reviewRepository.findByReviewerUser(
+                        userId, status, PaginationSupport.pageRequest(page, size)),
+                reviewMapper::toResponse);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_REVIEWER', 'ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -136,6 +155,7 @@ public class ReviewAssignmentService {
     // cập nhật trạng thái/lý do và lưu thay đổi.
     public ReviewAssignmentResponse start(Long assignmentId) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
+        requireOpenPeriod(assignment.getTopic());
         requireOwnerOrManager(assignment);
         requireStatus(assignment, ReviewAssignmentStatusConstain.ASSIGNED);
         assignment.setStatus(ReviewAssignmentStatusConstain.IN_PROGRESS);
@@ -148,6 +168,7 @@ public class ReviewAssignmentService {
     // recommendation, ghi thời điểm gửi rồi chuyển assignment sang SUBMITTED.
     public ReviewAssignmentResponse submit(Long assignmentId, SubmitReviewRequest request) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
+        requireOpenPeriod(assignment.getTopic());
         requireOwnerOrManager(assignment);
         if (assignment.getStatus() != ReviewAssignmentStatusConstain.ASSIGNED
                 && assignment.getStatus() != ReviewAssignmentStatusConstain.IN_PROGRESS
@@ -175,7 +196,11 @@ public class ReviewAssignmentService {
     // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public ReviewAssignmentResponse approve(Long assignmentId) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
+        requireOpenPeriod(assignment.getTopic());
         requireStatus(assignment, ReviewAssignmentStatusConstain.SUBMITTED);
+        if (assignment.getApprovedReportId() == null) {
+            throw new AppException(ErrorCode.DEFENSE_REPORT_NOT_APPROVED);
+        }
         if (assignment.getRecommendation() != ReviewRecommendationConstain.ELIGIBLE_FOR_DEFENSE) {
             throw new AppException(ErrorCode.REVIEW_OPERATION_NOT_ALLOWED);
         }
@@ -191,6 +216,7 @@ public class ReviewAssignmentService {
     // do yêu cầu bổ sung và chuyển assignment về trạng thái cần xử lý lại.
     public ReviewAssignmentResponse requestRevision(Long assignmentId) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
+        requireOpenPeriod(assignment.getTopic());
         requireStatus(assignment, ReviewAssignmentStatusConstain.SUBMITTED);
         assignment.setStatus(ReviewAssignmentStatusConstain.REVISION_REQUIRED);
         assignment.setReviewedAt(LocalDateTime.now());
@@ -204,6 +230,7 @@ public class ReviewAssignmentService {
     // ghi sang trạng thái tương ứng.
     public ReviewAssignmentResponse cancel(Long assignmentId, CancelReviewRequest request) {
         ReviewAssignmentEntity assignment = findAssignment(assignmentId);
+        requireOpenPeriod(assignment.getTopic());
         if (assignment.getStatus() == ReviewAssignmentStatusConstain.CANCELLED
                 || assignment.getStatus() == ReviewAssignmentStatusConstain.APPROVED) {
             throw new AppException(ErrorCode.REVIEW_OPERATION_NOT_ALLOWED);
@@ -237,8 +264,7 @@ public class ReviewAssignmentService {
     private TopicEntity findEligibleTopic(Long topicId) {
         TopicEntity topic =
                 topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
-        if (topic.getDefensePeriod() == null
-                || topic.getDefensePeriod().getStatus() == DefensePeriodConstain.FINISHED) {
+        if (topic.getDefensePeriod() == null || topic.getDefensePeriod().isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         if (topic.getTeam() == null
@@ -264,6 +290,15 @@ public class ReviewAssignmentService {
                         topic.getDefenseSchedule().getDefenseDate(),
                         topic.getDefenseSchedule().getStartTime()))) {
             throw new AppException(ErrorCode.REVIEW_DEADLINE_INVALID);
+        }
+    }
+
+    private void requireOpenPeriod(TopicEntity topic) {
+        if (topic == null || topic.getDefensePeriod() == null) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND);
+        }
+        if (topic.getDefensePeriod().isFinished()) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
     }
 

@@ -51,6 +51,17 @@ export const AuthProvider = ({ children }) => {
     }
   }, [restoreSession]);
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      localStorage.removeItem(AUTH_SESSION_MARKER);
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsLoading(false);
+    };
+    window.addEventListener('app:auth-session-expired', handleSessionExpired);
+    return () => window.removeEventListener('app:auth-session-expired', handleSessionExpired);
+  }, []);
+
   /**
    * Đăng nhập người dùng
    */

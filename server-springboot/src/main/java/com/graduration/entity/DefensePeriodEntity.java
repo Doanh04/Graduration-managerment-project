@@ -1,6 +1,8 @@
 package com.graduration.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,6 +23,8 @@ import lombok.experimental.FieldDefaults;
 @Table(name = "Defense_period")
 // Đợt bảo vệ đồ án
 public class DefensePeriodEntity {
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "Id_Defense")
@@ -34,6 +38,9 @@ public class DefensePeriodEntity {
 
     @Column(name = "end_date", nullable = false)
     LocalDate endDate;
+
+    @Column(name = "final_submission_deadline")
+    LocalDateTime finalSubmissionDeadline;
 
     @Column(name = "project_type")
     String projectType;
@@ -65,4 +72,35 @@ public class DefensePeriodEntity {
     @OneToMany(mappedBy = "defensePeriod")
     @Builder.Default
     List<TeamEntity> teams = new ArrayList<>();
+
+    public DefensePeriodConstain resolveStatus(LocalDate today) {
+        if (today == null || startDate == null || endDate == null) {
+            return status;
+        }
+        if (today.isBefore(startDate)) {
+            return DefensePeriodConstain.PENDING;
+        }
+        if (today.isAfter(endDate)) {
+            return DefensePeriodConstain.FINISHED;
+        }
+        return DefensePeriodConstain.ONGOING;
+    }
+
+    public void synchronizeStatus(LocalDate today) {
+        DefensePeriodConstain resolvedStatus = resolveStatus(today);
+        if (resolvedStatus != null) {
+            status = resolvedStatus;
+        }
+    }
+
+    public boolean isFinished() {
+        return resolveStatus(LocalDate.now(BUSINESS_ZONE)) == DefensePeriodConstain.FINISHED;
+    }
+
+    @PostLoad
+    @PrePersist
+    @PreUpdate
+    void synchronizeStatusWithCurrentDate() {
+        synchronizeStatus(LocalDate.now(BUSINESS_ZONE));
+    }
 }

@@ -1,0 +1,17 @@
+.student-shortcut.disabled {
+  cursor: not-allowed;
+  opacity: .48;
+  filter: grayscale(.35);
+  user-select: none;
+  pointer-events: none;
+}
+
+.student-shortcut.disabled:hover {
+  transform: none;
+  border-color: #e2e8ef;
+  box-shadow: 0 2px 8px rgba(25, 45, 70, .025);
+}
+
+.student-shortcut.disabled .student-shortcut-footer {
+  color: #778497;
+}

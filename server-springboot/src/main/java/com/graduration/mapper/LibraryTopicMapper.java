@@ -12,9 +12,17 @@ import com.graduration.entity.LibraryTopicEntity;
 @Mapper(componentModel = "spring", builder = @Builder(disableBuilder = true))
 public interface LibraryTopicMapper {
     @Mapping(target = "idLibraryTopic", ignore = true)
+    @Mapping(target = "fileName", ignore = true)
+    @Mapping(target = "contentType", ignore = true)
+    @Mapping(target = "fileSize", ignore = true)
+    @Mapping(target = "fileData", ignore = true)
     LibraryTopicEntity toLibraryTopicEntity(LibraryTopicRequest request);
 
     @Mapping(target = "idLibraryTopic", ignore = true)
+    @Mapping(target = "fileName", ignore = true)
+    @Mapping(target = "contentType", ignore = true)
+    @Mapping(target = "fileSize", ignore = true)
+    @Mapping(target = "fileData", ignore = true)
     void updateLibraryTopic(LibraryTopicRequest request, @MappingTarget LibraryTopicEntity libraryTopic);
 
     LibraryTopicResponse toLibraryTopicResponse(LibraryTopicEntity libraryTopic);

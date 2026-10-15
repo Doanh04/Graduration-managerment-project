@@ -17,6 +17,9 @@ public class SubmissionResponse {
     Long submissionId;
     Long milestoneId;
     String milestoneName;
+    Long defensePeriodId;
+    String defensePeriodName;
+    String academicYear;
     Long teamId;
     String teamName;
     String studentId;

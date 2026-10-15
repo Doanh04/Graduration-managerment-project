@@ -1,6 +1,7 @@
 package com.graduration.DTO.Response;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import com.graduration.Constain.DefensePeriodConstain;
 
@@ -17,6 +18,7 @@ public class DefensePeriodResponse {
     String periodName;
     LocalDate startDate;
     LocalDate endDate;
+    LocalDateTime finalSubmissionDeadline;
     String projectType;
     DefensePeriodConstain status;
     Integer academicId;

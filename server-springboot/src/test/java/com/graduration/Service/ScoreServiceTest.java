@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -140,8 +141,10 @@ class ScoreServiceTest {
         DefensePeriodEntity period =
                 DefensePeriodEntity.builder().ID_Defense(2L).build();
         TeamEntity team = TeamEntity.builder().idTeam(7L).build();
-        StudentEntity student =
-                StudentEntity.builder().idStudent("student-1").team(team).build();
+        StudentEntity student = StudentEntity.builder()
+                .idStudent("student-1")
+                .teamMemberships(new ArrayList<>(List.of(team)))
+                .build();
         TopicEntity topic = TopicEntity.builder()
                 .idTopic(9L)
                 .team(team)

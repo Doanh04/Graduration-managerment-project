@@ -90,7 +90,8 @@ public class RegisterStudentControler {
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long defensePeriodId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) String classCode) {
         return ApiResponse.<com.graduration.DTO.Response.PageResponse<RegisterStudentResponse>>builder()
-                .result(userStudentService.getAllStudentsPage(page, size, keyword, academicYearId, defensePeriodId, classCode))
+                .result(userStudentService.getAllStudentsPage(
+                        page, size, keyword, academicYearId, defensePeriodId, classCode))
                 .build();
     }
 

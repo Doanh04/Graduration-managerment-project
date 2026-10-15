@@ -10,25 +10,37 @@ import org.springframework.stereotype.Component;
 
 import com.graduration.Constain.CommitteeMemberStatusConstain;
 import com.graduration.Constain.EnrollmentStatusConstain;
+import com.graduration.Constain.ReviewAssignmentStatusConstain;
 import com.graduration.DTO.Response.DefenseScheduleResponse;
+import com.graduration.Repository.GraduationEnrollmentRepository;
+import com.graduration.Repository.ReviewAssignmentRepository;
 import com.graduration.entity.DefenseCommitteesEntity;
 import com.graduration.entity.DefenseSchedulesEntity;
 import com.graduration.entity.SubmistionEntity;
 import com.graduration.entity.TeamEntity;
 import com.graduration.entity.TopicEntity;
-import com.graduration.Repository.GraduationEnrollmentRepository;
+
 import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
 public class DefenseScheduleMapper {
     private final GraduationEnrollmentRepository enrollmentRepository;
+    private final ReviewAssignmentRepository reviewAssignmentRepository;
 
     public DefenseScheduleResponse toResponse(DefenseSchedulesEntity entity) {
         TopicEntity topic = entity.getTopic();
         // Lịch bảo vệ chỉ dùng nhóm đã được gán đề tài chính thức.
         TeamEntity team = selectTeam(topic);
         DefenseCommitteesEntity committee = entity.getDefenseCommittees();
+        var approvedReview = topic == null || committee == null
+                ? null
+                : reviewAssignmentRepository
+                        .findFirstByTopic_IdTopicAndDefenseCommittee_IdComitteesAndStatusOrderByReviewedAtDesc(
+                                topic.getIdTopic(),
+                                committee.getIdComittees(),
+                                ReviewAssignmentStatusConstain.APPROVED)
+                        .orElse(null);
         List<DefenseScheduleResponse.StudentSummary> students = team == null || team.getStudentEntities() == null
                 ? List.of()
                 : team.getStudentEntities().stream()
@@ -38,7 +50,8 @@ public class DefenseScheduleMapper {
                                     ? null
                                     : enrollmentRepository
                                             .findByStudent_IdStudentAndDefensePeriod_ID_Defense(
-                                                    student.getIdStudent(), topic.getDefensePeriod().getID_Defense())
+                                                    student.getIdStudent(),
+                                                    topic.getDefensePeriod().getID_Defense())
                                             .orElse(null);
                             var enrollmentStatus = enrollment == null ? null : enrollment.getStatus();
                             return DefenseScheduleResponse.StudentSummary.builder()
@@ -111,6 +124,8 @@ public class DefenseScheduleMapper {
                 .teamName(team == null ? null : team.getNameTeam())
                 .teamDescription(team == null ? null : team.getDescription())
                 .submissionId(latestSubmissionId(team))
+                .reviewAssignmentId(approvedReview == null ? null : approvedReview.getReviewAssignmentId())
+                .approvedReportId(approvedReview == null ? null : approvedReview.getApprovedReportId())
                 .students(students)
                 .committeeId(committee == null ? null : committee.getIdComittees())
                 .committeeName(committee == null ? null : committee.getComitteesName())

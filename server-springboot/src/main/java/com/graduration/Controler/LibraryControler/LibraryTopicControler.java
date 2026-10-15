@@ -1,15 +1,22 @@
 package com.graduration.Controler.LibraryControler;
 
-import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
 
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.DTO.Request.LibraryTopicRequest;
 import com.graduration.DTO.Response.ApiResponse;
@@ -24,11 +31,17 @@ import lombok.RequiredArgsConstructor;
 public class LibraryTopicControler {
     private final LibraryTopicService libraryTopicService;
 
-    @PostMapping("/create-library-topic")
-    public ApiResponse<LibraryTopicResponse> createLibraryTopic(@Valid @RequestBody LibraryTopicRequest request) {
+    @PostMapping(value = "/create-library-topic", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<LibraryTopicResponse> createLibraryTopic(
+            @RequestParam String title,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String objective,
+            @RequestParam(required = false) String technology,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
         return ApiResponse.<LibraryTopicResponse>builder()
-                .message("Library topic created successfully")
-                .result(libraryTopicService.createLibraryTopic(request))
+                .message("Thêm đề tài tham khảo thành công")
+                .result(libraryTopicService.createLibraryTopic(
+                        new LibraryTopicRequest(title, description, objective, technology), file))
                 .build();
     }
 
@@ -48,20 +61,46 @@ public class LibraryTopicControler {
                 .build();
     }
 
-    @PutMapping("/{idLibraryTopic}")
+    @PutMapping(value = "/{idLibraryTopic}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<LibraryTopicResponse> updateLibraryTopic(
-            @PathVariable Long idLibraryTopic, @Valid @RequestBody LibraryTopicRequest request) {
+            @PathVariable Long idLibraryTopic,
+            @RequestParam String title,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String objective,
+            @RequestParam(required = false) String technology,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
         return ApiResponse.<LibraryTopicResponse>builder()
-                .message("Library topic updated successfully")
-                .result(libraryTopicService.updateLibraryTopic(idLibraryTopic, request))
+                .message("Cập nhật đề tài tham khảo thành công")
+                .result(libraryTopicService.updateLibraryTopic(
+                        idLibraryTopic, new LibraryTopicRequest(title, description, objective, technology), file))
                 .build();
+    }
+
+    @GetMapping("/{idLibraryTopic}/file")
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long idLibraryTopic) {
+        LibraryTopicService.DownloadedLibraryTopic file = libraryTopicService.downloadFile(idLibraryTopic);
+        MediaType contentType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            if (file.contentType() != null) {
+                contentType = MediaType.parseMediaType(file.contentType());
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Metadata cũ không hợp lệ vẫn được trả về dưới dạng dữ liệu nhị phân.
+        }
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(file.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .contentType(contentType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(file.resource());
     }
 
     @DeleteMapping("/{idLibraryTopic}")
     public ApiResponse<Void> deleteLibraryTopic(@PathVariable Long idLibraryTopic) {
         libraryTopicService.deleteLibraryTopic(idLibraryTopic);
         return ApiResponse.<Void>builder()
-                .message("Library topic deleted successfully")
+                .message("Xóa đề tài tham khảo thành công")
                 .build();
     }
 }

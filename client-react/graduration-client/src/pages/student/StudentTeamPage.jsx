@@ -51,6 +51,8 @@ const normalizeResponse = (response) => (
 
 export default function StudentTeamPage() {
   const [teams, setTeams] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [schedule, setSchedule] = useState(null);
   const [team, setTeam] = useState(null);
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -60,9 +62,14 @@ export default function StudentTeamPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await httpClient.get(API_ENDPOINTS.teams.mineAll);
+      const [response, enrollmentResponse] = await Promise.all([
+        httpClient.get(API_ENDPOINTS.teams.mineAll),
+        httpClient.get(API_ENDPOINTS.graduationEnrollments.mine).catch(() => ({ result: [] })),
+      ]);
       const payload = normalizeResponse(response);
+      const enrollmentPayload = normalizeResponse(enrollmentResponse);
       const availableTeams = Array.isArray(payload) ? payload : [];
+      setEnrollments(Array.isArray(enrollmentPayload) ? enrollmentPayload : []);
       setTeams(availableTeams);
       setSelectedTeamId((current) => {
         const selected = availableTeams.find((item) => String(item.idTeam) === String(current));
@@ -89,16 +96,25 @@ export default function StudentTeamPage() {
     setTeam(teams.find((item) => String(item.idTeam) === String(selectedTeamId)) || null);
   }, [teams, selectedTeamId]);
 
-  const members = useMemo(() => {
-    const uniqueMembers = new Map();
-    (Array.isArray(team?.students) ? team.students : []).forEach((member, index) => {
-      const key = member?.idStudent || member?.studentCode || `member-${index}`;
-      if (!uniqueMembers.has(key)) uniqueMembers.set(key, member);
-    });
-    return [...uniqueMembers.values()];
+  useEffect(() => {
+    let cancelled = false;
+    setSchedule(null);
+    if (!team?.defensePeriodId) return undefined;
+    httpClient.get(`/defense-periods/${team.defensePeriodId}/schedules`, { params: { page: 0, size: 100 } })
+      .then((response) => {
+        const result = normalizeResponse(response);
+        const items = Array.isArray(result) ? result : (Array.isArray(result?.content) ? result.content : []);
+        const current = items.find((item) => String(item.teamId) === String(team.idTeam) || String(item.topicId) === String(team.topicId));
+        if (!cancelled) setSchedule(current || null);
+      }).catch(() => { if (!cancelled) setSchedule(null); });
+    return () => { cancelled = true; };
   }, [team]);
 
   const topicAssigned = Boolean(team?.topicId || team?.topicTitle);
+  const currentEnrollment = enrollments.find((enrollment) => (
+    String(enrollment?.defensePeriodId || '') === String(team?.defensePeriodId || '')
+  ));
+  const defenseBanned = String(currentEnrollment?.status || '').toUpperCase() === 'WITHDRAWN';
 
   return (
     <main className="student-team-page">
@@ -148,7 +164,7 @@ export default function StudentTeamPage() {
 
       {!loading && !error && team && (
         <>
-          {teams.length > 1 && (
+          {teams.length > 0 && (
             <section className="student-team-picker student-team-card">
               <div>
                 <span>NHÓM / ĐỢT BẢO VỆ</span>
@@ -165,10 +181,11 @@ export default function StudentTeamPage() {
           )}
           <section className="student-team-summary student-team-card">
             <div className="student-team-summary-icon"><Users size={25} /></div>
-            <div className="student-team-summary-content">
+            <div className={`student-team-summary-content ${defenseBanned ? 'defense-ineligible-student' : ''}`}>
               <p className="student-team-label">NHÓM SINH VIÊN</p>
               <h2>{team.nameTeam}</h2>
               <p>{team.defensePeriodName ? `${team.defensePeriodName}${team.academicYear ? ` · ${team.academicYear}` : ''}` : valueOrDash(team.description)}</p>
+              {defenseBanned && <em className="defense-ineligible-badge">Sinh viên bị cấm thi</em>}
             </div>
             <div className="student-team-summary-meta">
               <span><ShieldCheck size={15} /> Vai trò</span>
@@ -179,10 +196,6 @@ export default function StudentTeamPage() {
           </section>
 
           <section className="student-team-stats">
-            <article className="student-team-stat student-team-card">
-              <div className="student-team-stat-icon blue"><Users size={20} /></div>
-              <div><span>Thành viên</span><strong>{members.length}</strong></div>
-            </article>
             <article className="student-team-stat student-team-card">
               <div className="student-team-stat-icon green"><CheckCircle2 size={20} /></div>
               <div><span>Đề tài</span><strong>{topicAssigned ? 'Đã gán' : 'Chưa gán'}</strong></div>
@@ -208,36 +221,23 @@ export default function StudentTeamPage() {
                 <div className="student-team-muted">Nhóm chưa được gán đề tài.</div>
               )}
             </article>
+            <article className="student-team-card student-team-topic">
+              <div className="student-team-section-heading"><CalendarDays size={20} /><h2>Lịch bảo vệ</h2></div>
+              {schedule ? <div className="student-team-schedule-info"><strong>{formatDate(schedule.defenseDate)} · {schedule.startTime || '—'} – {schedule.endTime || '—'}</strong><span>Phòng {schedule.room || '—'} · {schedule.location || '—'}</span><span>Hội đồng: {schedule.committeeName || '—'}</span>{Array.isArray(schedule.committeeMembers) && schedule.committeeMembers.length > 0 && <small>Giảng viên: {schedule.committeeMembers.map((member) => member.lectureName || member.lectureCode).filter(Boolean).join(', ')}</small>}</div> : <div className="student-team-muted">Chưa có lịch bảo vệ.</div>}
+            </article>
 
             <article className="student-team-card student-team-members">
               <div className="student-team-section-heading">
-                <Users size={20} />
-                <h2>Thành viên nhóm</h2>
-                <span className="student-team-count">{members.length}</span>
+                <UserRound size={20} />
+                <h2>Thông tin của tôi</h2>
               </div>
-              {members.length ? (
-                <div className="student-team-member-list">
-                  {members.map((member, index) => {
-                    const name = studentName(member);
-                    return (
-                      <div className="student-team-member" key={member?.idStudent || member?.studentCode || index}>
-                        <div className="student-team-avatar">{initials(name)}</div>
-                        <div className="student-team-member-info">
-                          <strong>{name}</strong>
-                          <span>{valueOrDash(member?.studentCode || member?.code)} · {valueOrDash(member?.classCode || member?.class?.classCode)}</span>
-                        </div>
-                        {member?.emailStudent || member?.email ? (
-                          <a href={`mailto:${member.emailStudent || member.email}`} title="Gửi email">
-                            <Mail size={17} />
-                          </a>
-                        ) : <UserRound size={17} className="student-team-member-placeholder" />}
-                      </div>
-                    );
-                  })}
+              <div className={`student-team-member ${defenseBanned ? 'defense-ineligible-student' : ''}`}>
+                <div className="student-team-avatar">{initials(currentEnrollment?.studentName || 'Bạn')}</div>
+                <div className="student-team-member-info">
+                  <strong>{currentEnrollment?.studentName || 'Bạn'}{defenseBanned && <em className="defense-ineligible-badge">Sinh viên bị cấm thi</em>}</strong>
+                  <span>{valueOrDash(currentEnrollment?.studentCode)}</span>
                 </div>
-              ) : (
-                <div className="student-team-muted">Chưa có thông tin thành viên.</div>
-              )}
+              </div>
             </article>
           </section>
         </>

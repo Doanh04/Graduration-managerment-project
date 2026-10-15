@@ -29,6 +29,8 @@ public class ScoreResponse {
     Long topicId;
     String topicTitle;
     Long defensePeriodId;
+    String defensePeriodName;
+    String academicYear;
     String lecturerId;
     String lecturerCode;
     String lecturerName;
@@ -36,4 +38,5 @@ public class ScoreResponse {
     LocalDateTime updatedAt;
     LocalDateTime submittedAt;
     LocalDateTime publishedAt;
+    java.util.List<CommitteeScoreEntryResponse> committeeScores;
 }

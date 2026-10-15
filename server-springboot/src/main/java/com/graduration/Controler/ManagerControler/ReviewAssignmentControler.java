@@ -1,11 +1,8 @@
 package com.graduration.Controler.ManagerControler;
 
-import jakarta.validation.Valid;
-
 import org.springframework.web.bind.annotation.*;
 
 import com.graduration.Constain.ReviewAssignmentStatusConstain;
-import com.graduration.DTO.Request.AssignReviewRequest;
 import com.graduration.DTO.Request.CancelReviewRequest;
 import com.graduration.DTO.Request.SubmitReviewRequest;
 import com.graduration.DTO.Response.ApiResponse;
@@ -19,15 +16,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ReviewAssignmentControler {
     private final ReviewAssignmentService reviewAssignmentService;
-
-    @PostMapping("/topics/{topicId}/review-assignments")
-    public ApiResponse<ReviewAssignmentResponse> assign(
-            @PathVariable Long topicId, @Valid @RequestBody AssignReviewRequest request) {
-        return ApiResponse.<ReviewAssignmentResponse>builder()
-                .message("Reviewer assigned successfully")
-                .result(reviewAssignmentService.assign(topicId, request))
-                .build();
-    }
 
     @GetMapping("/topics/{topicId}/review-assignments")
     public ApiResponse<PageResponse<ReviewAssignmentResponse>> getByTopic(
@@ -71,7 +59,7 @@ public class ReviewAssignmentControler {
 
     @PatchMapping("/review-assignments/{assignmentId}/submit")
     public ApiResponse<ReviewAssignmentResponse> submit(
-            @PathVariable Long assignmentId, @Valid @RequestBody SubmitReviewRequest request) {
+            @PathVariable Long assignmentId, @jakarta.validation.Valid @RequestBody SubmitReviewRequest request) {
         return ApiResponse.<ReviewAssignmentResponse>builder()
                 .message("Review submitted successfully")
                 .result(reviewAssignmentService.submit(assignmentId, request))
@@ -96,7 +84,7 @@ public class ReviewAssignmentControler {
 
     @PatchMapping("/review-assignments/{assignmentId}/cancel")
     public ApiResponse<ReviewAssignmentResponse> cancel(
-            @PathVariable Long assignmentId, @Valid @RequestBody CancelReviewRequest request) {
+            @PathVariable Long assignmentId, @jakarta.validation.Valid @RequestBody CancelReviewRequest request) {
         return ApiResponse.<ReviewAssignmentResponse>builder()
                 .message("Review assignment cancelled successfully")
                 .result(reviewAssignmentService.cancel(assignmentId, request))

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BookOpen, Check, Clock3, Download, Eye, FileText, LoaderCircle, Plus, Search, Send, X, XCircle } from 'lucide-react';
+import { AlertCircle, BookOpen, Check, Clock3, Download, ExternalLink, Eye, FileText, LoaderCircle, Plus, Search, Send, X, XCircle } from 'lucide-react';
 import API_ENDPOINTS from '../../config/endpoints.js';
 import httpClient from '../../config/HttpClient.jsx';
 import ResourceService from '../../services/ResourceService.jsx';
@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import getApiErrorMessage from '../../utils/apiError.js';
 import { formatDateTimeDisplay } from '../../utils/dateFormat.js';
 import '../../style/TopicRegistration.scss';
+import '../../style/TopicRegistrationSettings.scss';
 import '../../style/TopicRegistrationDetail.scss';
 
 const STATUS = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Từ chối', CANCELLED: 'Đã hủy' };
@@ -30,22 +31,25 @@ export default function TopicRegistrationPage({ mode = 'student' }) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [creatorNameMap, setCreatorNameMap] = useState(() => new Map());
+  const [systemSettings, setSystemSettings] = useState({ studentTopicProposalEnabled: false });
 
   const load = async () => {
     setLoading(true); setError('');
     try {
       if (student) {
-        const [myTeam, available, mine, myProposals, activePeriods] = await Promise.all([
+        const [myTeam, available, mine, myProposals, activePeriods, currentSettings] = await Promise.all([
           ResourceService.getOne(API_ENDPOINTS.teams.mine),
           ResourceService.getAll(API_ENDPOINTS.topics.list, { status: 'APPROVED' }),
           ResourceService.getOne(API_ENDPOINTS.topicRegistrations.mine),
           ResourceService.getOne(API_ENDPOINTS.topics.mine),
           ResourceService.getAll(API_ENDPOINTS.defensePeriods.list),
+          ResourceService.getOne(API_ENDPOINTS.systemSettings.current),
         ]);
         setTeam(myTeam); setTopics(available.filter((item) => !item.teamId));
         setRegistrations(Array.isArray(mine) ? mine : []);
         setProposals(Array.isArray(myProposals) ? myProposals : []);
         setPeriods(activePeriods.filter((item) => item.status !== 'FINISHED'));
+        setSystemSettings((current) => ({ ...current, ...currentSettings }));
       } else {
         const proposalStatus = status === 'PENDING' ? 'PENDING_APPROVAL' : status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' ? 'REJECTED' : null;
         const [topicRegistrations, proposalTopics, lecturerResult, studentResult, userRoleResult] = await Promise.all([
@@ -95,7 +99,12 @@ export default function TopicRegistrationPage({ mode = 'student' }) {
   };
 
   const propose = async (event) => {
-    event.preventDefault(); setSaving(true); setError('');
+    event.preventDefault();
+    if (!systemSettings.studentTopicProposalEnabled) {
+      setError('Chức năng đề xuất đề tài của sinh viên đang được tắt.');
+      return;
+    }
+    setSaving(true); setError('');
     try {
       const response = await ResourceService.create(API_ENDPOINTS.topics.create, { ...proposal, categoryTopic: 'STUDENT', defensePeriodId: Number(proposal.defensePeriodId) });
       const created = response?.result ?? response;
@@ -144,7 +153,8 @@ export default function TopicRegistrationPage({ mode = 'student' }) {
   };
 
   return <div className="topic-registration-page">
-    <div className="page-heading"><div><span>{student ? 'ĐĂNG KÝ ĐỒ ÁN' : 'XÉT DUYỆT ĐỀ TÀI'}</span><h1>{student ? 'Lựa chọn và đề xuất đề tài' : 'Duyệt đăng ký đề tài'}</h1><p>{student ? 'Đăng ký đề tài có sẵn hoặc gửi đề xuất mới khi nhóm chưa có đề tài.' : 'Xét duyệt yêu cầu và gán đề tài cho nhóm sinh viên.'}</p></div>{student && !blocked && <button className="primary-button" onClick={() => { setModal({ type: 'proposal' }); setError(''); }}><Plus size={16}/> Đề xuất đề tài mới</button>}</div>
+    <div className="page-heading"><div><span>{student ? 'ĐĂNG KÝ ĐỒ ÁN' : 'XÉT DUYỆT ĐỀ TÀI'}</span><h1>{student ? 'Lựa chọn và đề xuất đề tài' : 'Duyệt đăng ký đề tài'}</h1><p>{student ? 'Đăng ký đề tài có sẵn hoặc gửi đề xuất mới khi nhóm chưa có đề tài.' : 'Xét duyệt yêu cầu và gán đề tài cho nhóm sinh viên.'}</p></div>{student && !blocked && <button className={`primary-button proposal-button ${!systemSettings.studentTopicProposalEnabled ? 'proposal-disabled' : ''}`} disabled={!systemSettings.studentTopicProposalEnabled} title={!systemSettings.studentTopicProposalEnabled ? 'Ban quản lý khoa đang tắt chức năng đề xuất đề tài' : ''} onClick={() => { setModal({ type: 'proposal' }); setError(''); }}><Plus size={16}/> Đề xuất đề tài mới</button>}</div>
+    {student && !blocked && !systemSettings.studentTopicProposalEnabled && <div className="registration-banner disabled-feature"><AlertCircle size={19}/><div><strong>Đề xuất đề tài đang tắt</strong><span>Bạn vẫn có thể lựa chọn và đăng ký các đề tài có sẵn bên dưới.</span></div></div>}
     {student && team?.topicId && <div className="registration-banner success"><Check size={19}/><div><strong>Nhóm đã có đề tài</strong><span>{team.topicTitle}. Bạn không thể đăng ký hoặc đề xuất thêm đề tài.</span></div></div>}
     {student && pending && !team?.topicId && <div className="registration-banner pending"><Clock3 size={19}/><div><strong>Đang chờ duyệt: {pending.topicTitle}</strong><span>Trong lúc chờ xét duyệt, nhóm không thể gửi thêm đăng ký khác.</span></div><button disabled={saving} onClick={() => cancel(pending)}>Hủy đăng ký</button></div>}
     {student && pendingProposal && !team?.topicId && <div className="registration-banner pending"><Clock3 size={19}/><div><strong>Đề xuất đang chờ duyệt: {pendingProposal.title}</strong><span>Khi được duyệt, đề tài sẽ tự động được gán cho nhóm {team?.nameTeam}.</span></div></div>}
@@ -195,6 +205,26 @@ function TopicFileActions({ topic }) {
       setError(getApiErrorMessage(requestError, 'Không thể xem trước tệp đề tài.'));
     } finally { setLoading(false); }
   };
+  const openInNewTab = async () => {
+    setLoading(true); setError('');
+    const newTab = window.open('about:blank', '_blank');
+    if (!newTab) {
+      setError('Trình duyệt đang chặn cửa sổ mới. Vui lòng cho phép popup rồi thử lại.');
+      setLoading(false);
+      return;
+    }
+    newTab.opener = null;
+    newTab.document.title = 'Đang tải tệp...';
+    try {
+      const blob = await fetchFile();
+      const url = URL.createObjectURL(blob);
+      newTab.location.replace(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (requestError) {
+      newTab.close();
+      setError(getApiErrorMessage(requestError, 'Không thể mở tệp đề tài trong tab mới.'));
+    } finally { setLoading(false); }
+  };
   const download = async () => {
     setLoading(true); setError('');
     try {
@@ -205,7 +235,7 @@ function TopicFileActions({ topic }) {
       setError(getApiErrorMessage(requestError, 'Không thể tải tệp đề tài.'));
     } finally { setLoading(false); }
   };
-  return <section className="registration-file-section"><h4><FileText size={17}/> Tệp mô tả đề tài</h4><div className="registration-file-row"><div className="registration-file-name"><strong>{topic.fileName}</strong><small>{topic.contentType || 'Tệp đính kèm'}{topic.fileSize ? ` · ${formatBytes(topic.fileSize)}` : ''}</small></div><div className="registration-file-actions"><button type="button" disabled={loading} onClick={isPdf ? preview : download}>{isPdf ? <Eye size={14}/> : <Download size={14}/>} {loading ? 'Đang xử lý...' : isPdf ? 'Xem trước' : 'Tải xuống'}</button>{previewUrl && <button type="button" className="file-close-preview" onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(''); }}>Đóng xem trước</button>}</div></div>{error && <p className="registration-file-error">{error}</p>}{previewUrl && <div className="registration-file-preview"><iframe src={previewUrl} title={`Xem trước ${topic.fileName}`} /></div>}</section>;
+  return <section className="registration-file-section"><h4><FileText size={17}/> Tệp mô tả đề tài</h4><div className="registration-file-row"><div className="registration-file-name"><strong>{topic.fileName}</strong><small>{topic.contentType || 'Tệp đính kèm'}{topic.fileSize ? ` · ${formatBytes(topic.fileSize)}` : ''}</small></div><div className="registration-file-actions">{isPdf && <button type="button" disabled={loading} onClick={preview}><Eye size={14}/> {loading ? 'Đang xử lý...' : 'Xem trước'}</button>}<button type="button" disabled={loading} onClick={openInNewTab}><ExternalLink size={14}/> Mở tab mới</button><button type="button" disabled={loading} onClick={download}><Download size={14}/> Tải xuống</button>{previewUrl && <button type="button" className="file-close-preview" onClick={() => { URL.revokeObjectURL(previewUrl); setPreviewUrl(''); }}>Đóng xem trước</button>}</div></div>{error && <p className="registration-file-error">{error}</p>}{previewUrl && <div className="registration-file-preview"><iframe src={previewUrl} title={`Xem trước ${topic.fileName}`} /></div>}</section>;
 }
 function DetailValue({ label, value }) { return <div className="registration-detail-value"><span>{label}</span><strong>{value || 'Chưa cập nhật'}</strong></div>; }
 function ModalHeader({ eyebrow, title, onClose }) { return <header><div><span>{eyebrow}</span><h3>{title}</h3></div><button onClick={onClose}><X size={19}/></button></header>; }

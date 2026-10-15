@@ -5,9 +5,11 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.graduration.Constain.EnrollmentStatusConstain;
 import com.graduration.entity.GraduationEnrollmentEntity;
 import com.graduration.entity.StudentEntity;
 
@@ -45,4 +47,26 @@ public interface GraduationEnrollmentRepository
     List<StudentEntity> findDistinctStudentsByAcademicYearId(@Param("academicYearId") Integer academicYearId);
 
     List<GraduationEnrollmentEntity> findByStudent_UserEntity_UserIdOrderByEnrolledAtDesc(String userId);
+
+    @EntityGraph(attributePaths = {"student", "student.userEntity"})
+    @Query(
+            "select enrollment from GraduationEnrollmentEntity enrollment "
+                    + "where enrollment.defensePeriod.ID_Defense = :defensePeriodId "
+                    + "and enrollment.status <> :excludedStatus")
+    List<GraduationEnrollmentEntity> findForNotificationsByDefensePeriod(
+            @Param("defensePeriodId") Long defensePeriodId,
+            @Param("excludedStatus") EnrollmentStatusConstain excludedStatus);
+
+    @Query(
+            """
+			select distinct enrollment from GraduationEnrollmentEntity enrollment
+			join fetch enrollment.student student
+			left join fetch student.classEntity
+			where enrollment.defensePeriod.ID_Defense = :defensePeriodId
+			and enrollment.status <> :excludedStatus
+			order by student.fullNameStudent, student.studentCode
+			""")
+    List<GraduationEnrollmentEntity> findForExportByDefensePeriod(
+            @Param("defensePeriodId") Long defensePeriodId,
+            @Param("excludedStatus") EnrollmentStatusConstain excludedStatus);
 }

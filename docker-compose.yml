@@ -3,8 +3,10 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-doanh@123}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-graduration-managerment}
+      MYSQL_USER: ${MYSQL_USER:-graduration_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
       - mysql_data:/var/lib/mysql
@@ -13,20 +15,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 20s
+    networks:
+      - data
 
   mongodb:
     image: mongo:7.0
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-doanh@123}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set in .env}
     volumes:
       - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 20s
+    networks:
+      - data
 
   backend:
     build:
@@ -40,19 +48,27 @@ services:
         condition: service_healthy
     environment:
       SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-graduration-managerment}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-doanh@123}
-      # MONGO_URI phải là URI đã URL-encode mật khẩu (ví dụ @ thành %40).
-      # Giá trị mặc định tương ứng với tài khoản local hiện tại: doanh@123.
-      SPRING_DATA_MONGODB_URI: ${MONGO_URI:-mongodb://admin:doanh%40123@mongodb:27017/graduration_managerment?authSource=admin}
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-graduration_app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
+      SPRING_DATA_MONGODB_URI: ${MONGO_URI:?MONGO_URI must be set in .env}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      SPRING_JPA_SHOW_SQL: "false"
+      JWT_SIGNER_KEY: ${JWT_SIGNER_KEY:?JWT_SIGNER_KEY must be set in .env}
+      JWT_VALID_DURATION: ${JWT_VALID_DURATION:-3600}
+      JWT_REFRESHABLE_DURATION: ${JWT_REFRESHABLE_DURATION:-36000}
       APP_STORAGE_ROOT: /app/storage
-      APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-false}
+      APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
     volumes:
       - ./storage:/app/storage
-    ports:
-      - "${BACKEND_PORT:-8080}:8080"
+    expose:
+      - "8080"
+    networks:
+      - app
+      - data
 
   frontend:
     build:
@@ -64,8 +80,15 @@ services:
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - "${FRONTEND_BIND:-80}:80"
+    networks:
+      - app
 
 volumes:
   mysql_data:
   mongo_data:
+
+networks:
+  app:
+  data:
+    internal: true

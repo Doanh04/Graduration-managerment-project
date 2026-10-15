@@ -56,6 +56,11 @@ public class ReviewAssignmentEntity {
     @Column(name = "cancelled_reason", length = 1000)
     String cancelledReason;
 
+    Long approvedReportId;
+    LocalDateTime reportCheckedAt;
+    @Column(length = 1000)
+    String reportFailureReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_by")
     UserEntity assignedBy;
@@ -71,6 +76,10 @@ public class ReviewAssignmentEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lecture_id", nullable = false)
     LectureEntity lecture;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "committee_id")
+    DefenseCommitteesEntity defenseCommittee;
 
     @PrePersist
     void prePersist() {

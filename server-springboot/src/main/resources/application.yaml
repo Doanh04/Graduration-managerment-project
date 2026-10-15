@@ -10,23 +10,25 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
   datasource:
-    url: "jdbc:mysql://localhost:3306/graduration-managerment"
+    url: "${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/graduration-managerment}"
     driverClassName: "com.mysql.cj.jdbc.Driver"
-    username: root
-    password: doanh@123
+    username: "${SPRING_DATASOURCE_USERNAME:root}"
+    password: "${SPRING_DATASOURCE_PASSWORD:doanh@123}"
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: "${SPRING_JPA_HIBERNATE_DDL_AUTO:update}"
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
   data:
     mongodb:
-      uri: mongodb://admin:doanh%40123@localhost:27017/graduration_managerment?authSource=admin
+      uri: "${SPRING_DATA_MONGODB_URI:mongodb://admin:doanh%40123@localhost:27017/graduration_managerment?authSource=admin}"
 
 jwt:
-  signerKey: "tgWNKP/9+GK8SlEph/A1WRAHz2KLXhw1ccWCwD1yphs="
-  valid-duration: 3600
-  refreshable-duration: 36000
+  signerKey: "${JWT_SIGNER_KEY:tgWNKP/9+GK8SlEph/A1WRAHz2KLXhw1ccWCwD1yphs=}"
+  valid-duration: ${JWT_VALID_DURATION:3600}
+  refreshable-duration: ${JWT_REFRESHABLE_DURATION:36000}
 
 app:
   cookie:
-    secure: false
+    secure: ${APP_COOKIE_SECURE:false}
+  cors:
+    allowed-origins: "${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}"

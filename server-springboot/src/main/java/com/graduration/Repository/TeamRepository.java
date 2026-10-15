@@ -132,5 +132,12 @@ public interface TeamRepository extends JpaRepository<TeamEntity, Long> {
 
     boolean existsByTopic_IdTopic(Long topicId);
 
+    @EntityGraph(attributePaths = {"studentEntities", "studentEntities.userEntity", "topic", "defensePeriod"})
+    Optional<TeamEntity> findByTopic_IdTopic(Long topicId);
+
+    @EntityGraph(attributePaths = {"studentEntities", "studentEntities.userEntity", "topic", "defensePeriod"})
+    @Query("select distinct team from TeamEntity team where team.defensePeriod.ID_Defense = :defensePeriodId")
+    List<TeamEntity> findAllForNotificationsByDefensePeriod(@Param("defensePeriodId") Long defensePeriodId);
+
     boolean existsByTopic_IdTopicAndIdTeamNot(Long topicId, Long idTeam);
 }

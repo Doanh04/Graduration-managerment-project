@@ -2,6 +2,7 @@ package com.graduration.Service.GradurationService;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
@@ -14,9 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.graduration.Configuration.PaginationSupport;
-import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.MilesStoneStatusConstain;
 import com.graduration.Constain.MilesStoneTypeConstain;
+import com.graduration.Constain.NotificationTypeConstain;
 import com.graduration.DTO.Request.CreateMilestoneRequest;
 import com.graduration.DTO.Request.UpdateMilestoneRequest;
 import com.graduration.DTO.Response.MilestoneResponse;
@@ -29,6 +30,8 @@ import com.graduration.entity.MilesStoneEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
 import com.graduration.mapper.MilestoneMapper;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -38,10 +41,14 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MilestoneService {
+    private static final DateTimeFormatter DISPLAY_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
     MilestoneRepository milestoneRepository;
     DefensePeriodRepository defensePeriodRepository;
     TeamRepository teamRepository;
     MilestoneMapper milestoneMapper;
+    NotificationService notificationService;
+    NotificationRecipientService notificationRecipientService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
@@ -173,7 +180,20 @@ public class MilestoneService {
         requireActiveDefensePeriod(milestone.getDefensePeriod());
         validateWithinPeriod(milestone.getDefensePeriod(), milestone.getStartAt(), milestone.getDeadLine());
         milestone.setStatus(MilesStoneStatusConstain.OPEN);
-        return milestoneMapper.toResponse(milestoneRepository.save(milestone));
+        MilesStoneEntity saved = milestoneRepository.save(milestone);
+        notificationService.notifyUsersOnce(
+                notificationRecipientService.studentUserIdsForDefensePeriod(
+                        saved.getDefensePeriod().getID_Defense()),
+                "Đã mở tiến độ đồ án",
+                "Tiến độ \"" + saved.getMilesStoneName() + "\" đã mở. Hạn nộp: "
+                        + saved.getDeadLine().format(DISPLAY_TIME) + "."
+                        + (saved.getDescription() == null || saved.getDescription().isBlank()
+                                ? ""
+                                : " Yêu cầu: " + saved.getDescription()),
+                NotificationTypeConstain.MILESTONE_OPENED,
+                "MILESTONE",
+                saved.getIdMilesStone());
+        return milestoneMapper.toResponse(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -182,6 +202,7 @@ public class MilestoneService {
     // quyền thực hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public MilestoneResponse closeMilestone(Long milestoneId) {
         MilesStoneEntity milestone = findMilestone(milestoneId);
+        requireActiveDefensePeriod(milestone.getDefensePeriod());
         requireStatus(milestone, MilesStoneStatusConstain.OPEN);
         milestone.setStatus(MilesStoneStatusConstain.CLOSED);
         return milestoneMapper.toResponse(milestoneRepository.save(milestone));
@@ -193,6 +214,7 @@ public class MilestoneService {
     // mốc đã cập nhật.
     public MilestoneResponse cancelMilestone(Long milestoneId) {
         MilesStoneEntity milestone = findMilestone(milestoneId);
+        requireActiveDefensePeriod(milestone.getDefensePeriod());
         if (milestone.getStatus() != MilesStoneStatusConstain.DRAFT
                 && milestone.getStatus() != MilesStoneStatusConstain.OPEN) {
             throw new AppException(ErrorCode.MILESTONE_OPERATION_NOT_ALLOWED);
@@ -207,6 +229,7 @@ public class MilestoneService {
     // hoặc chuyển bản ghi sang trạng thái tương ứng.
     public void deleteMilestone(Long milestoneId) {
         MilesStoneEntity milestone = findMilestone(milestoneId);
+        requireActiveDefensePeriod(milestone.getDefensePeriod());
         requireStatus(milestone, MilesStoneStatusConstain.DRAFT);
         if (!milestone.getSubmistion().isEmpty()) {
             throw new AppException(ErrorCode.MILESTONE_IN_USE);
@@ -240,7 +263,7 @@ public class MilestoneService {
 
     // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireActiveDefensePeriod(DefensePeriodEntity period) {
-        if (period.getStatus() == DefensePeriodConstain.FINISHED) {
+        if (period.isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
     }

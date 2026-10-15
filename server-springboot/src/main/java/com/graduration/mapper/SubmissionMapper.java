@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import com.graduration.DTO.Response.SubmissionCommentResponse;
 import com.graduration.DTO.Response.SubmissionResponse;
 import com.graduration.entity.CommentEntity;
+import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.LectureEntity;
 import com.graduration.entity.MilesStoneEntity;
 import com.graduration.entity.StudentEntity;
@@ -16,12 +17,18 @@ import com.graduration.entity.UserEntity;
 public class SubmissionMapper {
     public SubmissionResponse toResponse(SubmistionEntity submission) {
         MilesStoneEntity milestone = submission.getMilesStone();
+        DefensePeriodEntity defensePeriod = milestone == null ? null : milestone.getDefensePeriod();
         TeamEntity team = submission.getTeam();
         StudentEntity student = submission.getSubmittedBy();
         return SubmissionResponse.builder()
                 .submissionId(submission.getIdSubmission())
                 .milestoneId(milestone == null ? null : milestone.getIdMilesStone())
                 .milestoneName(milestone == null ? null : milestone.getMilesStoneName())
+                .defensePeriodId(defensePeriod == null ? null : defensePeriod.getID_Defense())
+                .defensePeriodName(defensePeriod == null ? null : defensePeriod.getPeriodName())
+                .academicYear(defensePeriod == null || defensePeriod.getAcademicYear() == null
+                        ? null
+                        : defensePeriod.getAcademicYear().getAcademicYear())
                 .teamId(team == null ? null : team.getIdTeam())
                 .teamName(team == null ? null : team.getNameTeam())
                 .studentId(student == null ? null : student.getIdStudent())

@@ -20,10 +20,16 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Table(
         name = "score",
-        uniqueConstraints =
+        uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_score_student_topic_lecturer_type",
-                        columnNames = {"id_student", "id_topic", "lecture_id", "score_type"}))
+                        columnNames = {"id_student", "id_topic", "lecture_id", "score_type"}),
+                @UniqueConstraint(name = "uk_score_automatic_schedule_student",
+                        columnNames = {"automatic_schedule_id", "id_student"}),
+                @UniqueConstraint(name = "uk_score_automatic_review_student",
+                        columnNames = {"automatic_review_assignment_id", "id_student"}),
+                @UniqueConstraint(name = "uk_score_automatic_final_student",
+                        columnNames = {"automatic_final_topic_id", "id_student"})})
 public class ScoreEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -33,7 +39,7 @@ public class ScoreEntity {
     @Column(name = "score", precision = 5, scale = 2, nullable = false)
     BigDecimal score;
 
-    @Column(name = "comment")
+    @Column(name = "comment", length = 4000)
     String comment;
 
     @Enumerated(EnumType.STRING)
@@ -50,9 +56,15 @@ public class ScoreEntity {
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "lecture_id", nullable = false)
+    // Automatic deadline results have no human evaluator.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lecture_id")
     LectureEntity lecture;
+
+    Long automaticScheduleId;
+    Long automaticReviewAssignmentId;
+    @Column(name = "automatic_final_topic_id")
+    Long automaticFinalTopicId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_student", nullable = false)

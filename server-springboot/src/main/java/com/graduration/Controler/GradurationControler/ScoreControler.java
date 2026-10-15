@@ -11,9 +11,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.graduration.DTO.Request.ScoreRequest;
+import com.graduration.DTO.Request.CommitteeScoreSheetRequest;
 import com.graduration.DTO.Response.ApiResponse;
 import com.graduration.DTO.Response.PageResponse;
 import com.graduration.DTO.Response.ScoreResponse;
+import com.graduration.DTO.Response.CommitteeScoreSheetResponse;
 import com.graduration.Service.GradurationService.ScoreService;
 
 import lombok.RequiredArgsConstructor;
@@ -46,10 +48,38 @@ public class ScoreControler {
                 .build();
     }
 
+    @GetMapping("/students/{studentId}/topics/{topicId}/committee-score-sheet")
+    public ApiResponse<CommitteeScoreSheetResponse> getCommitteeScoreSheet(
+            @PathVariable String studentId, @PathVariable Long topicId) {
+        return ApiResponse.<CommitteeScoreSheetResponse>builder()
+                .result(scoreService.getCommitteeScoreSheet(studentId, topicId))
+                .build();
+    }
+
+    @PutMapping("/students/{studentId}/topics/{topicId}/committee-score-sheet")
+    public ApiResponse<CommitteeScoreSheetResponse> saveCommitteeScoreSheet(
+            @PathVariable String studentId,
+            @PathVariable Long topicId,
+            @Valid @RequestBody CommitteeScoreSheetRequest request) {
+        return ApiResponse.<CommitteeScoreSheetResponse>builder()
+                .message("Committee score sheet saved successfully")
+                .result(scoreService.saveCommitteeScoreSheet(studentId, topicId, request))
+                .build();
+    }
+
+    @PatchMapping("/students/{studentId}/topics/{topicId}/committee-score-sheet/submit")
+    public ApiResponse<CommitteeScoreSheetResponse> submitCommitteeScoreSheet(
+            @PathVariable String studentId, @PathVariable Long topicId) {
+        return ApiResponse.<CommitteeScoreSheetResponse>builder()
+                .message("Committee score sheet submitted successfully")
+                .result(scoreService.submitCommitteeScoreSheet(studentId, topicId))
+                .build();
+    }
+
     @PatchMapping("/scores/{scoreId}/submit")
     public ApiResponse<ScoreResponse> submit(@PathVariable Long scoreId) {
         return ApiResponse.<ScoreResponse>builder()
-                .message("Score submitted successfully")
+                .message("Score submitted and locked pending final submission approval")
                 .result(scoreService.submit(scoreId))
                 .build();
     }
@@ -83,6 +113,13 @@ public class ScoreControler {
             @RequestParam(required = false) Integer size) {
         return ApiResponse.<PageResponse<ScoreResponse>>builder()
                 .result(scoreService.getByDefensePeriod(defensePeriodId, page, size))
+                .build();
+    }
+
+    @GetMapping("/scores/my")
+    public ApiResponse<PageResponse<ScoreResponse>> getMyPublishedScores() {
+        return ApiResponse.<PageResponse<ScoreResponse>>builder()
+                .result(scoreService.getMyPublishedScores())
                 .build();
     }
 }

@@ -169,11 +169,19 @@ public class UserStudentService {
     // có ghi danh phù hợp với bộ lọc, phân trang kết quả và ánh xạ sang dữ liệu hiển thị cho frontend.
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPERVISOR')")
     public com.graduration.DTO.Response.PageResponse<RegisterStudentResponse> getAllStudentsPage(
-            Integer page, Integer size, String keyword, Integer academicYearId, Long defensePeriodId, String classCode) {
+            Integer page,
+            Integer size,
+            String keyword,
+            Integer academicYearId,
+            Long defensePeriodId,
+            String classCode) {
         var pageable = PaginationSupport.pageRequest(page, size);
         var students = studentRepository.searchByKeywordAndAcademicYearAndDefensePeriod(
-                keyword == null ? null : keyword.trim(), academicYearId, defensePeriodId,
-                classCode == null || classCode.isBlank() ? null : classCode.trim(), pageable);
+                keyword == null ? null : keyword.trim(),
+                academicYearId,
+                defensePeriodId,
+                classCode == null || classCode.isBlank() ? null : classCode.trim(),
+                pageable);
         return com.graduration.DTO.Response.PageResponse.from(
                 students, student -> userMaper.toStudentResponse(student.getUserEntity(), student));
     }

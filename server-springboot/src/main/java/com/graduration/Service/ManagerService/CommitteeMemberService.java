@@ -12,7 +12,6 @@ import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.CommitteeMemberRoleConstain;
 import com.graduration.Constain.CommitteeMemberStatusConstain;
 import com.graduration.Constain.DefenseCommitteeStatusConstain;
-import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.AssignCommitteeMemberRequest;
 import com.graduration.DTO.Request.DeactivateCommitteeMemberRequest;
@@ -44,6 +43,7 @@ public class CommitteeMemberService {
     LectureRepository lectureRepository;
     UserRepository userRepository;
     CommitteeMemberMapper memberMapper;
+    ReviewAssignmentProvisioningService reviewProvisioning;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
@@ -69,7 +69,11 @@ public class CommitteeMemberService {
                 .assignedBy(currentUser())
                 .note(normalize(request.getNote()))
                 .build();
-        return memberMapper.toResponse(memberRepository.save(member));
+        ComitteesMemberEntity saved = memberRepository.save(member);
+        if (saved.getRole() == CommitteeMemberRoleConstain.REVIEWER) {
+            reviewProvisioning.provisionCommittee(committeeId);
+        }
+        return memberMapper.toResponse(saved);
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -119,7 +123,11 @@ public class CommitteeMemberService {
         requireUniqueRole(member.getDefenseCommittees().getIdComittees(), request.getRole(), memberId);
         member.setRole(request.getRole());
         member.setNote(normalize(request.getNote()));
-        return memberMapper.toResponse(memberRepository.save(member));
+        ComitteesMemberEntity saved = memberRepository.save(member);
+        if (saved.getRole() == CommitteeMemberRoleConstain.REVIEWER) {
+            reviewProvisioning.provisionCommittee(saved.getDefenseCommittees().getIdComittees());
+        }
+        return memberMapper.toResponse(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -162,7 +170,7 @@ public class CommitteeMemberService {
         if (committee.getStatus() != DefenseCommitteeStatusConstain.DRAFT) {
             throw new AppException(ErrorCode.DEFENSE_COMMITTEE_OPERATION_NOT_ALLOWED);
         }
-        if (committee.getDefensePeriod().getStatus() == DefensePeriodConstain.FINISHED) {
+        if (committee.getDefensePeriod().isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         return committee;

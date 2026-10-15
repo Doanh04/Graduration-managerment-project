@@ -11,12 +11,14 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.graduration.DTO.Request.AuthenticationRequest;
+import com.graduration.DTO.Request.ChangePasswordRequest;
 import com.graduration.DTO.Request.IntrospectRequest;
 import com.graduration.DTO.Request.LogoutRequest;
 import com.graduration.DTO.Request.RefreshRequest;
@@ -108,6 +110,14 @@ public class AuthenticationCookieControler {
         AuthenticationResponse authentication = authenticationService.getCurrentUser(currentUser.getName());
         return ApiResponse.<CookieAuthenticationResponse>builder()
                 .result(toCookieResponse(authentication))
+                .build();
+    }
+
+    @PatchMapping("/change-password")
+    public ApiResponse<Void> changePassword(Authentication currentUser, @RequestBody ChangePasswordRequest request) {
+        authenticationService.changePassword(currentUser.getName(), request);
+        return ApiResponse.<Void>builder()
+                .message("Password changed successfully")
                 .build();
     }
 

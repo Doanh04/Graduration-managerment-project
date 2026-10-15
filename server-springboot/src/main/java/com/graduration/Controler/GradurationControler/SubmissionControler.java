@@ -49,12 +49,14 @@ public class SubmissionControler {
     public ApiResponse<PageResponse<SubmissionResponse>> getSubmissions(
             @RequestParam(required = false) Long teamId,
             @RequestParam(required = false) Long milestoneId,
+            @RequestParam(required = false) Long defensePeriodId,
             @RequestParam(required = false) SubmissionStatusConstain status,
             @RequestParam(required = false) Boolean late,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return ApiResponse.<PageResponse<SubmissionResponse>>builder()
-                .result(submissionService.getSubmissions(teamId, milestoneId, status, late, page, size))
+                .result(submissionService.getSubmissions(
+                        teamId, milestoneId, defensePeriodId, status, late, page, size))
                 .build();
     }
 
@@ -62,12 +64,14 @@ public class SubmissionControler {
     public ApiResponse<PageResponse<SubmissionResponse>> getTeamSubmissions(
             @PathVariable Long teamId,
             @RequestParam(required = false) Long milestoneId,
+            @RequestParam(required = false) Long defensePeriodId,
             @RequestParam(required = false) SubmissionStatusConstain status,
             @RequestParam(required = false) Boolean late,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return ApiResponse.<PageResponse<SubmissionResponse>>builder()
-                .result(submissionService.getSubmissions(teamId, milestoneId, status, late, page, size))
+                .result(submissionService.getSubmissions(
+                        teamId, milestoneId, defensePeriodId, status, late, page, size))
                 .build();
     }
 

@@ -34,6 +34,8 @@ import com.graduration.DTO.Response.TeamResponse;
 import com.graduration.Repository.StudentRepository;
 import com.graduration.Repository.TeamRepository;
 import com.graduration.Repository.TopicRepository;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.StudentEntity;
 import com.graduration.entity.TeamEntity;
 import com.graduration.entity.TopicEntity;
@@ -54,6 +56,12 @@ class TeamServiceTest {
 
     @Mock
     TeamMapper teamMapper;
+
+    @Mock
+    NotificationService notificationService;
+
+    @Mock
+    NotificationRecipientService notificationRecipientService;
 
     @InjectMocks
     TeamService teamService;
@@ -260,7 +268,7 @@ class TeamServiceTest {
         TeamResponse actual = teamService.addStudent(1L, "SV001");
 
         assertSame(expected, actual);
-        assertSame(team, student.getTeam());
+        assertEquals(List.of(team), student.getTeamMemberships());
         assertEquals(List.of(student), team.getStudentEntities());
         verify(studentRepository).save(student);
     }
@@ -282,7 +290,7 @@ class TeamServiceTest {
         StudentEntity second = StudentEntity.builder()
                 .idStudent("student-2")
                 .studentCode("SV002")
-                .team(otherTeam)
+                .teamMemberships(new ArrayList<>(List.of(otherTeam)))
                 .build();
         when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
         when(studentRepository.findByStudentCodeIgnoreCase("SV001")).thenReturn(Optional.of(first));
@@ -292,7 +300,7 @@ class TeamServiceTest {
                 assertThrows(AppException.class, () -> teamService.addStudents(1L, Set.of("SV001", "SV002")));
 
         assertEquals(ErrorCode.STUDENT_ALREADY_IN_TEAM, exception.getErrorCode());
-        assertNull(first.getTeam());
+        assertEquals(0, first.getTeamMemberships().size());
         verify(studentRepository, never()).saveAll(any());
     }
 
@@ -307,8 +315,8 @@ class TeamServiceTest {
 
         teamService.addStudents(1L, Set.of(" SV001 ", "SV002"));
 
-        assertSame(team, first.getTeam());
-        assertSame(team, second.getTeam());
+        assertEquals(List.of(team), first.getTeamMemberships());
+        assertEquals(List.of(team), second.getTeamMemberships());
         assertEquals(2, team.getStudentEntities().size());
         verify(studentRepository).saveAll(any());
     }
@@ -329,14 +337,17 @@ class TeamServiceTest {
     void removeStudent_detachesStudentByStudentCode() {
         TeamEntity team = TeamEntity.builder().idTeam(1L).build();
         StudentEntity student =
-                StudentEntity.builder().studentCode("SV001").team(team).build();
+                StudentEntity.builder()
+                        .studentCode("SV001")
+                        .teamMemberships(new ArrayList<>(List.of(team)))
+                        .build();
         team.getStudentEntities().add(student);
         when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
         when(studentRepository.findByStudentCodeIgnoreCase("sv001")).thenReturn(Optional.of(student));
 
         teamService.removeStudent(1L, " sv001 ");
 
-        assertNull(student.getTeam());
+        assertEquals(0, student.getTeamMemberships().size());
         assertEquals(0, team.getStudentEntities().size());
         verify(studentRepository).save(student);
     }
@@ -346,7 +357,7 @@ class TeamServiceTest {
         TeamEntity team = TeamEntity.builder().idTeam(1L).build();
         StudentEntity student = StudentEntity.builder()
                 .studentCode("SV001")
-                .team(TeamEntity.builder().idTeam(2L).build())
+                .teamMemberships(new ArrayList<>(List.of(TeamEntity.builder().idTeam(2L).build())))
                 .build();
         when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
         when(studentRepository.findByStudentCodeIgnoreCase("SV001")).thenReturn(Optional.of(student));
@@ -396,12 +407,12 @@ class TeamServiceTest {
                 .idTeam(1L)
                 .studentEntities(new ArrayList<>(List.of(student)))
                 .build();
-        student.setTeam(team);
+        student.getTeamMemberships().add(team);
         when(teamRepository.findWithDetailsByIdTeam(1L)).thenReturn(Optional.of(team));
 
         teamService.deleteTeam(1L);
 
-        assertNull(student.getTeam());
+        assertEquals(0, student.getTeamMemberships().size());
         assertEquals(0, team.getStudentEntities().size());
         verify(studentRepository).saveAll(any());
         verify(teamRepository).delete(team);

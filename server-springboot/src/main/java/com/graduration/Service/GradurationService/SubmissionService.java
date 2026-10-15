@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.CommentTypeConstain;
 import com.graduration.Constain.MilesStoneStatusConstain;
+import com.graduration.Constain.NotificationTypeConstain;
 import com.graduration.Constain.SubmissionStatusConstain;
 import com.graduration.Constain.SupervisorAssignmentStatusConstain;
 import com.graduration.DTO.Response.PageResponse;
@@ -39,6 +40,8 @@ import com.graduration.entity.TeamEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
 import com.graduration.mapper.SubmissionMapper;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +62,8 @@ public class SubmissionService {
     SubmissionMapper submissionMapper;
     CommentService commentService;
     GraduationEnrollmentService graduationEnrollmentService;
+    NotificationService notificationService;
+    NotificationRecipientService notificationRecipientService;
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional
@@ -68,6 +73,7 @@ public class SubmissionService {
             Long milestoneId, Long teamId, String note, MultipartFile file, LocalDateTime submittedAt) {
         validateFilePresent(file);
         MilesStoneEntity milestone = findMilestone(milestoneId);
+        requireOpenPeriod(milestone);
         TeamEntity team = findTeam(teamId);
         StudentEntity student = currentStudent();
         requireTeamMember(team, student);
@@ -102,7 +108,19 @@ public class SubmissionService {
                 .milesStone(milestone)
                 .team(team)
                 .build();
-        return submissionMapper.toResponse(submissionRepository.save(submission));
+        SubmistionEntity saved = submissionRepository.save(submission);
+        if (team.getTopic() != null) {
+            notificationService.notifyUsers(
+                    notificationRecipientService.activeSupervisorUserIds(team.getTopic().getIdTopic()),
+                    "Sinh viên đã nộp tiến độ",
+                    student.getFullNameStudent() + " (" + student.getStudentCode() + ") thuộc "
+                            + team.getNameTeam() + " đã nộp \"" + milestone.getMilesStoneName()
+                            + "\" cho đề tài \"" + team.getTopic().getTitle() + "\".",
+                    NotificationTypeConstain.SUBMISSION_RECEIVED,
+                    "SUBMISSION",
+                    saved.getIdSubmission());
+        }
+        return submissionMapper.toResponse(saved);
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -120,7 +138,13 @@ public class SubmissionService {
     // Hàm getSubmissions: Nhận mã hoặc điều kiện tìm kiếm của getSubmissions, truy vấn bản ghi/quan hệ tương ứng, báo
     // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public PageResponse<SubmissionResponse> getSubmissions(
-            Long teamId, Long milestoneId, SubmissionStatusConstain status, Boolean late, Integer page, Integer size) {
+            Long teamId,
+            Long milestoneId,
+            Long defensePeriodId,
+            SubmissionStatusConstain status,
+            Boolean late,
+            Integer page,
+            Integer size) {
         Specification<SubmistionEntity> specification = Specification.where(null);
         if (teamId != null) {
             specification = specification.and(
@@ -129,6 +153,10 @@ public class SubmissionService {
         if (milestoneId != null) {
             specification = specification.and(
                     (root, query, cb) -> cb.equal(root.get("milesStone").get("IdMilesStone"), milestoneId));
+        }
+        if (defensePeriodId != null) {
+            specification = specification.and((root, query, cb) -> cb.equal(
+                    root.get("milesStone").get("defensePeriod").get("ID_Defense"), defensePeriodId));
         }
         if (status != null) {
             specification = specification.and((root, query, cb) -> cb.equal(root.get("status"), status));
@@ -177,10 +205,12 @@ public class SubmissionService {
     // gian để bài không còn được dùng trong quy trình chấm.
     public SubmissionResponse withdraw(Long submissionId) {
         SubmistionEntity submission = findSubmission(submissionId);
+        requireOpenPeriod(submission.getMilesStone());
         StudentEntity student = currentStudent();
         requireTeamMember(submission.getTeam(), student);
         graduationEnrollmentService.requireParticipationAllowed(
-                student.getIdStudent(), submission.getMilesStone().getDefensePeriod().getID_Defense());
+                student.getIdStudent(),
+                submission.getMilesStone().getDefensePeriod().getID_Defense());
         SubmistionEntity latest = submissionRepository
                 .findFirstByTeam_IdTeamAndMilesStone_IdMilesStoneOrderByVersionDesc(
                         submission.getTeam().getIdTeam(),
@@ -200,6 +230,7 @@ public class SubmissionService {
     // thực hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public SubmissionResponse startReview(Long submissionId) {
         SubmistionEntity submission = findSubmission(submissionId);
+        requireOpenPeriod(submission.getMilesStone());
         requireReviewAccess(submission);
         requireStatus(submission, SubmissionStatusConstain.SUBMITTED);
         submission.setStatus(SubmissionStatusConstain.UNDER_REVIEW);
@@ -242,6 +273,7 @@ public class SubmissionService {
             Long submissionId, String comment, SubmissionStatusConstain target, CommentTypeConstain commentType) {
         validateComment(comment);
         SubmistionEntity submission = findSubmission(submissionId);
+        requireOpenPeriod(submission.getMilesStone());
         requireReviewAccess(submission);
         if (submission.getStatus() != SubmissionStatusConstain.SUBMITTED
                 && submission.getStatus() != SubmissionStatusConstain.UNDER_REVIEW) {
@@ -249,7 +281,24 @@ public class SubmissionService {
         }
         submission.setStatus(target);
         commentService.createWorkflowComment(submission, comment, commentType);
-        return submissionMapper.toResponse(submissionRepository.save(submission));
+        SubmistionEntity saved = submissionRepository.save(submission);
+        NotificationTypeConstain notificationType = target == SubmissionStatusConstain.REVISION_REQUIRED
+                ? NotificationTypeConstain.REVISION_REQUIRED
+                : NotificationTypeConstain.SUBMISSION_REVIEWED;
+        String title = switch (target) {
+            case APPROVED -> "Bài nộp tiến độ đã được duyệt";
+            case REVISION_REQUIRED -> "Bài nộp tiến độ cần chỉnh sửa";
+            case REJECTED -> "Bài nộp tiến độ bị từ chối";
+            default -> "Bài nộp tiến độ đã được nhận xét";
+        };
+        notificationService.notifyUsers(
+                notificationRecipientService.studentUserIdsForTeam(saved.getTeam().getIdTeam()),
+                title,
+                "Tiến độ \"" + saved.getMilesStone().getMilesStoneName() + "\": " + comment.trim(),
+                notificationType,
+                "SUBMISSION",
+                saved.getIdSubmission());
+        return submissionMapper.toResponse(saved);
     }
 
     // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
@@ -262,6 +311,15 @@ public class SubmissionService {
         }
         if (now.isAfter(milestone.getDeadLine()) && !Boolean.TRUE.equals(milestone.getAllowLateSubmission())) {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
+        }
+    }
+
+    private void requireOpenPeriod(MilesStoneEntity milestone) {
+        if (milestone == null || milestone.getDefensePeriod() == null) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND);
+        }
+        if (milestone.getDefensePeriod().isFinished()) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
     }
 

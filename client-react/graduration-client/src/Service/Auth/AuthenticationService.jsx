@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-// Khi chạy sau Nginx, API dùng cùng origin qua đường dẫn /graduration.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/graduration';
+// Giữ hostname frontend và backend giống nhau khi chạy local/LAN để trình duyệt
+// gửi được access_token và refresh_token HttpOnly ở bước tải hồ sơ sau đăng nhập.
+const browserApiUrl = typeof window === 'undefined'
+  ? 'http://localhost:8080/graduration'
+  : `${window.location.protocol}//${window.location.hostname}:8080/graduration`;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || browserApiUrl;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

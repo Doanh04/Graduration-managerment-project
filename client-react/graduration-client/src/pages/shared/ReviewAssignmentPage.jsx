@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import DefenseReportPanel from '../../components/DefenseReportPanel.jsx';
+import CommitteeScoreSheetModal from '../../components/CommitteeScoreSheetModal.jsx';
 import { AlertCircle, Check, Download, Eye, FileText, LoaderCircle, MapPin, MessageSquare, Search, Send, Users, X } from 'lucide-react';
 import API_ENDPOINTS from '../../config/endpoints.js';
 import ResourceService from '../../services/ResourceService.jsx';
@@ -9,11 +11,12 @@ import { formatDateDisplay, formatDateTimeDisplay } from '../../utils/dateFormat
 import '../../style/WorkflowPages.scss';
 
 const STATUS = {
-  ASSIGNED: 'Đã phân công',
-  IN_PROGRESS: 'Đang phản biện',
-  SUBMITTED: 'Đã gửi phản biện',
-  APPROVED: 'Đã duyệt',
-  REVISION_REQUIRED: 'Yêu cầu chỉnh sửa',
+  ASSIGNED: 'Chưa nộp',
+  IN_PROGRESS: 'Đã nộp · Chờ duyệt',
+  SUBMITTED: 'Đã nộp · Chờ duyệt',
+  APPROVED: 'Đã đồng ý xếp lịch',
+  REVISION_REQUIRED: 'Cần nộp lại',
+  NOT_ELIGIBLE: 'Không đủ điều kiện · 0 điểm',
   CANCELLED: 'Đã hủy',
   COMMITTEE: 'Phản biện theo hội đồng',
 };
@@ -74,38 +77,32 @@ function scheduleStatusLabel(value) {
   const normalized = String(code || '').trim().toUpperCase();
   return SCHEDULE_STATUS[normalized] || (typeof code === 'string' ? code : '') || '—';
 }
-const RECOMMENDATIONS = [
-  { value: 'ELIGIBLE_FOR_DEFENSE', label: 'Đủ điều kiện bảo vệ' },
-  { value: 'REVISION_REQUIRED', label: 'Cần chỉnh sửa' },
-  { value: 'NOT_ELIGIBLE_FOR_DEFENSE', label: 'Không đủ điều kiện bảo vệ' },
-];
-
 export default function ReviewAssignmentPage() {
-  const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [periods, setPeriods] = useState([]);
+  const [periodId, setPeriodId] = useState('');
   const [modal, setModal] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [comment, setComment] = useState('');
-  const [recommendation, setRecommendation] = useState('');
 
   const load = async () => {
     setLoading(true);
     setError('');
     try {
       const reviewParams = status && status !== 'COMMITTEE' ? { status } : {};
-      const [assignmentsResult, schedulesResult] = await Promise.allSettled([
+      const [assignmentsResult, schedulesResult, periodsResult] = await Promise.allSettled([
         ResourceService.getAll(API_ENDPOINTS.reviews.mine, reviewParams),
         ResourceService.getAll(API_ENDPOINTS.schedules.reviewerMine),
+        ResourceService.getAll(API_ENDPOINTS.defensePeriods.list),
       ]);
       if (assignmentsResult.status === 'rejected' && schedulesResult.status === 'rejected') {
         throw assignmentsResult.reason;
       }
       const assignments = assignmentsResult.status === 'fulfilled' ? assignmentsResult.value : [];
       const committeeSchedules = schedulesResult.status === 'fulfilled' ? schedulesResult.value : [];
+      if (periodsResult.status === 'fulfilled') setPeriods(periodsResult.value);
       // Không để lỗi API lịch hội đồng bị che khuất khiến trang chỉ hiển thị trạng thái rỗng.
       // Trường hợp thường gặp là backend chưa được khởi động lại sau khi thêm endpoint mới
       // hoặc tài khoản chưa có quyền ROLE_REVIEWER.
@@ -118,6 +115,7 @@ export default function ReviewAssignmentPage() {
         assignmentId: `committee-${normalized.scheduleId}`,
         source: 'COMMITTEE',
         scheduleId: normalized.scheduleId,
+        defensePeriodId: normalized.defensePeriodId,
         defensePeriodName: normalized.defensePeriodName,
         academicYear: normalized.academicYear,
         projectType: normalized.projectType,
@@ -132,6 +130,8 @@ export default function ReviewAssignmentPage() {
         teamName: normalized.teamName,
         teamDescription: normalized.teamDescription,
         submissionId: normalized.submissionId,
+        reviewAssignmentId: normalized.reviewAssignmentId,
+        approvedReportId: normalized.approvedReportId,
         defenseDate: normalized.defenseDate,
         startTime: normalized.startTime,
         endTime: normalized.endTime,
@@ -174,71 +174,49 @@ export default function ReviewAssignmentPage() {
   useEffect(() => { load(); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(
-    () => items.filter((item) => `${item.topicTitle || ''} ${item.teamName || ''} ${item.assignmentId || ''}`
-      .toLowerCase().includes(query.toLowerCase())),
-    [items, query],
+    () => items.filter((item) => (!periodId || String(item.defensePeriodId) === String(periodId))
+      && `${item.topicTitle || ''} ${item.teamName || ''} ${item.assignmentId || ''}`
+        .toLowerCase().includes(query.toLowerCase())),
+    [items, query, periodId],
   );
 
   const open = (item) => {
     setModal(item);
-    setComment(item.reviewComment || '');
-    setRecommendation(item.recommendation || '');
     setError('');
-  };
-
-  const update = async (action, payload = null) => {
-    setSaving(true);
-    setError('');
-    try {
-      await ResourceService.update(API_ENDPOINTS.reviews[action](modal.assignmentId), payload, 'patch');
-      toast.success(action === 'submit' ? 'Đã gửi kết quả phản biện.' : 'Đã cập nhật phân công phản biện.');
-      setModal(null);
-      await load();
-    } catch (e) {
-      const message = getApiErrorMessage(e, 'Không thể cập nhật phản biện.');
-      setError(message);
-      toast.error(message, { title: 'Thao tác thất bại' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submit = () => {
-    if (!comment.trim() || !recommendation) {
-      setError('Vui lòng nhập nhận xét và chọn đề xuất phản biện.');
-      return;
-    }
-    update('submit', { reviewComment: comment.trim(), recommendation });
   };
 
   return (
     <div className="workflow-page review-assignment-page">
       <div className="page-heading">
-        <div><span>PHẢN BIỆN ĐỀ TÀI</span><h1>Đề tài được phân công phản biện</h1><p>Xem hồ sơ, gửi nhận xét và cập nhật kết quả phản biện.</p></div>
+        <div><span>PHẢN BIỆN THEO HỘI ĐỒNG</span><h1>Hồ sơ các nhóm trong đợt bảo vệ</h1><p>Danh sách tự động hiển thị theo đợt của hội đồng mà bạn giữ vai trò Phản biện.</p></div>
       </div>
       {error && !modal && <div className="workflow-error page-error"><AlertCircle size={17} />{error}</div>}
       <section className="workflow-panel">
         <div className="workflow-toolbar">
           <label><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo đề tài hoặc nhóm..." /></label>
+          <select value={periodId} onChange={(e) => setPeriodId(e.target.value)} aria-label="Lọc theo đợt bảo vệ">
+            <option value="">Tất cả đợt bảo vệ</option>
+            {periods.map((period) => <option key={period.defensePeriodId} value={period.defensePeriodId}>{period.periodName} · {period.academicYear}</option>)}
+          </select>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Tất cả trạng thái</option>
             {Object.entries(STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </div>
         {loading ? <div className="workflow-state"><LoaderCircle className="spin" /><strong>Đang tải dữ liệu...</strong></div>
-          : filtered.length === 0 ? <div className="workflow-state"><MessageSquare /><strong>Chưa có đề tài được phân công phản biện.</strong></div>
-            : <div className="workflow-table"><table><thead><tr><th>Mã</th><th>Đề tài</th><th>Hạn phản biện</th><th>Đề xuất</th><th>Trạng thái</th><th /></tr></thead><tbody>
+          : filtered.length === 0 ? <div className="workflow-state"><MessageSquare /><strong>Chưa có đề tài hoặc nhóm trong đợt của hội đồng.</strong></div>
+            : <div className="workflow-table"><table><thead><tr><th>Mã</th><th>Đề tài / nhóm</th><th>Hội đồng</th><th>Hạn phản biện</th><th>Bài nộp</th><th /></tr></thead><tbody>
               {filtered.map((item) => <tr key={item.assignmentId}>
                 <td>{item.source === 'COMMITTEE' ? `Lịch #${item.scheduleId}` : item.assignmentId}</td>
                 <td><strong>{item.topicTitle || '—'}</strong><small>{item.teamName || 'Chưa có nhóm'}{item.committeeName ? ` · ${item.committeeName}` : ''}</small></td>
+                <td>{item.committeeName || '—'}</td>
                 <td>{item.source === 'COMMITTEE' ? formatScheduleTime(item) : formatDate(item.deadline)}</td>
-                <td>{item.source === 'COMMITTEE' ? 'Theo vai trò phản biện trong hội đồng' : recommendationLabel(item.recommendation)}</td>
                 <td><span className={`workflow-status ${String(item.status || '').toLowerCase()}`}>{item.source === 'COMMITTEE' ? `Hội đồng · ${scheduleStatusLabel(item.scheduleStatus)}` : STATUS[item.status] || item.status}</span></td>
                 <td><div className="workflow-actions"><button title="Xem chi tiết" onClick={() => open(item)}><Eye size={15} /></button></div></td>
               </tr>)}
             </tbody></table></div>}
       </section>
-      {modal && (modal.source === 'COMMITTEE' ? <CommitteeScheduleModal item={modal} onClose={() => setModal(null)} /> : <div className="modal-backdrop"><section className="workflow-modal"><header><div><span>PHẢN BIỆN ĐỀ TÀI</span><h3>{modal.topicTitle}</h3></div><button onClick={() => setModal(null)}><X size={19} /></button></header><form onSubmit={(e) => { e.preventDefault(); submit(); }}><div className="submission-summary"><div><span>Nhóm</span><strong>{modal.teamName || '—'}</strong></div><div><span>Hạn phản biện</span><strong>{formatDate(modal.deadline)}</strong></div><div><span>Trạng thái</span><strong>{STATUS[modal.status] || modal.status}</strong></div></div><label>Nhận xét<textarea value={comment} onChange={(e) => setComment(e.target.value)} disabled={modal.status === 'APPROVED' || modal.status === 'CANCELLED'} placeholder="Nhập nhận xét chi tiết..." /></label><label>Đề xuất<select value={recommendation} onChange={(e) => setRecommendation(e.target.value)} disabled={modal.status === 'APPROVED' || modal.status === 'CANCELLED'}><option value="">Chọn đề xuất</option>{RECOMMENDATIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{error && <div className="workflow-error"><AlertCircle size={16} />{error}</div>}<footer><button type="button" className="secondary-button" onClick={() => setModal(null)}>Đóng</button>{modal.status === 'ASSIGNED' && <button type="button" className="secondary-button" disabled={saving} onClick={() => update('start')}>Bắt đầu phản biện</button>}{['ASSIGNED', 'IN_PROGRESS', 'REVISION_REQUIRED'].includes(modal.status) && <button className="primary-button" disabled={saving}>{saving ? 'Đang gửi...' : <><Send size={15} /> Gửi phản biện</>}</button>}</footer></form>{['SUBMITTED'].includes(modal.status) && <div className="review-actions" style={{ padding: '0 24px 20px' }}><button className="success" disabled={saving} onClick={() => update('approve')}><Check size={14} /> Duyệt kết quả</button><button className="warning" disabled={saving} onClick={() => update('revise')}>Yêu cầu chỉnh sửa</button></div>}</section></div>)}
+      {modal && (modal.source === 'COMMITTEE' ? <CommitteeScheduleModal item={modal} onClose={() => setModal(null)} /> : <div className="modal-backdrop"><section className="workflow-modal"><header><div><span>HỒ SƠ PHẢN BIỆN TRƯỚC BẢO VỆ</span><h3>{modal.topicTitle}</h3></div><button onClick={() => setModal(null)}><X size={19} /></button></header><div className="review-schedule-body"><div className="submission-summary"><div><span>Nhóm</span><strong>{modal.teamName || '—'}</strong></div><div><span>Hội đồng</span><strong>{modal.committeeName || '—'}</strong></div><div><span>Hạn phản biện</span><strong>{formatDate(modal.deadline)}</strong></div><div><span>Trạng thái</span><strong>{STATUS[modal.status] || modal.status}</strong></div></div><DefenseReportPanel assignmentId={modal.assignmentId} /></div><footer><button type="button" className="secondary-button" onClick={() => setModal(null)}>Đóng</button></footer></section></div>)}
     </div>
   );
 }
@@ -323,7 +301,7 @@ export function CommitteeScheduleModal({ item, onClose, mode = 'detail' }) {
         if (!studentId) return [studentId, null];
         try {
           const response = await ResourceService.getOne(
-            API_ENDPOINTS.scores.current(studentId, item.topicId),
+            API_ENDPOINTS.scores.committeeSheet(studentId, item.topicId),
           );
           const result = response?.result ?? response?.data ?? response ?? null;
           return [studentId, isScoreRecord(result) ? result : null];
@@ -433,15 +411,103 @@ export function CommitteeScheduleModal({ item, onClose, mode = 'detail' }) {
     <section className="review-detail-section detail-only"><h4><FileText size={16} /> Nội dung đề tài</h4><div className="review-detail-grid"><div><span>Mô tả</span><strong>{item.topicDescription || 'Chưa cập nhật'}</strong></div><div><span>Mục tiêu</span><strong>{item.topicObjective || 'Chưa cập nhật'}</strong></div><div><span>Công nghệ</span><strong>{item.topicTechnology || 'Chưa cập nhật'}</strong></div><div><span>Mô tả nhóm</span><strong>{item.teamDescription || 'Chưa cập nhật'}</strong></div></div></section>
     {!scoreOnly && hasFile && <section className="review-detail-section review-topic-file detail-only"><h4><FileText size={16} /> Tệp đề tài</h4><div className="review-topic-file-row"><div><strong title={item.topicFileName}>{item.topicFileName}</strong><small>{item.topicFileContentType || 'Tệp đính kèm'}{item.topicFileSize ? ` · ${formatFileSize(item.topicFileSize)}` : ''}</small></div><div className="review-file-actions"><button type="button" className="review-file-action" onClick={previewTopicFile} disabled={fileLoading}>{fileLoading ? <LoaderCircle className="spin" size={14} /> : <Eye size={14} />}Xem trước</button><button type="button" className="review-file-action" onClick={downloadTopicFile} disabled={fileLoading}><Download size={14} />Tải xuống</button></div></div>{fileError && <div className="workflow-error"><AlertCircle size={14} />{fileError}</div>}</section>}
     <section className="review-detail-section detail-only"><h4><MapPin size={16} /> Địa điểm và phiên bảo vệ</h4><div className="review-detail-grid"><div><span>Phòng</span><strong>{item.room || '—'}</strong></div><div><span>Địa điểm</span><strong>{item.location || '—'}</strong></div><div><span>Buổi</span><strong>{sessionLabel(item.session)}</strong></div></div></section>
-    <section className="review-detail-section"><h4><Users size={16} /> Sinh viên thực hiện <em>{students.length}{bannedStudentCount ? ` · ${bannedStudentCount}/${students.length} sinh viên bị cấm bảo vệ` : ''}</em></h4>{students.length ? <div className="review-student-list">{students.map((student, index) => <div className={student.defenseEligible === false ? 'defense-ineligible-student' : ''} key={studentIdentifier(student) || `student-${index}`}><div><strong>{student.fullName || '—'}{student.defenseEligible === false && <span className="defense-ineligible-badge">Bị cấm bảo vệ · Điểm 0</span>}</strong><small>{[student.studentCode, student.email, student.phone].filter(Boolean).join(' · ') || 'Chưa có thông tin liên hệ'}</small>{scoreOnly && <StudentAssessment record={student.defenseEligible === false ? { score: 0, status: 'LOCKED', comment: 'Sinh viên bị hủy tư cách thi' } : studentScores[studentIdentifier(student)]} loading={student.defenseEligible === false ? false : scoresLoading} />}</div>{!scheduleOnly && item.currentRole === 'CHAIRPERSON' && student.defenseEligible !== false && student.studentId && item.topicId && <button type="button" className="review-file-action score-student-button" onClick={() => setScoreStudent(student)}><Check size={13} /> Chấm điểm</button>}</div>)}</div> : <p className="review-empty-detail">Chưa có thông tin sinh viên của nhóm.</p>}{item.currentRole && <div className="workflow-info role-info">Vai trò của bạn trong hội đồng: <strong>{committeeRoleLabel(item.currentRole)}</strong>. {item.currentRole === 'CHAIRPERSON' ? 'Bạn có thể nhập và gửi điểm cho từng sinh viên.' : 'Bạn có quyền xem hồ sơ bảo vệ; quyền chấm điểm thuộc về Chủ tịch.'}</div>}</section>
-    <section className="review-detail-section committee-comments-section"><h4><MessageSquare size={16} /> {scoreOnly ? 'Nhận xét và chấm điểm' : 'Nhận xét tiến độ và bài nộp'} <em>{comments.length}</em></h4><p className="review-comments-help">{scoreOnly ? 'Tất cả thành viên hội đồng có thể gửi nhận xét. Nhận xét đánh giá khi chấm điểm được lưu cùng bản ghi điểm.' : scheduleOnly ? 'Các nhận xét hiện có của hồ sơ bảo vệ.' : 'Nhận xét tiến độ được lưu trên bài nộp mới nhất của nhóm và hiển thị cho sinh viên, giảng viên hướng dẫn và hội đồng. Nhận xét đánh giá khi chấm điểm được lưu cùng bản ghi điểm.'}</p>{commentsLoading ? <p className="review-empty-detail">Đang tải nhận xét...</p> : comments.length ? <div className="committee-comment-list">{comments.map((entry, index) => <article className="committee-comment" key={entry.commentId || `comment-${index}`}><div className="committee-comment-header"><strong>{entry.lecturerName || entry.authorUsername || entry.authorUserId || 'Thành viên hội đồng'}</strong><small>{formatDateDisplay(entry.createdAt)}</small></div><small className="committee-comment-milestone">Mốc tiến độ: {milestoneNameFrom(entry) || submissionMilestoneName || 'Chưa xác định'}</small><p>{entry.content || entry.comment || '—'}</p></article>)}</div> : <p className="review-empty-detail">Chưa có nhận xét cho bài nộp này.</p>}{scheduleOnly ? <div className="workflow-info schedule-readonly-note">Trang Bảo vệ đồ án chỉ cho phép xem thông tin và nhận xét hiện có. Bạn có thể gửi nhận xét tại trang Chấm điểm bảo vệ.</div> : item.submissionId ? <form className="committee-comment-form" onSubmit={submitCommitteeComment}><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Nhập nhận xét về tiến độ hoặc bài nộp..." disabled={commentSaving} /><button type="submit" className="primary-button" disabled={commentSaving || !comment.trim()}>{commentSaving ? <LoaderCircle className="spin" size={14} /> : <Send size={14} />} {commentSaving ? 'Đang gửi...' : 'Gửi nhận xét'}</button></form> : <div className="workflow-info">Nhóm chưa có bài nộp nên chưa thể ghi nhận xét trong hồ sơ bảo vệ.</div>}{commentError && <div className="workflow-error"><AlertCircle size={14} />{commentError}</div>}</section>
+    <section className="review-detail-section"><h4><Users size={16} /> Sinh viên thực hiện <em>{students.length}{bannedStudentCount ? ` · ${bannedStudentCount}/${students.length} sinh viên bị cấm bảo vệ` : ''}</em></h4>{students.length ? <div className="review-student-list">{students.map((student, index) => <div className={student.defenseEligible === false ? 'defense-ineligible-student' : ''} key={studentIdentifier(student) || `student-${index}`}><div><strong>{student.fullName || '—'}{student.defenseEligible === false && <span className="defense-ineligible-badge">Bị cấm bảo vệ · Điểm 0</span>}</strong><small>{[student.studentCode, student.email, student.phone].filter(Boolean).join(' · ') || 'Chưa có thông tin liên hệ'}</small>{scoreOnly && <StudentAssessment record={student.defenseEligible === false ? { finalScore: 0, published: true, committeeScores: [], comment: 'Sinh viên bị hủy tư cách thi' } : studentScores[studentIdentifier(student)]} loading={student.defenseEligible === false ? false : scoresLoading} />}</div>{!scheduleOnly && item.currentRole === 'SECRETARY' && student.defenseEligible !== false && student.studentId && item.topicId && <button type="button" className="review-file-action score-student-button" onClick={() => setScoreStudent(student)}><Check size={13} /> Nhập điểm hội đồng</button>}</div>)}</div> : <p className="review-empty-detail">Chưa có thông tin sinh viên của nhóm.</p>}{item.currentRole && <div className="workflow-info role-info">Vai trò của bạn trong hội đồng: <strong>{committeeRoleLabel(item.currentRole)}</strong>. {item.currentRole === 'SECRETARY' ? 'Bạn nhập điểm và nhận xét của Chủ tịch và Phản biện; hệ thống tự tính điểm trung bình từ hai vai trò này.' : 'Bạn có quyền xem hồ sơ và kết quả; quyền nhập điểm hội đồng thuộc về Thư ký.'}</div>}</section>
+    {scoreOnly ? <ApprovedDefenseReport assignmentId={item.reviewAssignmentId} approvedReportId={item.approvedReportId} /> : <section className="review-detail-section committee-comments-section">
+      <h4><MessageSquare size={16} /> Nhận xét tiến độ và bài nộp <em>{comments.length}</em></h4>
+      <p className="review-comments-help">{scheduleOnly ? 'Các nhận xét hiện có của hồ sơ bảo vệ.' : 'Nhận xét tiến độ được lưu trên bài nộp mới nhất của nhóm và hiển thị cho sinh viên, giảng viên hướng dẫn và hội đồng.'}</p>
+      {commentsLoading ? <p className="review-empty-detail">Đang tải nhận xét...</p> : comments.length ? <div className="committee-comment-list">{comments.map((entry, index) => <article className="committee-comment" key={entry.commentId || `comment-${index}`}><div className="committee-comment-header"><strong>{entry.lecturerName || entry.authorUsername || entry.authorUserId || 'Thành viên hội đồng'}</strong><small>{formatDateDisplay(entry.createdAt)}</small></div><small className="committee-comment-milestone">Mốc tiến độ: {milestoneNameFrom(entry) || submissionMilestoneName || 'Chưa xác định'}</small><p>{entry.content || entry.comment || '—'}</p></article>)}</div> : <p className="review-empty-detail">Chưa có nhận xét cho bài nộp này.</p>}
+      {scheduleOnly ? <div className="workflow-info schedule-readonly-note">Trang Bảo vệ đồ án chỉ cho phép xem thông tin và nhận xét hiện có. Bạn có thể gửi nhận xét tại trang Chấm điểm bảo vệ.</div> : item.submissionId ? <form className="committee-comment-form" onSubmit={submitCommitteeComment}><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Nhập nhận xét về tiến độ hoặc bài nộp..." disabled={commentSaving} /><button type="submit" className="primary-button" disabled={commentSaving || !comment.trim()}>{commentSaving ? <LoaderCircle className="spin" size={14} /> : <Send size={14} />} {commentSaving ? 'Đang gửi...' : 'Gửi nhận xét'}</button></form> : <div className="workflow-info">Nhóm chưa có bài nộp tiến độ nên chưa thể ghi nhận xét tại đây.</div>}
+      {commentError && <div className="workflow-error"><AlertCircle size={14} />{commentError}</div>}
+    </section>}
     <section className="review-detail-section detail-only"><h4><Users size={16} /> Thành viên hội đồng <em>{committeeMembers.length}</em></h4>{committeeMembers.length ? <div className="review-committee-list">{committeeMembers.map((member, index) => <div key={member.lectureId || member.lectureCode || `member-${index}`}><div><strong>{member.lectureName || '—'}</strong><small>{[member.lectureCode, member.degree, member.email].filter(Boolean).join(' · ') || '—'}</small></div><span>{committeeRoleLabel(member.role)}</span></div>)}</div> : <p className="review-empty-detail">Chưa có thông tin thành viên hội đồng.</p>}</section>
     {!scoreOnly && (item.committeeDescription || item.projectType) && <section className="review-detail-section detail-only"><h4><FileText size={16} /> Thông tin hội đồng</h4><div className="review-detail-grid"><div><span>Mô tả</span><strong>{item.committeeDescription || 'Chưa cập nhật'}</strong></div><div><span>Loại đồ án</span><strong>{item.projectType || 'Chưa cập nhật'}</strong></div></div></section>}
     {!scoreOnly && item.note && <section className="review-detail-section detail-only"><h4><FileText size={16} /> Ghi chú lịch bảo vệ</h4><p className="review-note-detail">{item.note}</p></section>}
     {!scoreOnly && <div className="workflow-info review-permission-note detail-only">Mọi thành viên hội đồng đều có thể xem lịch, hồ sơ đề tài, nhóm và sinh viên. Các thao tác đánh giá được giới hạn theo vai trò được phân công.</div>}
   </div><footer><button type="button" className="secondary-button" onClick={onClose}>Đóng</button></footer></section></div>
     {!scoreOnly && filePreview && <div className="modal-backdrop review-file-preview-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeFilePreview()}><section className="file-preview-modal review-file-preview-modal" role="dialog" aria-modal="true"><header><div><span>XEM TRƯỚC TỆP ĐỀ TÀI</span><h3>{item.topicFileName}</h3></div><button type="button" onClick={closeFilePreview} aria-label="Đóng"><X size={19} /></button></header>{filePreview.isPdf ? <div className="file-preview-frame"><iframe src={filePreview.objectUrl} title={`Xem trước ${item.topicFileName}`} /></div> : <div className="file-preview-unavailable"><FileText size={34} /><strong>Không thể hiển thị trực tiếp tệp Word trong trình duyệt</strong><span>Tệp DOC/DOCX đã được tải từ hệ thống. Hãy tải tệp về máy để mở đầy đủ nội dung.</span><button type="button" className="secondary-button" onClick={downloadTopicFile} disabled={fileLoading}>{fileLoading ? <LoaderCircle className="spin" size={14} /> : <Download size={14} />}Tải xuống tệp Word</button></div>}<footer><span>{filePreview.isPdf ? 'PDF được tải có xác thực và hiển thị trực tiếp trong cửa sổ này.' : 'Tệp Word không hỗ trợ hiển thị trực tiếp; bạn có thể tải xuống để xem.'}</span><button type="button" className="secondary-button" onClick={closeFilePreview}>Đóng</button></footer></section></div>}
-    {scoreStudent && <CommitteeScoreModal item={item} student={scoreStudent} onClose={() => setScoreStudent(null)} />}
+    {scoreStudent && <CommitteeScoreSheetModal item={item} student={scoreStudent} onClose={() => setScoreStudent(null)} />}
+  </>;
+}
+
+function ApprovedDefenseReport({ assignmentId, approvedReportId }) {
+  const [overview, setOverview] = useState(null);
+  const [loading, setLoading] = useState(Boolean(assignmentId));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    setOverview(null);
+    setError('');
+    if (!assignmentId) {
+      setLoading(false);
+      return () => { active = false; };
+    }
+    setLoading(true);
+    ResourceService.getOne(API_ENDPOINTS.defenseReports.assignment(assignmentId))
+      .then((result) => { if (active) setOverview(result?.result ?? result?.data ?? result); })
+      .catch((requestError) => {
+        if (active) setError(getApiErrorMessage(requestError, 'Không thể tải hồ sơ phản biện đã duyệt.'));
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [assignmentId]);
+
+  useEffect(() => () => {
+    if (preview?.url) URL.revokeObjectURL(preview.url);
+  }, [preview]);
+
+  const versions = Array.isArray(overview?.versions) ? overview.versions : [];
+  const approvedVersion = versions.find((version) => String(version.id) === String(approvedReportId))
+    || versions.find((version) => String(version.status).toUpperCase() === 'APPROVED');
+
+  const openReport = async () => {
+    if (!approvedVersion) return;
+    setBusy(true);
+    setError('');
+    try {
+      const response = await ResourceService.downloadFile(API_ENDPOINTS.defenseReports.file(approvedVersion.id));
+      const blob = response instanceof Blob
+        ? response
+        : new Blob([response], { type: approvedVersion.contentType || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const isPdfReport = String(approvedVersion.contentType || approvedVersion.fileName || '').toLowerCase().includes('pdf');
+      if (isPdfReport) {
+        setPreview({ url, name: approvedVersion.fileName });
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = approvedVersion.fileName || 'bao-cao.docx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Không thể mở báo cáo đã duyệt.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (preview?.url) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  };
+
+  return <>
+    <section className="review-detail-section approved-defense-report">
+      <h4><FileText size={16} /> Hồ sơ phản biện đã đồng ý</h4>
+      <p className="review-comments-help">Thư ký và các thành viên hội đồng sử dụng báo cáo cùng link source/sản phẩm này để chấm điểm.</p>
+      {loading ? <p className="review-empty-detail"><LoaderCircle className="spin" size={15} /> Đang tải hồ sơ phản biện...</p> : error ? <div className="workflow-error"><AlertCircle size={14} />{error}</div> : approvedVersion ? <article className="approved-report-card">
+        <div className="approved-report-file"><div><strong>{approvedVersion.fileName || 'Báo cáo đã duyệt'}</strong><small>Phiên bản {approvedVersion.revision} · Đã được phản biện đồng ý {approvedVersion.reviewedAt ? `· ${formatDateTimeDisplay(approvedVersion.reviewedAt)}` : ''}</small></div><button type="button" className="review-file-action" disabled={busy} onClick={openReport}>{busy ? <LoaderCircle className="spin" size={14} /> : String(approvedVersion.contentType || '').includes('pdf') ? <Eye size={14} /> : <Download size={14} />}{String(approvedVersion.contentType || '').includes('pdf') ? 'Xem báo cáo' : 'Tải và mở bằng Word'}</button></div>
+        <div className="approved-report-links">{approvedVersion.sourceUrl && <a href={approvedVersion.sourceUrl} target="_blank" rel="noopener noreferrer">Mở source code ↗</a>}{approvedVersion.productUrl && <a href={approvedVersion.productUrl} target="_blank" rel="noopener noreferrer">Mở sản phẩm / demo ↗</a>}</div>
+        {approvedVersion.note && <p><strong>Ghi chú của sinh viên:</strong> {approvedVersion.note}</p>}
+        {approvedVersion.reviewComment && <p><strong>Nhận xét phản biện:</strong> {approvedVersion.reviewComment}</p>}
+      </article> : <div className="workflow-info">Chưa tìm thấy phiên bản báo cáo đã được phản biện đồng ý cho lịch bảo vệ này.</div>}
+    </section>
+    {preview && <div className="modal-backdrop review-file-preview-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closePreview()}><section className="file-preview-modal review-file-preview-modal" role="dialog" aria-modal="true"><header><div><span>XEM TRƯỚC BÁO CÁO ĐÃ DUYỆT</span><h3>{preview.name}</h3></div><button type="button" onClick={closePreview} aria-label="Đóng"><X size={19} /></button></header><div className="file-preview-frame"><iframe src={preview.url} title={`Xem trước ${preview.name}`} /></div><footer><span>Báo cáo PDF đã được giảng viên phản biện đồng ý.</span><button type="button" className="secondary-button" onClick={closePreview}>Đóng</button></footer></section></div>}
   </>;
 }
 
@@ -478,7 +544,7 @@ function CommitteeScoreModal({ item, student, onClose }) {
   }, [item.topicId, student.studentId]);
 
   const scoreStatus = String(scoreResult?.status || '').toUpperCase();
-  const editable = !scoreResult || scoreStatus === 'DRAFT';
+  const editable = !saving && !['LOCKED', 'SUBMITTED'].includes(scoreStatus);
   const canUnlock = scoreStatus === 'SUBMITTED' || scoreStatus === 'LOCKED';
 
   const saveScore = async (submit = false) => {
@@ -590,18 +656,19 @@ function StudentAssessment({ record, loading }) {
     return <div className="review-student-assessment"><small className="review-student-unrated">Sinh viên chưa được đánh giá</small></div>;
   }
 
-  const score = record.totalScore ?? record.score ?? record.point;
+  const score = record.finalScore ?? record.totalScore ?? record.score ?? record.point;
+  const entries = record.entries ?? record.committeeScores ?? [];
   const evaluation = record.comment ?? record.evaluation ?? record.feedback ?? record.reviewComment;
   return <div className="review-student-assessment">
-    <small><strong>Điểm:</strong> {score === null || score === undefined || score === '' ? 'Chưa có điểm' : `${score}/10`}</small>
-    <small><strong>Đánh giá:</strong> {evaluation || 'Chưa có nhận xét'}</small>
+    <small><strong>Điểm trung bình:</strong> {score === null || score === undefined || score === '' ? 'Chưa có điểm' : `${score}/10`}</small>
+    <small><strong>Tiến độ:</strong> {record.scoredMembers ?? entries.filter((entry) => entry.score !== null && entry.score !== undefined).length}/{record.totalMembers ?? entries.length} thành viên đã chấm{record.published ? ' · Đã công bố' : ''}</small>
+    {evaluation && <small><strong>Đánh giá:</strong> {evaluation}</small>}
   </div>;
 }
 
 function formatDate(value) { return formatDateTimeDisplay(value); }
 function formatTimeRange(item) { return item.startTime ? `${item.startTime}${item.endTime ? `–${item.endTime}` : ''}` : '—'; }
 function formatScheduleTime(item) { return `${formatDateDisplay(item.defenseDate)}${item.startTime ? ` · ${formatTimeRange(item)}` : ''}`; }
-function recommendationLabel(value) { return RECOMMENDATIONS.find((item) => item.value === value)?.label || '—'; }
 function milestoneNameFrom(value = {}) {
   return value?.milestoneName
     || value?.milestoneTitle
@@ -665,6 +732,7 @@ function normalizeSchedule(schedule = {}) {
     scheduleStatus: normalizedStatus,
     scheduleState: normalizedStatus,
     scheduleId: schedule.scheduleId || schedule.idDefenseScheduce || schedule.id,
+    defensePeriodId: schedule.defensePeriodId || schedule.idDefensePeriod || schedule.idPeriod,
     defensePeriodName: schedule.defensePeriodName || schedule.periodName,
     academicYear: schedule.academicYear || schedule.academicYearName,
     projectType: schedule.projectType,
@@ -677,6 +745,8 @@ function normalizeSchedule(schedule = {}) {
     topicFileContentType: schedule.topicFileContentType || schedule.contentType || topic.contentType,
     topicFileSize: schedule.topicFileSize || schedule.fileSize || topic.fileSize,
     submissionId: schedule.submissionId || schedule.latestSubmissionId || topic.submissionId,
+    reviewAssignmentId: schedule.reviewAssignmentId || schedule.approvedReviewAssignmentId,
+    approvedReportId: schedule.approvedReportId,
     teamName: schedule.teamName || team.nameTeam || team.teamName || team.name,
     teamDescription: schedule.teamDescription || team.description,
     committeeName: schedule.committeeName || committee.comitteesName || committee.committeeName || committee.name,

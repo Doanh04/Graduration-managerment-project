@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.graduration.Constain.CategoryTopicConstain;
+import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.TopicStatusConstain;
 
 import lombok.*;
@@ -31,8 +32,10 @@ public class TopicResponse {
     LocalDateTime updatedAt;
     Long defensePeriodId;
     String defensePeriodName;
+    DefensePeriodConstain defensePeriodStatus;
     Integer academicYearId;
     String academicYear;
+    String projectType;
     Long teamId;
     String teamName;
     boolean hasActiveSupervisor;

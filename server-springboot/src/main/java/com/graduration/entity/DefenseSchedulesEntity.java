@@ -75,6 +75,14 @@ public class DefenseSchedulesEntity {
     @Column(name = "cancelled_reason", length = 1000)
     String cancelledReason;
 
+    // Null identifies pre-migration schedules. Historical schedules are explicitly exempted at startup.
+    Boolean reportRequired;
+    Long approvedReportId;
+    String approvedReportBy;
+    LocalDateTime reportCheckedAt;
+    @Column(length = 1000)
+    String reportFailureReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     UserEntity createdBy;
@@ -93,6 +101,7 @@ public class DefenseSchedulesEntity {
 
     @PrePersist
     void prePersist() {
+        reportRequired = reportRequired == null ? true : reportRequired;
         LocalDateTime now = LocalDateTime.now();
         createdAt = createdAt == null ? now : createdAt;
         updatedAt = now;

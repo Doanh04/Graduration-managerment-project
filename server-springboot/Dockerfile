@@ -6,7 +6,7 @@ COPY pom.xml .
 RUN mvn -B dependency:go-offline -DskipTests
 
 COPY src ./src
-RUN mvn -B clean package -DskipTests
+RUN mvn -B clean package -Dmaven.test.skip=true
 
 # Giai đoạn chạy chỉ cần JRE, giúp image nhỏ hơn image Maven/JDK.
 FROM eclipse-temurin:21-jre-jammy

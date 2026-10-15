@@ -29,6 +29,8 @@ import com.graduration.DTO.Response.TopicResponse;
 import com.graduration.Repository.DefensePeriodRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.Service.GradurationService.TopicService;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.TopicEntity;
 import com.graduration.exception.AppException;
@@ -45,6 +47,12 @@ class TopicServiceTest {
 
     @Mock
     TopicMapper topicMapper;
+
+    @Mock
+    NotificationService notificationService;
+
+    @Mock
+    NotificationRecipientService notificationRecipientService;
 
     @InjectMocks
     TopicService topicService;

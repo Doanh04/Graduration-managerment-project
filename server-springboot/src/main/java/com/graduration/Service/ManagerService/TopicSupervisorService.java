@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.graduration.Configuration.PaginationSupport;
-import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.Constain.SupervisorAssignmentStatusConstain;
 import com.graduration.Constain.SupervisorRoleConstain;
@@ -134,6 +133,7 @@ public class TopicSupervisorService {
     // ghi lý do, đổi sang INACTIVE rồi lưu.
     public TopicSupervisorResponse deactivate(Long assignmentId, DeactivateTopicSupervisorRequest request) {
         TopicSuperVisorEntity assignment = findAssignment(assignmentId);
+        findAssignableTopic(assignment.getTopic().getIdTopic());
         requireActive(assignment);
         if (request == null
                 || request.getReason() == null
@@ -162,8 +162,7 @@ public class TopicSupervisorService {
     private TopicEntity findAssignableTopic(Long topicId) {
         TopicEntity topic =
                 topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
-        if (topic.getDefensePeriod() == null
-                || topic.getDefensePeriod().getStatus() == DefensePeriodConstain.FINISHED) {
+        if (topic.getDefensePeriod() == null || topic.getDefensePeriod().isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         if (topic.getStatus() == TopicStatusConstain.REJECTED || topic.getStatus() == TopicStatusConstain.CANCELLED) {

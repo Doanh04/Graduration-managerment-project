@@ -46,4 +46,22 @@ public interface DefensePeriodRepository extends JpaRepository<DefensePeriodEnti
 			where period.endDate < :today and period.status <> :finished
 			""")
     int markExpiredPeriodsFinished(@Param("today") LocalDate today, @Param("finished") DefensePeriodConstain finished);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+			update DefensePeriodEntity period
+			set period.status = :ongoing
+			where period.startDate <= :today and period.endDate >= :today and period.status <> :ongoing
+			""")
+    int markCurrentPeriodsOngoing(@Param("today") LocalDate today, @Param("ongoing") DefensePeriodConstain ongoing);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            """
+			update DefensePeriodEntity period
+			set period.status = :pending
+			where period.startDate > :today and period.status <> :pending
+			""")
+    int markUpcomingPeriodsPending(@Param("today") LocalDate today, @Param("pending") DefensePeriodConstain pending);
 }

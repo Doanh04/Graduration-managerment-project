@@ -1,5 +1,6 @@
 package com.graduration.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -35,6 +36,10 @@ public interface TopicSupervisorRepository extends JpaRepository<TopicSuperVisor
 
     @EntityGraph(attributePaths = {"topic", "topic.defensePeriod", "lecture", "lecture.user", "assignedBy"})
     Page<TopicSuperVisorEntity> findByTopic_IdTopic(Long topicId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"topic", "lecture", "lecture.user"})
+    List<TopicSuperVisorEntity> findByTopic_IdTopicAndStatus(
+            Long topicId, SupervisorAssignmentStatusConstain status);
 
     @EntityGraph(attributePaths = {"topic", "topic.defensePeriod", "lecture", "lecture.user", "assignedBy"})
     Page<TopicSuperVisorEntity> findByLecture_LectureIdAndStatus(

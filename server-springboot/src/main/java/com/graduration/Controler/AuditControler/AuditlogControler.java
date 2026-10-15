@@ -1,7 +1,14 @@
 package com.graduration.Controler.AuditControler;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -59,5 +66,26 @@ public class AuditlogControler {
                                 ? auditLogService.getAuditLogsByAction(action)
                                 : auditLogService.getAuditLogsByAction(action, page, size))
                 .build();
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportAuditLogs(
+            @org.springframework.web.bind.annotation.RequestParam(required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate fromDate,
+            @org.springframework.web.bind.annotation.RequestParam(required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate toDate) {
+        byte[] content = auditLogService.exportAuditLogs(fromDate, toDate);
+        String fileName = "nhat-ky-hoat-dong_" + fromDate + "_den_" + toDate + ".xlsx";
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(fileName, StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentLength(content.length)
+                .body(content);
     }
 }

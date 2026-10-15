@@ -255,7 +255,7 @@ export default function DefenseCommitteePage() {
         null,
         "patch",
       );
-      toast.success("Đã kích hoạt hội đồng.");
+      toast.success("Đã công bố hội đồng.");
       await load();
     } catch (ex) {
       toast.error(
@@ -360,7 +360,7 @@ export default function DefenseCommitteePage() {
                             <Edit3 />
                           </button>
                           <button
-                            title="Kích hoạt"
+                            title="Công bố hội đồng"
                             className="success"
                             onClick={() => activate(i)}
                           >
@@ -564,7 +564,7 @@ export default function DefenseCommitteePage() {
             </div>
             <footer>
               <span>
-                Cần tối thiểu 3 thành viên, gồm 1 Chủ tịch và 1 Thư ký.
+                Chỉ được công bố khi có ít nhất 3 thành viên, gồm đúng 1 Chủ tịch, đúng 1 Thư ký và ít nhất 1 Phản biện.
               </span>
               <button
                 className="secondary-button"

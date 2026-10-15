@@ -2,6 +2,7 @@ package com.graduration.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.graduration.entity.UserEntity;
+import com.graduration.Constain.RoleConstain;
 
 @Repository
 public interface UserRepository extends JpaRepository<UserEntity, String> {
@@ -47,4 +49,7 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
     boolean existsByUserName(String userName);
 
     boolean existsByUserNameAndUserIdNot(String userName, String userId);
+
+    @EntityGraph(attributePaths = {"roles"})
+    List<UserEntity> findDistinctByRoles_RoleIn(Collection<RoleConstain> roles);
 }

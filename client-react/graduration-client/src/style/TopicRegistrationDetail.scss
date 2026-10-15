@@ -151,6 +151,8 @@
 .registration-file-actions {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 7px;
 }
 
@@ -210,5 +212,10 @@
   .registration-file-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .registration-file-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

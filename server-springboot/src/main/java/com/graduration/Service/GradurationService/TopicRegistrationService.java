@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.TopicRegistrationStatusConstain;
 import com.graduration.Constain.TopicStatusConstain;
+import com.graduration.Constain.NotificationTypeConstain;
 import com.graduration.DTO.Request.CreateTopicRegistrationRequest;
 import com.graduration.DTO.Response.PageResponse;
 import com.graduration.DTO.Response.TopicRegistrationResponse;
@@ -22,6 +23,8 @@ import com.graduration.Repository.TeamRepository;
 import com.graduration.Repository.TopicRegistrationRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.Repository.UserRepository;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.GraduationEnrollmentEntity;
 import com.graduration.entity.LectureEntity;
 import com.graduration.entity.StudentEntity;
@@ -47,6 +50,8 @@ public class TopicRegistrationService {
     LectureRepository lectureRepository;
     UserRepository userRepository;
     GraduationEnrollmentService graduationEnrollmentService;
+    NotificationService notificationService;
+    NotificationRecipientService notificationRecipientService;
 
     @PreAuthorize("hasAuthority('ROLE_STUDENT')")
     @Transactional
@@ -61,6 +66,7 @@ public class TopicRegistrationService {
         TopicEntity topic = topicRepository
                 .findById(request.getTopicId())
                 .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+        requireOpenPeriod(topic);
         if (topic.getStatus() != TopicStatusConstain.APPROVED
                 || topic.getTeam() != null
                 || teamRepository.existsByTopic_IdTopic(topic.getIdTopic())) {
@@ -140,6 +146,7 @@ public class TopicRegistrationService {
     // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public TopicRegistrationResponse approve(Long registrationId) {
         TopicRegistrationEntity registration = findRegistration(registrationId);
+        requireOpenPeriod(registration.getTopic());
         requirePending(registration);
         TeamEntity team = registration.getTeam();
         TopicEntity topic = registration.getTopic();
@@ -166,7 +173,15 @@ public class TopicRegistrationService {
                     item.setStatus(TopicRegistrationStatusConstain.CANCELLED);
                     review(item, "Nhóm đã được duyệt một đề tài khác");
                 });
-        return toResponse(registrationRepository.save(registration));
+        TopicRegistrationEntity saved = registrationRepository.save(registration);
+        notificationService.notifyUsers(
+                notificationRecipientService.studentUserIdsForTeam(team.getIdTeam()),
+                "Đăng ký đề tài đã được duyệt",
+                "Nhóm " + team.getNameTeam() + " đã được gán đề tài \"" + topic.getTitle() + "\".",
+                NotificationTypeConstain.TOPIC_ASSIGNED,
+                "TOPIC_REGISTRATION",
+                saved.getRegistrationId());
+        return toResponse(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -178,6 +193,7 @@ public class TopicRegistrationService {
             throw new AppException(ErrorCode.TOPIC_REGISTRATION_REJECTION_REASON_REQUIRED);
         }
         TopicRegistrationEntity registration = findRegistration(registrationId);
+        requireOpenPeriod(registration.getTopic());
         requirePending(registration);
         registration.setStatus(TopicRegistrationStatusConstain.REJECTED);
         review(registration, reason.trim());
@@ -190,6 +206,7 @@ public class TopicRegistrationService {
     // ghi sang trạng thái tương ứng.
     public TopicRegistrationResponse cancel(Long registrationId) {
         TopicRegistrationEntity registration = findRegistration(registrationId);
+        requireOpenPeriod(registration.getTopic());
         if (!registration
                 .getEnrollment()
                 .getStudent()
@@ -227,6 +244,15 @@ public class TopicRegistrationService {
     private void requirePending(TopicRegistrationEntity registration) {
         if (registration.getStatus() != TopicRegistrationStatusConstain.PENDING) {
             throw new AppException(ErrorCode.TOPIC_REGISTRATION_OPERATION_NOT_ALLOWED);
+        }
+    }
+
+    private void requireOpenPeriod(TopicEntity topic) {
+        if (topic == null || topic.getDefensePeriod() == null) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND);
+        }
+        if (topic.getDefensePeriod().isFinished()) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
     }
 

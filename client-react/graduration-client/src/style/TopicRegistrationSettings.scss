@@ -1,0 +1,11 @@
+.proposal-button.proposal-disabled {
+  cursor: not-allowed;
+  opacity: .45;
+  filter: grayscale(.35);
+}
+
+.registration-banner.disabled-feature {
+  color: #647286;
+  border-color: #d9e1e9;
+  background: #f5f7f9;
+}

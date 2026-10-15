@@ -6,5 +6,6 @@ public enum ReviewAssignmentStatusConstain {
     SUBMITTED,
     APPROVED,
     REVISION_REQUIRED,
+    NOT_ELIGIBLE,
     CANCELLED
 }

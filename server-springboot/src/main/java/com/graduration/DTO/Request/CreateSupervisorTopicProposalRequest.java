@@ -27,7 +27,6 @@ public class CreateSupervisorTopicProposalRequest {
     @NotNull(message = "DEFENSE_PERIOD_NOT_FOUND")
     Long defensePeriodId;
 
-    @NotBlank(message = "TEAM_NAME_NOT_BLANK")
     String teamName;
 
     @NotEmpty(message = "STUDENT_NOT_BLANK")

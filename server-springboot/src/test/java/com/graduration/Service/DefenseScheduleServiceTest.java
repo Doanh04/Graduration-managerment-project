@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,6 +45,8 @@ import com.graduration.Repository.TopicRepository;
 import com.graduration.Repository.UserRepository;
 import com.graduration.Service.ManagerService.DefenseScheduleHistoryService;
 import com.graduration.Service.ManagerService.DefenseScheduleService;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.ComitteesMemberEntity;
 import com.graduration.entity.DefenseCommitteesEntity;
 import com.graduration.entity.DefensePeriodEntity;
@@ -79,6 +82,12 @@ class DefenseScheduleServiceTest {
 
     @Mock
     DefenseScheduleHistoryService historyService;
+
+    @Mock
+    NotificationService notificationService;
+
+    @Mock
+    NotificationRecipientService notificationRecipientService;
 
     @InjectMocks
     DefenseScheduleService scheduleService;
@@ -116,12 +125,14 @@ class DefenseScheduleServiceTest {
     void validate_reportsRoomConflict() {
         Fixture fixture = fixture();
         stubEntities(fixture);
-        when(scheduleRepository.hasRoomConflict(any(), any(), any(), any(), any(), any()))
+        when(scheduleRepository.hasRoomConflict(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(true);
 
         DefenseScheduleValidationResponse result = scheduleService.validate(2L, request());
 
         assertFalse(result.isValid());
+        verify(scheduleRepository).hasRoomConflict(
+                eq(2L), any(), any(), any(), any(), any(), any());
         assertEquals(
                 DefenseScheduleConflictTypeConstain.ROOM_CONFLICT,
                 result.getConflicts().get(0).getType());
@@ -153,7 +164,7 @@ class DefenseScheduleServiceTest {
     }
 
     @Test
-    void validate_reportsSupervisorReviewerConflict() {
+    void validate_acceptsSupervisorWhoAlreadyApprovedAsCommitteeReviewer() {
         Fixture fixture = fixture();
         LectureEntity lecturer = LectureEntity.builder().lectureId("lecture-1").build();
         fixture.topic
@@ -173,10 +184,7 @@ class DefenseScheduleServiceTest {
 
         DefenseScheduleValidationResponse result = scheduleService.validate(2L, request());
 
-        assertFalse(result.isValid());
-        assertEquals(
-                DefenseScheduleConflictTypeConstain.SUPERVISOR_REVIEWER_CONFLICT,
-                result.getConflicts().get(0).getType());
+        assertTrue(result.isValid());
     }
 
     @Test

@@ -14,4 +14,7 @@ public class LibraryTopicResponse {
     String description;
     String objective;
     String technology;
+    String fileName;
+    String contentType;
+    Long fileSize;
 }

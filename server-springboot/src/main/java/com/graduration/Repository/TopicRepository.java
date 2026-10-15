@@ -2,6 +2,7 @@ package com.graduration.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -14,9 +15,74 @@ import com.graduration.Constain.TopicStatusConstain;
 import com.graduration.entity.TopicEntity;
 
 public interface TopicRepository extends JpaRepository<TopicEntity, Long>, JpaSpecificationExecutor<TopicEntity> {
+    @Query("""
+            select distinct topic from TopicEntity topic
+            join fetch topic.team team
+            join team.studentEntities student
+            join fetch topic.defensePeriod period
+            left join fetch period.academicYear
+            where student.userEntity.userId = :userId
+            and topic.defenseSchedule is not null
+            order by period.finalSubmissionDeadline desc
+            """)
+    List<TopicEntity> findFinalSubmissionTopicsForStudent(@Param("userId") String userId);
+
+    @Query("""
+            select distinct topic from TopicEntity topic
+            join fetch topic.team team
+            join fetch topic.defensePeriod period
+            left join fetch period.academicYear
+            where topic.defenseSchedule is not null
+            and exists (
+                select score.id from ScoreEntity score
+                where score.topic.idTopic = topic.idTopic
+                and score.lecture is not null
+                and score.status = com.graduration.Constain.ScoreStatusConstain.LOCKED
+            )
+            order by period.finalSubmissionDeadline desc, topic.title
+            """)
+    List<TopicEntity> findFinalSubmissionTopicsForAdmin();
+
     List<TopicEntity> findByCreatedByOrderByCreatedAtDesc(String createdBy);
 
     boolean existsByCreatedByAndStatusIn(String createdBy, Collection<TopicStatusConstain> statuses);
+
+    @Query("""
+            select distinct topic from TopicEntity topic
+            join fetch topic.team team
+            join fetch topic.defensePeriod period
+            left join fetch period.academicYear
+            where period.ID_Defense = :periodId
+            and topic.status in :statuses
+            order by topic.createdAt desc
+            """)
+    List<TopicEntity> findReviewableByPeriod(
+            @Param("periodId") Long periodId,
+            @Param("statuses") Collection<TopicStatusConstain> statuses);
+
+    @Query("""
+            select distinct topic from TopicEntity topic
+            join fetch topic.team team
+            join team.studentEntities student
+            join fetch topic.defensePeriod period
+            left join fetch period.academicYear
+            where student.userEntity.userId = :userId
+            and topic.status in :statuses
+            """)
+    List<TopicEntity> findReviewableByStudentUser(
+            @Param("userId") String userId,
+            @Param("statuses") Collection<TopicStatusConstain> statuses);
+
+    @Query(
+            """
+			select distinct topic from TopicEntity topic
+			join fetch topic.team team
+			join team.studentEntities student
+			where student.idStudent = :studentId
+			and topic.defensePeriod.ID_Defense = :defensePeriodId
+			""")
+    Optional<TopicEntity> findByStudentAndDefensePeriod(
+            @Param("studentId") String studentId, @Param("defensePeriodId") Long defensePeriodId);
 
     /**
      * Loads only topics that can be placed on a defense schedule. A real team,
@@ -38,6 +104,14 @@ public interface TopicRepository extends JpaRepository<TopicEntity, Long>, JpaSp
 				select schedule.idDefenseScheduce
 				from DefenseSchedulesEntity schedule
 				where schedule.topic.idTopic = topic.idTopic
+			)
+			and exists (
+				select review.reviewAssignmentId from ReviewAssignmentEntity review
+				join review.defenseCommittee committee
+				where review.topic.idTopic = topic.idTopic
+				and review.status = com.graduration.Constain.ReviewAssignmentStatusConstain.APPROVED
+				and committee.defensePeriod.ID_Defense = :periodId
+				and committee.status <> com.graduration.Constain.DefenseCommitteeStatusConstain.INACTIVE
 			)
 			order by topic.createdAt desc
 			""")

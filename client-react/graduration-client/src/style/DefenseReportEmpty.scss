@@ -1,0 +1,136 @@
+.defense-report-empty {
+  padding: 24px;
+  margin-top: 4px;
+
+  > header {
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e7edf3;
+  }
+}
+
+.report-empty-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  p {
+    margin: 4px 0 0;
+    color: #728397;
+  }
+}
+
+.report-empty-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #e8f7fb;
+  color: #0096c4;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.report-badge.waiting {
+  color: #98681d;
+  background: #fff3d9;
+}
+
+.report-empty-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+
+  > div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #e4ebf1;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #789;
+  }
+
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  strong { color: #23364d; }
+}
+
+.report-upload-placeholder {
+  padding: 18px;
+  border: 1px dashed #cbd9e5;
+  border-radius: 12px;
+  background: #fbfcfd;
+
+  button { justify-self: start; }
+}
+
+.report-disabled-field {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #dce6ef;
+  border-radius: 8px;
+  background: #f1f4f7;
+  color: #9aa8b7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: not-allowed;
+}
+
+.report-disabled-note {
+  min-height: 70px;
+  align-items: flex-start;
+}
+
+.report-empty-footer {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto 1fr;
+  gap: 10px 12px;
+  align-items: start;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e7edf3;
+
+  > span {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #e7f6fb;
+    color: #008eb9;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0;
+    color: #728397;
+    line-height: 1.45;
+  }
+
+  strong {
+    display: block;
+    color: #23364d;
+    margin-bottom: 3px;
+  }
+}
+
+.report-loading {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  color: #728397;
+}
+
+@media (max-width: 780px) {
+  .report-empty-summary { grid-template-columns: 1fr; }
+  .report-empty-footer { grid-template-columns: auto 1fr; }
+  .defense-report-empty { padding: 18px; }
+  .report-empty-title { align-items: flex-start; }
+}

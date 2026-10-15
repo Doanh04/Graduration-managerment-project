@@ -4,6 +4,8 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.graduration.Constain.EnrollmentStatusConstain;
@@ -58,6 +60,15 @@ public class GraduationEnrollmentControler {
         return ApiResponse.<List<GraduationEnrollmentResponse>>builder()
                 .result(service.getMine())
                 .build();
+    }
+
+    @GetMapping(value = "/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> export(@RequestParam Long defensePeriodId) {
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=graduation-enrollment-period-" + defensePeriodId + ".xlsx")
+                .body(service.exportByDefensePeriod(defensePeriodId));
     }
 
     @GetMapping("/{id}")

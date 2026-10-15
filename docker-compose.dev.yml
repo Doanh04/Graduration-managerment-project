@@ -1,0 +1,12 @@
+# Chỉ dùng khi phát triển local và cần truy cập trực tiếp backend/database từ máy host:
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mysql mongodb
+services:
+  mysql:
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+  mongodb:
+    ports:
+      - "${MONGO_HOST_PORT:-27017}:27017"
+  backend:
+    ports:
+      - "${BACKEND_HOST_PORT:-8080}:8080"

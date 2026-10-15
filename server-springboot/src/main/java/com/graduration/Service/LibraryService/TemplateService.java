@@ -23,6 +23,7 @@ import com.graduration.DTO.Response.PageResponse;
 import com.graduration.DTO.Response.TemplateResponse;
 import com.graduration.Repository.TemplateRepository;
 import com.graduration.Repository.UserRepository;
+import com.graduration.Service.SystemSettingService;
 import com.graduration.entity.TemplateEntity;
 import com.graduration.entity.UserEntity;
 import com.graduration.exception.AppException;
@@ -43,6 +44,7 @@ public class TemplateService {
     TemplateRepository templateRepository;
     UserRepository userRepository;
     TemplateMapper templateMapper;
+    SystemSettingService systemSettingService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
@@ -70,6 +72,7 @@ public class TemplateService {
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
     public TemplateResponse getTemplate(Integer templateId) {
+        systemSettingService.requireTemplatesVisible();
         return templateMapper.toTemplateResponse(findTemplate(templateId));
     }
 
@@ -82,6 +85,9 @@ public class TemplateService {
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
     public List<TemplateResponse> getAllTemplates(Integer page, Integer size) {
+        if (!systemSettingService.canViewTemplates()) {
+            return List.of();
+        }
         return templateRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(templateMapper::toTemplateResponse)
                 .toList();
@@ -97,6 +103,9 @@ public class TemplateService {
     @Transactional(readOnly = true)
     public PageResponse<TemplateResponse> getAllTemplatesPage(
             Integer page, Integer size, TemplateTypeConstain templateType) {
+        if (!systemSettingService.canViewTemplates()) {
+            return PageResponse.of(List.of());
+        }
         Page<TemplateEntity> templates = templateType == null
                 ? templateRepository.findAll(PaginationSupport.pageRequest(page, size))
                 : templateRepository.findByTemplateType(templateType, PaginationSupport.pageRequest(page, size));
@@ -143,6 +152,7 @@ public class TemplateService {
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
     public DownloadedTemplate downloadTemplate(Integer templateId) {
+        systemSettingService.requireTemplatesVisible();
         TemplateEntity template = findTemplate(templateId);
         byte[] content = template.getFileData();
         if (content == null || content.length == 0) {

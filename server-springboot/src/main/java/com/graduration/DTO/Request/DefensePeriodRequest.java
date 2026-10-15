@@ -1,6 +1,7 @@
 package com.graduration.DTO.Request;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -27,11 +28,14 @@ public class DefensePeriodRequest {
     @NotNull(message = "END_DATE_NOT_BLANK")
     LocalDate endDate;
 
+    LocalDateTime finalSubmissionDeadline;
+
     @NotBlank(message = "DEFENSE_PERIOD_PROJECT_TYPE_NOT_BLANK")
     @Size(max = 255, message = "INVALID_KEY")
     String projectType;
 
-    @NotNull(message = "STATUS_NOT_FOUND")
+    // Kept for backward compatibility with older clients. The server derives the
+    // persisted status from startDate/endDate and never trusts this value.
     DefensePeriodConstain status;
 
     @NotNull(message = "ACADEMIC_YEAR_NOT_FOUND")

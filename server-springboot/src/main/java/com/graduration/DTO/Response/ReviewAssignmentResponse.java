@@ -24,6 +24,8 @@ public class ReviewAssignmentResponse {
     String lectureId;
     String lectureCode;
     String lectureName;
+    Long committeeId;
+    String committeeName;
     ReviewAssignmentStatusConstain status;
     LocalDateTime assignedAt;
     LocalDateTime deadline;

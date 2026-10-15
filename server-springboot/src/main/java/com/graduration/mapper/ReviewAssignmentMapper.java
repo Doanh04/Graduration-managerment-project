@@ -12,6 +12,7 @@ import com.graduration.entity.ReviewAssignmentEntity;
 public class ReviewAssignmentMapper {
     public ReviewAssignmentResponse toResponse(ReviewAssignmentEntity entity) {
         boolean terminal = entity.getStatus() == ReviewAssignmentStatusConstain.APPROVED
+                || entity.getStatus() == ReviewAssignmentStatusConstain.NOT_ELIGIBLE
                 || entity.getStatus() == ReviewAssignmentStatusConstain.CANCELLED;
         boolean overdue =
                 !terminal && entity.getDeadline() != null && LocalDateTime.now().isAfter(entity.getDeadline());
@@ -31,6 +32,8 @@ public class ReviewAssignmentMapper {
                 .lectureId(entity.getLecture().getLectureId())
                 .lectureCode(entity.getLecture().getLectureCode())
                 .lectureName(entity.getLecture().getFullNameLecture())
+                .committeeId(entity.getDefenseCommittee() == null ? null : entity.getDefenseCommittee().getIdComittees())
+                .committeeName(entity.getDefenseCommittee() == null ? null : entity.getDefenseCommittee().getComitteesName())
                 .status(entity.getStatus())
                 .assignedAt(entity.getAssignedAt())
                 .deadline(entity.getDeadline())

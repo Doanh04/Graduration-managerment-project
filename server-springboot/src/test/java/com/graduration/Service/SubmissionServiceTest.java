@@ -37,6 +37,8 @@ import com.graduration.Repository.StudentRepository;
 import com.graduration.Repository.SubmissionRepository;
 import com.graduration.Repository.TeamRepository;
 import com.graduration.Service.GradurationService.SubmissionService;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.MilesStoneEntity;
 import com.graduration.entity.StudentEntity;
@@ -73,6 +75,12 @@ class SubmissionServiceTest {
 
     @Mock
     SubmissionMapper submissionMapper;
+
+    @Mock
+    NotificationService notificationService;
+
+    @Mock
+    NotificationRecipientService notificationRecipientService;
 
     @InjectMocks
     SubmissionService submissionService;
@@ -218,7 +226,7 @@ class SubmissionServiceTest {
                 .team(team)
                 .build();
         team.setTopic(topic);
-        student.setTeam(team);
+        student.getTeamMemberships().add(team);
         return new Fixture(milestone, team, student);
     }
 

@@ -167,3 +167,5 @@
   .student-team-summary-meta { width: 100%; margin-left: 64px; }
   .student-team-stats, .student-team-grid { grid-template-columns: 1fr; }
 }
+.student-team-member.defense-ineligible-student{opacity:.62;background:#fff7f6;border-color:#fecaca}.student-team-summary-content .defense-ineligible-badge{display:inline-flex;margin-top:8px;padding:4px 8px;border-radius:10px;color:#b42318;background:#fee4e2;font-size:10px;font-style:normal;font-weight:700}
+.student-team-schedule-info{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:10px;background:#f7f9fc;color:#536176}.student-team-schedule-info strong{color:#172033;font-size:14px}.student-team-schedule-info span,.student-team-schedule-info small{font-size:11px}

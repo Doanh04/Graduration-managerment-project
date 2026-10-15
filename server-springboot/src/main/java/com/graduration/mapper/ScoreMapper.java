@@ -28,6 +28,10 @@ public class ScoreMapper {
                 .topicId(score.getTopic().getIdTopic())
                 .topicTitle(score.getTopic().getTitle())
                 .defensePeriodId(score.getTopic().getDefensePeriod().getID_Defense())
+                .defensePeriodName(score.getTopic().getDefensePeriod().getPeriodName())
+                .academicYear(score.getTopic().getDefensePeriod().getAcademicYear() == null
+                        ? null
+                        : score.getTopic().getDefensePeriod().getAcademicYear().getAcademicYear())
                 .lecturerId(
                         score.getLecture() == null ? null : score.getLecture().getLectureId())
                 .lecturerCode(

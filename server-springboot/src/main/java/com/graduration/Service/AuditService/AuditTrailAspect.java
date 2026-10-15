@@ -2,6 +2,7 @@ package com.graduration.Service.AuditService;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +13,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanWrapperImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -22,7 +24,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.graduration.Repository.AuditLogRepository;
+import com.graduration.Repository.SystemSettingRepository;
 import com.graduration.entity.AuditLogDocument;
+import com.graduration.entity.SystemSettingEntity;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +37,7 @@ public class AuditTrailAspect {
     private static final Logger log = LoggerFactory.getLogger(AuditTrailAspect.class);
 
     private final AuditLogRepository auditLogRepository;
+    private final SystemSettingRepository systemSettingRepository;
 
     @AfterReturning(
             pointcut = "execution(public * com.graduration.Service..*.create*(..)) || "
@@ -135,6 +140,11 @@ public class AuditTrailAspect {
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
                 auditLogRepository.save(auditLog);
+                try {
+                    enforceRetentionLimit();
+                } catch (RuntimeException retentionException) {
+                    log.warn("Could not enforce the audit retention limit", retentionException);
+                }
                 return;
             } catch (RuntimeException exception) {
                 lastException = exception;
@@ -142,6 +152,25 @@ public class AuditTrailAspect {
             }
         }
         log.error("Audit log was lost for {}.{}", auditLog.getResourceType(), auditLog.getAction(), lastException);
+    }
+
+    private void enforceRetentionLimit() {
+        int limit = systemSettingRepository
+                .findById(SystemSettingEntity.SINGLETON_ID)
+                .map(SystemSettingEntity::getAuditRetentionLimit)
+                .filter(value -> value > 0)
+                .orElse(SystemSettingEntity.DEFAULT_AUDIT_RETENTION_LIMIT);
+        long excess = auditLogRepository.count() - limit;
+        if (excess <= 0) {
+            return;
+        }
+        List<String> ids =
+                auditLogRepository
+                        .findAllByOrderByCreatedAtAsc(PageRequest.of(0, (int) Math.min(excess, Integer.MAX_VALUE)))
+                        .stream()
+                        .map(AuditLogDocument::getAuditLogId)
+                        .toList();
+        auditLogRepository.deleteAllById(ids);
     }
 
     // Hàm resolveResourceId: Nhận mã hoặc điều kiện tìm kiếm của resolveResourceId, truy vấn bản ghi/quan hệ tương ứng,

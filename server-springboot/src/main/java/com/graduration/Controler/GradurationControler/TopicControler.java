@@ -70,7 +70,7 @@ public class TopicControler {
             @RequestParam(name = "objective", required = false) String objective,
             @RequestParam(name = "technology", required = false) String technology,
             @RequestParam(name = "defensePeriodId") Long defensePeriodId,
-            @RequestParam(name = "teamName") String teamName,
+            @RequestParam(name = "teamName", required = false) String teamName,
             @RequestParam(name = "studentCodes") List<String> studentCodes,
             @RequestPart(value = "file", required = false) MultipartFile file) {
         CreateSupervisorTopicProposalRequest request = CreateSupervisorTopicProposalRequest.builder()

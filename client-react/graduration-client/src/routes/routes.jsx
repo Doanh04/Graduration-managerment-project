@@ -8,12 +8,16 @@ import ModulePage from '../pages/shared/ModulePage.jsx';
 import PeriodResourcePage from '../pages/shared/PeriodResourcePage.jsx';
 import LibraryTopicPage from '../pages/shared/LibraryTopicPage.jsx';
 import StudentHomePage from '../pages/student/StudentHomePage.jsx';
+import DefenseReportsPage from '../pages/student/DefenseReportsPage.jsx';
+import FinalSubmissionPage from '../pages/shared/FinalSubmissionPage.jsx';
 import StudentTeamPage from '../pages/student/StudentTeamPage.jsx';
+import StudentResultsPage from '../pages/student/StudentResultsPage.jsx';
 import RolePermissionPage from '../pages/admin/RolePermissionPage.jsx';
 import SupervisorAssignmentPage from '../pages/admin/SupervisorAssignmentPage.jsx';
 import SupervisorWorkspacePage from '../pages/lecturer/SupervisorWorkspacePage.jsx';
 import ProjectHistoryPage from '../pages/admin/ProjectHistoryPage.jsx';
 import AuditLogPage from '../pages/admin/AuditLogPage.jsx';
+import SystemSettingsPage from '../pages/admin/SystemSettingsPage.jsx';
 import MilestonePage from '../pages/shared/MilestonePage.jsx';
 import SubmissionPage from '../pages/shared/SubmissionPage.jsx';
 import ReviewAssignmentPage from '../pages/shared/ReviewAssignmentPage.jsx';
@@ -34,7 +38,7 @@ const columns = {
   milestones: [{ key: 'milestoneId', label: 'Mã' }, { key: 'milestoneName', label: 'Tên milestone', primary: true, secondary: 'defensePeriodName' }, { key: 'milestoneType', label: 'Loại' }, { key: 'deadline', label: 'Deadline', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
   templates: [{ key: 'templateId', label: 'Mã' }, { key: 'templateName', label: 'Tên biểu mẫu', primary: true, secondary: 'description' }, { key: 'templateType', label: 'Loại biểu mẫu', render: (value) => templateTypeLabel(value) }, { key: 'fileName', label: 'Tệp', render: (value) => value ? <span className="file-link">{value}</span> : '—' }, { key: 'createAt', label: 'Ngày tạo', format: 'date' }],
   academicYears: [{ key: 'academicId', label: 'Mã' }, { key: 'academicYear', label: 'Năm học', primary: true }, { key: 'startDate', label: 'Bắt đầu', format: 'date' }, { key: 'endDate', label: 'Kết thúc', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
-  periods: [{ key: 'defensePeriodId', label: 'Mã' }, { key: 'periodName', label: 'Đợt bảo vệ', primary: true, secondary: 'academicYear' }, { key: 'projectType', label: 'Loại đồ án' }, { key: 'startDate', label: 'Bắt đầu', format: 'date' }, { key: 'endDate', label: 'Kết thúc', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
+  periods: [{ key: 'defensePeriodId', label: 'Mã' }, { key: 'periodName', label: 'Đợt bảo vệ', primary: true, secondary: 'academicYear' }, { key: 'projectType', label: 'Loại đồ án' }, { key: 'startDate', label: 'Bắt đầu', format: 'date' }, { key: 'endDate', label: 'Kết thúc', format: 'date' }, { key: 'finalSubmissionDeadline', label: 'Hạn nộp báo cáo', format: 'datetime' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
   majors: [{ key: 'majorId', label: 'Mã' }, { key: 'majorName', label: 'Tên ngành', primary: true, secondary: 'description' }, { key: 'majorCode', label: 'Mã ngành' }],
   classes: [{ key: 'classCode', label: 'Mã lớp' }, { key: 'className', label: 'Tên lớp', primary: true, secondary: 'description' }, { key: 'majorName', label: 'Ngành học' }],
   teams: [{ key: 'idTeam', label: 'Mã' }, { key: 'nameTeam', label: 'Tên nhóm', primary: true, secondary: 'description' }, { key: 'defensePeriodName', label: 'Đợt bảo vệ', secondary: 'academicYear' }, { key: 'topicTitle', label: 'Đề tài' }, { key: 'joinDate', label: 'Ngày tạo', format: 'date' }, { key: 'role', label: 'Vai trò' }],
@@ -43,11 +47,47 @@ const columns = {
   reviews: [{ key: 'assignmentId', label: 'Mã' }, { key: 'topicTitle', label: 'Đề tài phản biện', primary: true, secondary: 'teamName' }, { key: 'deadline', label: 'Deadline', format: 'date' }, { key: 'recommendation', label: 'Đề xuất' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
   committees: [{ key: 'memberId', label: 'Mã' }, { key: 'committeeName', label: 'Hội đồng', primary: true, secondary: 'lectureName' }, { key: 'role', label: 'Vai trò' }, { key: 'assignedAt', label: 'Phân công', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
   defenseCommittees: [{ key: 'committeeId', label: 'Mã' }, { key: 'committeeName', label: 'Hội đồng', primary: true, secondary: 'description' }, { key: 'defensePeriodName', label: 'Đợt bảo vệ' }, { key: 'updatedAt', label: 'Cập nhật', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
-  schedules: [{ key: 'scheduleId', label: 'Mã' }, { key: 'topicTitle', label: 'Đề tài', primary: true, secondary: 'teamName' }, { key: 'room', label: 'Phòng' }, { key: 'defenseDate', label: 'Ngày bảo vệ', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
+  schedules: [
+    { key: 'teamName', label: 'Nhóm', primary: true },
+    { key: 'topicTitle', label: 'Đề tài', primary: true },
+    { key: 'room', label: 'Phòng' },
+    { key: 'defenseDate', label: 'Ngày bảo vệ', format: 'date' },
+    { key: 'startTime', label: 'Thời gian', render: (_, row) => <><strong>{formatClock(row.startTime)}</strong><small>đến {formatClock(row.endTime)}</small></> },
+    { key: 'location', label: 'Địa điểm' },
+    { key: 'committeeName', label: 'Hội đồng', render: (value, row) => <><strong>{value || 'Chưa phân công'}</strong><small>{formatCommitteeMembers(row.committeeMembers)}</small></> },
+    { key: 'status', label: 'Trạng thái', format: 'status' },
+  ],
   scores: [{ key: 'studentCode', label: 'Mã SV' }, { key: 'studentName', label: 'Sinh viên', primary: true, secondary: 'topicTitle' }, { key: 'totalScore', label: 'Điểm' }, { key: 'updatedAt', label: 'Cập nhật', format: 'date' }, { key: 'status', label: 'Trạng thái', format: 'status' }],
 };
 
+const formatClock = (value) => value ? String(value).slice(0, 5) : '—';
+const formatCommitteeMembers = (members) => Array.isArray(members) && members.length
+  ? members.map((member) => member.lectureName || member.lectureCode).filter(Boolean).join(', ')
+  : 'Chưa có giảng viên trong hội đồng';
+
 const text = (name, label, required = false, extra = {}) => ({ name, label, required, ...extra });
+
+const teamTopicUnavailableReason = (topic, { form = {}, row } = {}) => {
+  if (!form.defensePeriodId || String(topic.defensePeriodId) !== String(form.defensePeriodId)) {
+    return form.defensePeriodId ? 'Đề tài không cùng đợt' : '';
+  }
+  if (topic.teamId && String(topic.teamId) !== String(row?.idTeam)) return 'Đề tài đã có nhóm';
+  return '';
+};
+
+function deriveDefensePeriodStatus(startDate, endDate) {
+  const parseLocalDate = (value) => {
+    const [year, month, day] = String(value || '').split('-').map(Number);
+    return year && month && day ? new Date(year, month - 1, day) : null;
+  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  if (!start || !end || today < start) return 'PENDING';
+  if (today > end) return 'FINISHED';
+  return 'ONGOING';
+}
 const currentYear = new Date().getFullYear();
 const templateTypeOptions = [
   { value: 'TOPIC_REGISTRATION_FORM', label: 'Phiếu đăng ký đề tài' },
@@ -72,14 +112,14 @@ const academicYearOptions = Array.from({ length: 13 }, (_, index) => currentYear
   label: `${startYear} - ${startYear + 1}`,
 }));
 const crud = {
-  students: { idKey: 'idUser', create: API_ENDPOINTS.students.create, update: API_ENDPOINTS.students.update, updateMethod: 'patch', remove: API_ENDPOINTS.students.remove, removeKey: 'userName', resetPassword: API_ENDPOINTS.students.resetPassword, fields: [text('userName', 'Tên đăng nhập', true), text('password', 'Mật khẩu', true, { type: 'password', createOnly: true }), text('studentCode', 'Mã sinh viên', true), text('fullName', 'Họ và tên', true), text('email', 'Email', true, { type: 'email' }), text('phone', 'Số điện thoại', false, { inputMode: 'numeric', digitsOnly: true, maxLength: 10 }), text('classCode', 'Mã lớp', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.classes.list, optionValue: 'classCode', optionLabel: 'className', optionSecondary: 'classCode', placeholder: 'Tìm theo tên hoặc mã lớp...' })] },
+  students: { idKey: 'idUser', detailKey: 'userName', detail: API_ENDPOINTS.students.detail, detailView: 'student', create: API_ENDPOINTS.students.create, update: API_ENDPOINTS.students.update, updateMethod: 'patch', remove: API_ENDPOINTS.students.remove, removeKey: 'userName', resetPassword: API_ENDPOINTS.students.resetPassword, fields: [text('userName', 'Tên đăng nhập', true), text('password', 'Mật khẩu', true, { type: 'password', createOnly: true }), text('studentCode', 'Mã sinh viên', true), text('fullName', 'Họ và tên', true), text('email', 'Email', true, { type: 'email' }), text('phone', 'Số điện thoại', false, { inputMode: 'numeric', digitsOnly: true, maxLength: 10 }), text('classCode', 'Mã lớp', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.classes.list, optionValue: 'classCode', optionLabel: 'className', optionSecondary: 'classCode', placeholder: 'Tìm theo tên hoặc mã lớp...' })] },
   lecturers: { idKey: 'userId', create: API_ENDPOINTS.lecturers.create, update: API_ENDPOINTS.lecturers.update, updateMethod: 'patch', remove: API_ENDPOINTS.lecturers.remove, resetPassword: API_ENDPOINTS.lecturers.resetPassword, fields: [text('userName', 'Tên đăng nhập', true), text('password', 'Mật khẩu', false, { type: 'password' }), text('lectureCode', 'Mã giảng viên', true, { source: 'lecturerCode' }), text('fullName', 'Họ và tên', true), text('degree', 'Học vị'), text('email', 'Email', true, { type: 'email' }), text('phone', 'Số điện thoại', false, { inputMode: 'numeric', digitsOnly: true, maxLength: 10 })] },
   topics: { resourceType: 'topic', idKey: 'topicId', create: API_ENDPOINTS.topics.create, multipart: true, previewField: 'fileName', previewEndpoint: API_ENDPOINTS.topics.file, update: API_ENDPOINTS.topics.update, updateMethod: 'patch', remove: API_ENDPOINTS.topics.remove, quickStatus: { field: 'status', options: [{ value: 'APPROVED', label: 'Phê duyệt', from: ['DRAFT', 'PENDING_APPROVAL'], endpoint: API_ENDPOINTS.topics.approve }, { value: 'REJECTED', label: 'Từ chối', from: ['PENDING_APPROVAL'], endpoint: API_ENDPOINTS.topics.reject, requiresReason: true }] }, fields: [text('title', 'Tên đề tài', true), text('description', 'Mô tả', false, { type: 'textarea' }), text('objective', 'Mục tiêu', false, { type: 'textarea' }), text('technology', 'Công nghệ'), text('categoryTopic', 'Nguồn đề xuất', true, { type: 'select', options: [{ value: 'LECTURER', label: 'Giảng viên đề xuất' }, { value: 'STUDENT', label: 'Sinh viên đề xuất' }] }), text('defensePeriodId', 'Đợt bảo vệ', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.defensePeriods.list, optionValue: 'defensePeriodId', optionLabel: 'periodName', optionSecondary: 'academicYear', optionEntity: 'đợt bảo vệ chưa kết thúc', optionFilter: (period) => period.status !== 'FINISHED', placeholder: 'Tìm và chọn đợt bảo vệ chưa kết thúc...' }), text('file', 'Tệp đề tài', false, { type: 'file', accept: '.pdf,.doc,.docx', help: 'Chấp nhận PDF, DOC hoặc DOCX; dung lượng tối đa 10 MB.' })] },
   academicYears: { idKey: 'academicId', create: API_ENDPOINTS.academicYears.create, update: API_ENDPOINTS.academicYears.update, remove: API_ENDPOINTS.academicYears.remove, fields: [text('academicYear', 'Năm học', true, { type: 'select', options: academicYearOptions }), text('description', 'Mô tả', false, { type: 'textarea' })] },
-  periods: { idKey: 'defensePeriodId', create: API_ENDPOINTS.defensePeriods.create, update: API_ENDPOINTS.defensePeriods.update, remove: API_ENDPOINTS.defensePeriods.remove, quickStatus: { field: 'status', options: [{ value: 'PENDING', label: 'Chờ diễn ra' }, { value: 'ONGOING', label: 'Đang diễn ra' }, { value: 'FINISHED', label: 'Đã kết thúc' }] }, fields: [text('periodName', 'Tên đợt bảo vệ', true), text('startDate', 'Ngày bắt đầu', true, { type: 'date' }), text('endDate', 'Ngày kết thúc', true, { type: 'date' }), text('projectType', 'Loại đồ án', true), text('status', 'Trạng thái', true, { type: 'select', defaultValue: 'PENDING', options: [{ value: 'PENDING', label: 'Chờ diễn ra' }, { value: 'ONGOING', label: 'Đang diễn ra' }, { value: 'FINISHED', label: 'Đã kết thúc' }] }), text('academicId', 'Năm học', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.academicYears.list, optionValue: 'academicId', optionLabel: 'academicYear', optionEntity: 'năm học', placeholder: 'Tìm và chọn năm học...' })] },
+  periods: { resourceType: 'defensePeriod', idKey: 'defensePeriodId', create: API_ENDPOINTS.defensePeriods.create, update: API_ENDPOINTS.defensePeriods.update, remove: API_ENDPOINTS.defensePeriods.remove, lockWhen: (row) => row?.status === 'FINISHED', preparePayload: (payload) => ({ ...payload, status: deriveDefensePeriodStatus(payload.startDate, payload.endDate) }), fields: [text('periodName', 'Tên đợt bảo vệ', true), text('startDate', 'Ngày bắt đầu', true, { type: 'date' }), text('endDate', 'Ngày kết thúc', true, { type: 'date' }), text('finalSubmissionDeadline', 'Hạn nộp báo cáo', true, { type: 'datetime-local' }), text('projectType', 'Loại đồ án', true), text('academicId', 'Năm học', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.academicYears.list, optionValue: 'academicId', optionLabel: 'academicYear', optionEntity: 'năm học', placeholder: 'Tìm và chọn năm học...' })] },
   majors: { idKey: 'majorId', create: API_ENDPOINTS.majors.create, update: API_ENDPOINTS.majors.update, remove: API_ENDPOINTS.majors.remove, fields: [text('majorCode', 'Mã ngành', true), text('majorName', 'Tên ngành', true), text('description', 'Mô tả', false, { type: 'textarea' })] },
   classes: { idKey: 'idClass', create: API_ENDPOINTS.classes.create, update: API_ENDPOINTS.classes.update, remove: API_ENDPOINTS.classes.remove, fields: [text('classCode', 'Mã lớp', true), text('nameClass', 'Tên lớp', true, { source: 'className' }), text('majorId', 'Ngành học', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.majors.list, optionValue: 'majorId', optionLabel: 'majorName', placeholder: 'Tìm và chọn ngành học...' }), text('description', 'Mô tả', false, { type: 'textarea' })] },
-  teams: { idKey: 'idTeam', create: API_ENDPOINTS.teams.create, detail: API_ENDPOINTS.teams.detail, detailView: 'team', addStudent: API_ENDPOINTS.teams.addStudent, addStudents: API_ENDPOINTS.teams.addStudents, studentsEndpoint: API_ENDPOINTS.students.list, update: API_ENDPOINTS.teams.update, remove: API_ENDPOINTS.teams.remove, fields: [text('defensePeriodId', 'Đợt bảo vệ', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.defensePeriods.list, optionValue: 'defensePeriodId', optionLabel: 'periodName', optionSecondary: 'academicYear', optionEntity: 'đợt bảo vệ chưa kết thúc', optionFilter: (period) => period.status !== 'FINISHED', placeholder: 'Chọn đợt bảo vệ...' }), text('nameTeam', 'Tên nhóm', true), text('description', 'Mô tả', false, { type: 'textarea' }), text('joinDate', 'Ngày thành lập', false, { type: 'date' }), text('role', 'Vai trò'), text('topicId', 'Đề tài đã phê duyệt', false, { type: 'searchable-select', endpoint: API_ENDPOINTS.topics.list, optionValue: 'topicId', optionLabel: 'title', optionSecondary: 'technology', optionEntity: 'đề tài đã phê duyệt', optionFilter: (topic) => topic.status === 'APPROVED', placeholder: 'Chỉ chọn đề tài cùng đợt bảo vệ...' })] },
+  teams: { idKey: 'idTeam', create: API_ENDPOINTS.teams.create, detail: API_ENDPOINTS.teams.detail, detailView: 'team', addStudent: API_ENDPOINTS.teams.addStudent, addStudents: API_ENDPOINTS.teams.addStudents, studentsEndpoint: API_ENDPOINTS.students.list, update: API_ENDPOINTS.teams.update, remove: API_ENDPOINTS.teams.remove, fields: [text('defensePeriodId', 'Đợt bảo vệ', true, { type: 'searchable-select', endpoint: API_ENDPOINTS.defensePeriods.list, optionValue: 'defensePeriodId', optionLabel: 'periodName', optionSecondary: 'academicYear', optionEntity: 'đợt bảo vệ chưa kết thúc', optionFilter: (period) => period.status !== 'FINISHED', placeholder: 'Chọn đợt bảo vệ...' }), text('nameTeam', 'Tên nhóm', true), text('description', 'Mô tả', false, { type: 'textarea' }), text('joinDate', 'Ngày thành lập', false, { type: 'date' }), text('role', 'Vai trò'), text('topicId', 'Đề tài đã phê duyệt', false, { type: 'searchable-select', endpoint: API_ENDPOINTS.topics.list, optionValue: 'topicId', optionLabel: 'title', optionSecondary: 'technology', optionEntity: 'đề tài đã phê duyệt', optionFilter: (topic) => topic.status === 'APPROVED', optionDisabled: teamTopicUnavailableReason, placeholder: 'Chỉ chọn đề tài cùng đợt bảo vệ...' })] },
   templates: { idKey: 'templateId', create: API_ENDPOINTS.templates.create, multipart: true, previewField: 'fileName', previewEndpoint: API_ENDPOINTS.templates.file, update: API_ENDPOINTS.templates.update, remove: API_ENDPOINTS.templates.remove, fields: [text('templateName', 'Tên biểu mẫu', true), text('templateType', 'Loại biểu mẫu', true, { type: 'select', defaultValue: 'OTHER', options: templateTypeOptions }), text('description', 'Mô tả', false, { type: 'textarea' }), text('file', 'Tệp biểu mẫu', false, { type: 'file', requiredOnCreate: true, accept: '.pdf,.doc,.docx', help: 'Chấp nhận PDF, DOC hoặc DOCX; dung lượng tối đa 10 MB.' })] },
 };
 
@@ -97,6 +137,8 @@ const committeeCrud = (periodId) => ({
 const scheduleCrud = (periodId) => ({
   resourceType: 'schedule',
   idKey: 'scheduleId',
+  editLockWhen: (row) => ['PUBLISHED', 'SCHEDULED', 'COMPLETED'].includes(row?.status),
+  editLockMessage: 'Lịch đang hoạt động hoặc đã hoàn thành nên không thể chỉnh sửa.',
   detail: API_ENDPOINTS.schedules.detail,
   history: API_ENDPOINTS.schedules.history,
   detailView: 'schedule',
@@ -112,18 +154,16 @@ const scheduleCrud = (periodId) => ({
   ] },
   fields: [
     text('topicSchedules', 'Danh sách đề tài bảo vệ', true, {
-      // Dùng endpoint danh sách đề tài vốn đã được triển khai; lọc theo đợt ở server
-      // rồi tiếp tục áp dụng điều kiện nhóm/giảng viên ở giao diện để không phụ thuộc
-      // vào endpoint mới khi backend đang chạy phiên bản cũ.
-      type: 'schedule-topic-list', endpoint: API_ENDPOINTS.topics.list, params: { defensePeriodId: periodId, size: 100 }, createOnly: true,
+      type: 'schedule-topic-list', endpoint: API_ENDPOINTS.topics.eligibleForDefenseSchedule(periodId), createOnly: true,
       transform: (items) => items.map(({ topicId, startTime, endTime }) => ({ topicId, startTime, endTime })),
       optionValue: 'topicId', optionLabel: 'title', optionSecondary: 'teamName', optionEntity: 'đề tài đủ điều kiện',
       optionFilter: (topic) => ['APPROVED', 'REGISTERED', 'IN_PROGRESS'].includes(topic.status) && topic.teamId && topic.hasActiveSupervisor === true,
       placeholder: 'Tìm và chọn nhiều đề tài...',
     }),
     text('topicId', 'Đề tài bảo vệ', true, {
-      type: 'searchable-select', endpoint: API_ENDPOINTS.topics.list, editOnly: true,
+      type: 'searchable-select', endpoint: API_ENDPOINTS.topics.eligibleForDefenseSchedule(periodId), editOnly: true,
       optionValue: 'topicId', optionLabel: 'title', optionSecondary: 'teamName', optionEntity: 'đề tài đủ điều kiện',
+      currentOptionLabel: 'topicTitle', currentOptionSecondary: 'teamName',
       optionFilter: (topic) => String(topic.defensePeriodId) === String(periodId) && ['APPROVED', 'REGISTERED', 'IN_PROGRESS'].includes(topic.status) && topic.teamId && topic.hasActiveSupervisor === true,
       placeholder: 'Tìm và chọn đề tài...',
     }),
@@ -162,7 +202,6 @@ export const Routers = [
       { path: 'teams', element: <ModulePage title="Quản lý nhóm sinh viên" description="Tạo và quản lý nhóm theo từng đợt bảo vệ; một sinh viên chỉ thuộc một nhóm trong cùng đợt." actionLabel="Tạo nhóm" endpoint={API_ENDPOINTS.teams.list} columns={columns.teams} crud={crud.teams} filters={[{ name: 'defensePeriodId', label: 'Đợt bảo vệ', endpoint: API_ENDPOINTS.defensePeriods.list, optionValue: 'defensePeriodId', optionLabel: 'periodName', optionSecondary: 'academicYear', placeholder: 'Tất cả đợt bảo vệ' }]} /> },
       { path: 'topics', element: <ModulePage title="Quản lý đề tài" description="Thêm, cập nhật, tra cứu và quản lý các đề tài đồ án tốt nghiệp." actionLabel="Tạo đề tài" endpoint={API_ENDPOINTS.topics.list} resourceParams={{ excludeStudentProposals: true }} columns={columns.topics} crud={{ ...crud.topics, detail: API_ENDPOINTS.topics.detail, detailView: 'topic' }} importEndpoint={API_ENDPOINTS.topics.import} serverSearch searchFields={['title', 'technology', 'teamName', 'status']} searchPlaceholder="Tìm theo tên đề tài, công nghệ, nhóm hoặc trạng thái..." filters={[{ name: 'defensePeriodId', label: 'Đợt bảo vệ', endpoint: API_ENDPOINTS.defensePeriods.list, optionValue: 'defensePeriodId', optionLabel: 'periodName', optionSecondary: 'academicYear', placeholder: 'Tất cả đợt bảo vệ' }]} /> },
       { path: 'supervisor-assignments', element: <SupervisorAssignmentPage /> },
-      // Đường dẫn cũ được giữ để chuyển các bookmark về luồng hội đồng mới.
       { path: 'review-assignments', element: <Navigate to="/admin/committees" replace /> },
       { path: 'progress', element: <MilestonePage /> },
       { path: 'submissions', element: <SubmissionPage mode="review" /> },
@@ -175,6 +214,8 @@ export const Routers = [
       { path: 'project-history', element: <ProjectHistoryPage /> },
       { path: 'permissions', element: <RolePermissionPage /> },
       { path: 'audit-logs', element: guard(<AuditLogPage />, { allowedRoles: ['ADMIN'] }) },
+      { path: 'system-settings', element: guard(<SystemSettingsPage />, { allowedRoles: ['ADMIN'] }) },
+      { path: 'final-submissions', element: guard(<FinalSubmissionPage mode="admin" />, { allowedRoles: ['ADMIN'] }) },
     ],
   },
   {
@@ -196,12 +237,13 @@ export const Routers = [
     element: guard(<ApplicationLayout section="student" />, { allowedAccountTypes: ['STUDENT'] }),
     children: [
       { index: true, element: <StudentHomePage /> },
+      { path: 'defense-reports', element: <DefenseReportsPage /> },
+      { path: 'final-submission', element: <FinalSubmissionPage mode="student" /> },
       { path: 'team', element: <StudentTeamPage /> },
       { path: 'topics', element: <TopicRegistrationPage mode="student" /> },
-      { path: 'enrollment', element: <GraduationEnrollmentPage mode="student" /> },
       { path: 'progress', element: <SubmissionPage mode="student" /> },
-      { path: 'schedule', element: <PeriodResourcePage title="Lịch bảo vệ" description="Thời gian, địa điểm, phòng và thông tin hội đồng." actionLabel="Xem lịch" endpointForPeriod={API_ENDPOINTS.schedules.byPeriod} columns={columns.schedules} /> },
-      { path: 'results', element: modulePage('Kết quả đánh giá', 'Nhận xét, phản hồi và điểm số đã được công bố.', 'Xem kết quả', null, undefined, 'Kết quả sẽ hiển thị khi điểm được công bố.') },
+      { path: 'schedule', element: <PeriodResourcePage studentOnly title="Lịch bảo vệ" description="Thời gian, địa điểm, phòng và thông tin hội đồng." actionLabel="Xem lịch" endpointForPeriod={API_ENDPOINTS.schedules.byPeriod} columns={columns.schedules} /> },
+      { path: 'results', element: <StudentResultsPage /> },
       { path: 'templates', element: <ModulePage title="Biểu mẫu" description="Xem và tải các biểu mẫu dành cho sinh viên." actionLabel="Tải biểu mẫu" endpoint={API_ENDPOINTS.templates.list} columns={columns.templates} filters={[{ name: 'templateType', label: 'Loại biểu mẫu', options: templateTypeOptions, optionValue: 'value', optionLabel: 'label' }]} readOnly crud={{ idKey: 'templateId', previewField: 'fileName', previewEndpoint: API_ENDPOINTS.templates.file }} /> },
       { path: 'library-topics', element: <LibraryTopicPage /> },
     ],

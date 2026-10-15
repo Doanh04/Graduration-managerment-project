@@ -18,6 +18,17 @@ import com.graduration.entity.DefenseSchedulesEntity;
 
 @Repository
 public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedulesEntity, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from DefenseSchedulesEntity s where s.idDefenseScheduce = :id")
+    Optional<DefenseSchedulesEntity> lockForReport(@Param("id") Long id);
+
+    java.util.List<DefenseSchedulesEntity> findByReportRequiredIsNull();
+
+    @Query("select s.idDefenseScheduce from DefenseSchedulesEntity s where s.reportRequired = true and s.reportCheckedAt is null and s.defenseDate <= :today and s.status in (com.graduration.Constain.DefenseScheduleStatusConstain.PUBLISHED, com.graduration.Constain.DefenseScheduleStatusConstain.SCHEDULED)")
+    java.util.List<Long> findReportDeadlines(@Param("today") LocalDate today);
+
+    @Query("select distinct s from DefenseSchedulesEntity s join s.topic.team.studentEntities student where student.userEntity.userId = :userId order by s.defenseDate desc, s.startTime desc")
+    java.util.List<DefenseSchedulesEntity> findStudentReports(@Param("userId") String userId);
     @Override
     @EntityGraph(
             attributePaths = {
@@ -65,6 +76,24 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
             @Param("committeeId") Long committeeId,
             @Param("room") String room,
             @Param("status") DefenseScheduleStatusConstain status,
+            Pageable pageable);
+
+    @EntityGraph(
+            attributePaths = {
+                "topic",
+                "topic.defensePeriod",
+                "topic.defensePeriod.academicYear",
+                "topic.team",
+                "defenseCommittees",
+                "createdBy"
+            })
+    @Query(
+            "select distinct schedule from DefenseSchedulesEntity schedule join schedule.topic.team team join team.studentEntities student where student.userEntity.userId = :userId and schedule.topic.defensePeriod.ID_Defense = :periodId and schedule.status <> :cancelled and (:date is null or schedule.defenseDate = :date) order by schedule.defenseDate, schedule.startTime")
+    Page<DefenseSchedulesEntity> findByStudentAndPeriod(
+            @Param("userId") String userId,
+            @Param("periodId") Long periodId,
+            @Param("date") LocalDate date,
+            @Param("cancelled") DefenseScheduleStatusConstain cancelled,
             Pageable pageable);
 
     @EntityGraph(
@@ -127,6 +156,7 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
             """
 			select count(schedule) > 0 from DefenseSchedulesEntity schedule
 			where schedule.defenseDate = :date
+			and schedule.topic.defensePeriod.ID_Defense = :periodId
 			and lower(schedule.room) = lower(:room)
 			and schedule.startTime < :endTime
 			and schedule.endTime > :startTime
@@ -134,6 +164,7 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
 			and (:excludedId is null or schedule.idDefenseScheduce <> :excludedId)
 			""")
     boolean hasRoomConflict(
+            @Param("periodId") Long periodId,
             @Param("date") LocalDate date,
             @Param("room") String room,
             @Param("startTime") LocalTime startTime,
@@ -145,6 +176,7 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
             """
 			select count(schedule) > 0 from DefenseSchedulesEntity schedule
 			where schedule.defenseDate = :date
+			and schedule.topic.defensePeriod.ID_Defense = :periodId
 			and schedule.defenseCommittees.idComittees = :committeeId
 			and schedule.startTime < :endTime
 			and schedule.endTime > :startTime
@@ -152,6 +184,7 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
 			and (:excludedId is null or schedule.idDefenseScheduce <> :excludedId)
 			""")
     boolean hasCommitteeConflict(
+            @Param("periodId") Long periodId,
             @Param("date") LocalDate date,
             @Param("committeeId") Long committeeId,
             @Param("startTime") LocalTime startTime,
@@ -164,6 +197,7 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
 			select count(schedule) > 0 from DefenseSchedulesEntity schedule
 			join schedule.defenseCommittees.comitteesMember member
 			where schedule.defenseDate = :date
+			and schedule.topic.defensePeriod.ID_Defense = :periodId
 			and member.lecture.lectureId in (
 				select requestedMember.lecture.lectureId
 				from ComitteesMemberEntity requestedMember
@@ -177,6 +211,7 @@ public interface DefenseScheduleRepository extends JpaRepository<DefenseSchedule
 			and (:excludedId is null or schedule.idDefenseScheduce <> :excludedId)
 			""")
     boolean hasLecturerConflict(
+            @Param("periodId") Long periodId,
             @Param("date") LocalDate date,
             @Param("committeeId") Long committeeId,
             @Param("startTime") LocalTime startTime,

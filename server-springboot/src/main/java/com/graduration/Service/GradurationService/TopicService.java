@@ -33,7 +33,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.CategoryTopicConstain;
-import com.graduration.Constain.DefensePeriodConstain;
+import com.graduration.Constain.NotificationTypeConstain;
+import com.graduration.Constain.RoleConstain;
 import com.graduration.Constain.SupervisorAssignmentStatusConstain;
 import com.graduration.Constain.SupervisorRoleConstain;
 import com.graduration.Constain.TopicRegistrationStatusConstain;
@@ -52,6 +53,9 @@ import com.graduration.Repository.TopicRegistrationRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.Repository.TopicSupervisorRepository;
 import com.graduration.Repository.UserRepository;
+import com.graduration.Service.SystemSettingService;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.GraduationEnrollmentEntity;
 import com.graduration.entity.LectureEntity;
@@ -86,6 +90,9 @@ public class TopicService {
     LectureRepository lectureRepository;
     TopicSupervisorRepository topicSupervisorRepository;
     GraduationEnrollmentService graduationEnrollmentService;
+    SystemSettingService systemSettingService;
+    NotificationService notificationService;
+    NotificationRecipientService notificationRecipientService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")
     @Transactional
@@ -114,9 +121,6 @@ public class TopicService {
             throw new AppException(ErrorCode.INVALID_KEY);
         }
         validateRequest(request.getTitle(), CategoryTopicConstain.LECTURER);
-        if (request.getTeamName() == null || request.getTeamName().isBlank()) {
-            throw new AppException(ErrorCode.TEAM_NAME_NOT_BLANK);
-        }
         if (request.getStudentCodes() == null || request.getStudentCodes().isEmpty()) {
             throw new AppException(ErrorCode.STUDENT_NOT_BLANK);
         }
@@ -126,11 +130,6 @@ public class TopicService {
         if (topicRepository.existsTitleInDefensePeriod(title, period.getID_Defense())) {
             throw new AppException(ErrorCode.TOPIC_ALREADY_EXISTS);
         }
-        String teamName = request.getTeamName().trim();
-        if (teamRepository.existsByNameAndDefensePeriod(teamName, period.getID_Defense())) {
-            throw new AppException(ErrorCode.TEAM_ALREADY_EXISTS);
-        }
-
         Set<String> codes = new LinkedHashSet<>();
         request.getStudentCodes().forEach(code -> {
             if (code != null && !code.isBlank()) codes.add(code.trim());
@@ -141,6 +140,26 @@ public class TopicService {
         List<StudentEntity> students = studentRepository.findAllByStudentCodeIn(codes);
         if (students.size() != codes.size()) {
             throw new AppException(ErrorCode.STUDENT_PROFILE_NOT_FOUND);
+        }
+        String teamName;
+        if (students.size() == 1) {
+            StudentEntity onlyStudent = students.get(0);
+            String studentName = normalize(onlyStudent.getFullNameStudent());
+            if (studentName == null) {
+                studentName = onlyStudent.getStudentCode();
+            }
+            teamName = "Nhóm " + studentName;
+            if (teamRepository.existsByNameAndDefensePeriod(teamName, period.getID_Defense())) {
+                teamName = teamName + " - " + onlyStudent.getStudentCode();
+            }
+        } else {
+            if (request.getTeamName() == null || request.getTeamName().isBlank()) {
+                throw new AppException(ErrorCode.TEAM_NAME_NOT_BLANK);
+            }
+            teamName = request.getTeamName().trim();
+        }
+        if (teamRepository.existsByNameAndDefensePeriod(teamName, period.getID_Defense())) {
+            throw new AppException(ErrorCode.TEAM_ALREADY_EXISTS);
         }
         if (students.stream()
                 .anyMatch(student -> teamRepository.existsStudentInAnotherTeamOfDefensePeriod(
@@ -177,6 +196,28 @@ public class TopicService {
         }
         TopicEntity savedTopic = topicRepository.save(topic);
         createProposalRegistration(savedTopic, team, students, period);
+        LectureEntity proposer = null;
+        try {
+            proposer = lectureRepository.findByUser_UserId(currentUserId()).orElse(null);
+        } catch (Exception ignored) {
+            // Không để lỗi truy vấn thông tin hiển thị của thông báo ảnh hưởng việc tạo đề xuất.
+        }
+        String proposerName = proposer != null && proposer.getFullNameLecture() != null
+                ? proposer.getFullNameLecture()
+                : currentUserId();
+        String proposerCode = proposer != null && proposer.getLectureCode() != null
+                ? proposer.getLectureCode()
+                : currentUserId();
+        String description = normalize(savedTopic.getDescription());
+        notificationService.notifyRoles(
+                Set.of(RoleConstain.ADMIN, RoleConstain.FACULTY),
+                "Giảng viên gửi đề xuất đề tài",
+                "Giảng viên " + proposerName + " (" + proposerCode + ") đã đề xuất đề tài \""
+                        + savedTopic.getTitle() + "\" cho " + team.getNameTeam()
+                        + (description == null ? "." : ". Nội dung: " + description),
+                NotificationTypeConstain.TOPIC_PROPOSED,
+                "TOPIC",
+                savedTopic.getIdTopic());
         return toResponse(savedTopic);
     }
 
@@ -220,6 +261,7 @@ public class TopicService {
     private TopicResponse createTopicInternal(CreateTopicRequest request) {
         TeamEntity proposingTeam = null;
         if (hasAuthority("ROLE_STUDENT")) {
+            systemSettingService.requireStudentTopicProposalEnabled();
             proposingTeam = requireStudentTeamWithoutTopic();
             if (request == null || request.getCategoryTopic() != CategoryTopicConstain.STUDENT) {
                 throw new AppException(ErrorCode.TOPIC_CATEGORY_NOT_BLANK);
@@ -509,6 +551,7 @@ public class TopicService {
 
     private TopicResponse updateTopicInternal(Long topicId, UpdateTopicRequest request) {
         TopicEntity topic = findTopic(topicId);
+        requireActiveDefensePeriod(topic.getDefensePeriod());
         requireOwnerOrManager(topic);
         requireStudentParticipation(topic);
         requireEditable(topic);
@@ -532,6 +575,7 @@ public class TopicService {
     // chuyển bản ghi sang trạng thái tương ứng.
     public void deleteTopic(Long topicId) {
         TopicEntity topic = findTopic(topicId);
+        requireActiveDefensePeriod(topic.getDefensePeriod());
         requireOwnerOrManager(topic);
         requireStudentParticipation(topic);
         if (topic.getTeam() != null
@@ -553,6 +597,7 @@ public class TopicService {
         TopicEntity topic = findTopic(topicId);
         requireOwnerOrManager(topic);
         if (hasAuthority("ROLE_STUDENT")) {
+            systemSettingService.requireStudentTopicProposalEnabled();
             requireStudentTeamWithoutTopic();
             StudentEntity currentStudent = studentRepository
                     .findByUserEntity_UserId(currentUserId())
@@ -564,7 +609,8 @@ public class TopicService {
         requireActiveDefensePeriod(topic.getDefensePeriod());
         topic.setStatus(TopicStatusConstain.PENDING_APPROVAL);
         topic.setRejectionReason(null);
-        return toResponse(topicRepository.save(topic));
+        TopicEntity saved = topicRepository.save(topic);
+        return toResponse(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -573,6 +619,7 @@ public class TopicService {
     // thực hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public TopicResponse approveTopic(Long topicId) {
         TopicEntity topic = findTopic(topicId);
+        requireActiveDefensePeriod(topic.getDefensePeriod());
         // Topics created from the administration screen are already under review;
         // administrators/faculty may approve them directly from DRAFT. Student
         // proposals continue to use the normal PENDING_APPROVAL state.
@@ -618,7 +665,18 @@ public class TopicService {
             topic.setStatus(TopicStatusConstain.APPROVED);
         }
         topic.setRejectionReason(null);
-        return toResponse(topicRepository.save(topic));
+        TopicEntity saved = topicRepository.save(topic);
+        if (saved.getTeam() != null) {
+            notificationService.notifyUsers(
+                    notificationRecipientService.studentUserIdsForTeam(saved.getTeam().getIdTeam()),
+                    "Nhóm đã được gán đề tài",
+                    "Nhóm " + saved.getTeam().getNameTeam() + " đã được gán đề tài \""
+                            + saved.getTitle() + "\".",
+                    NotificationTypeConstain.TOPIC_ASSIGNED,
+                    "TOPIC",
+                    saved.getIdTopic());
+        }
+        return toResponse(saved);
     }
 
     /** Tự động tạo phân công hướng dẫn chính cho giảng viên đã gửi đề xuất sau khi admin duyệt đề tài. */
@@ -660,6 +718,7 @@ public class TopicService {
             throw new AppException(ErrorCode.TOPIC_REJECTION_REASON_NOT_BLANK);
         }
         TopicEntity topic = findTopic(topicId);
+        requireActiveDefensePeriod(topic.getDefensePeriod());
         requireStatus(topic, TopicStatusConstain.PENDING_APPROVAL);
         topic.setStatus(TopicStatusConstain.REJECTED);
         topic.setRejectionReason(reason.trim());
@@ -671,7 +730,7 @@ public class TopicService {
                     .map(TopicRegistrationEntity::getTeam)
                     .orElse(null);
             if (proposedTeam == null) {
-                return toResponse(topicRepository.save(topic));
+                return saveRejectedTopicAndNotify(topic);
             }
             List<StudentEntity> proposedStudents = new ArrayList<>(proposedTeam.getStudentEntities());
             proposedStudents.forEach(student -> {
@@ -690,7 +749,19 @@ public class TopicService {
             topicRegistrationRepository.flush();
             teamRepository.delete(proposedTeam);
         }
-        return toResponse(topicRepository.save(topic));
+        return saveRejectedTopicAndNotify(topic);
+    }
+
+    private TopicResponse saveRejectedTopicAndNotify(TopicEntity topic) {
+        TopicEntity saved = topicRepository.save(topic);
+        notificationService.notifyUsers(
+                java.util.Collections.singletonList(saved.getCreatedBy()),
+                "Đề xuất đề tài bị từ chối",
+                "Đề tài \"" + saved.getTitle() + "\" bị từ chối. Lý do: " + saved.getRejectionReason(),
+                NotificationTypeConstain.TOPIC_REJECTED,
+                "TOPIC",
+                saved.getIdTopic());
+        return toResponse(saved);
     }
 
     // Hàm findTopic: Nhận mã hoặc điều kiện tìm kiếm của findTopic, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi
@@ -1081,7 +1152,7 @@ public class TopicService {
 
     // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireActiveDefensePeriod(DefensePeriodEntity period) {
-        if (period.getStatus() == DefensePeriodConstain.FINISHED) {
+        if (period.isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
     }

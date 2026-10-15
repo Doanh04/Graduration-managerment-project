@@ -21,6 +21,7 @@ public class TeamResponse {
     Long defensePeriodId;
     String defensePeriodName;
     String academicYear;
+    String projectType;
     Long topicId;
     String topicTitle;
     String topicDescription;

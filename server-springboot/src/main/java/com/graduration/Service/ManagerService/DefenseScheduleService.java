@@ -2,6 +2,7 @@ package com.graduration.Service.ManagerService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -14,13 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.graduration.Configuration.PaginationSupport;
-import com.graduration.Constain.CommitteeMemberRoleConstain;
 import com.graduration.Constain.CommitteeMemberStatusConstain;
 import com.graduration.Constain.DefenseCommitteeStatusConstain;
-import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.DefenseScheduleConflictTypeConstain;
 import com.graduration.Constain.DefenseScheduleHistoryActionConstain;
 import com.graduration.Constain.DefenseScheduleStatusConstain;
+import com.graduration.Constain.NotificationTypeConstain;
 import com.graduration.Constain.SupervisorAssignmentStatusConstain;
 import com.graduration.Constain.SupervisorRoleConstain;
 import com.graduration.Constain.TopicStatusConstain;
@@ -38,6 +38,8 @@ import com.graduration.Repository.LectureRepository;
 import com.graduration.Repository.TopicRepository;
 import com.graduration.Repository.UserRepository;
 import com.graduration.Service.ManagerService.DefenseScheduleHistoryService.Snapshot;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefenseCommitteesEntity;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.DefenseSchedulesEntity;
@@ -55,6 +57,7 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class DefenseScheduleService {
+    private static final DateTimeFormatter SCHEDULE_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     DefenseScheduleRepository scheduleRepository;
     LectureRepository lectureRepository;
     DefensePeriodRepository periodRepository;
@@ -63,6 +66,10 @@ public class DefenseScheduleService {
     UserRepository userRepository;
     DefenseScheduleMapper scheduleMapper;
     DefenseScheduleHistoryService historyService;
+    DefenseReportService defenseReportService;
+    com.graduration.Repository.DefenseReportRepository defenseReportRepository;
+    NotificationService notificationService;
+    NotificationRecipientService notificationRecipientService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
@@ -110,7 +117,7 @@ public class DefenseScheduleService {
                 .toList();
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_STUDENT')")
     @Transactional(readOnly = true)
     // Hàm getByPeriod: Nhận các tham số lọc/phân trang của getByPeriod, truy vấn dữ liệu phù hợp từ repository, ánh xạ
     // từng entity sang DTO và trả về cho giao diện.
@@ -124,6 +131,17 @@ public class DefenseScheduleService {
             Integer size) {
         if (!periodRepository.existsById(periodId)) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND);
+        }
+        if (currentAuthentication().getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_STUDENT".equals(authority.getAuthority()))) {
+            return PageResponse.from(
+                    scheduleRepository.findByStudentAndPeriod(
+                            currentAuthentication().getName(),
+                            periodId,
+                            date,
+                            DefenseScheduleStatusConstain.CANCELLED,
+                            PaginationSupport.pageRequest(page, size)),
+                    scheduleMapper::toResponse);
         }
         return PageResponse.from(
                 scheduleRepository.findByPeriod(
@@ -181,8 +199,18 @@ public class DefenseScheduleService {
     // Hàm update: Nhận mã bản ghi cùng dữ liệu cập nhật của update, tải bản ghi hiện có, kiểm tra trạng thái và ràng
     // buộc rồi ghi các giá trị mới xuống repository.
     public DefenseScheduleResponse update(Long scheduleId, DefenseScheduleRequest request) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
-        requireStatus(schedule, DefenseScheduleStatusConstain.DRAFT);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
+        if (!Set.of(
+                        DefenseScheduleStatusConstain.DRAFT,
+                        DefenseScheduleStatusConstain.POSTPONED,
+                        DefenseScheduleStatusConstain.CANCELLED)
+                .contains(schedule.getStatus())) {
+            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
+        }
+        if (!java.util.Objects.equals(schedule.getTopic().getIdTopic(), request.getTopicId())
+                && !defenseReportRepository.findBySchedule_IdDefenseScheduceOrderByRevisionDesc(scheduleId).isEmpty())
+            throw new AppException(ErrorCode.DEFENSE_REPORT_OPERATION_INVALID);
         Snapshot before = historyService.snapshot(schedule);
         DefensePeriodEntity period =
                 findOpenPeriod(schedule.getTopic().getDefensePeriod().getID_Defense());
@@ -190,9 +218,19 @@ public class DefenseScheduleService {
         DefenseCommitteesEntity committee = findCommittee(request.getCommitteeId());
         DefenseScheduleValidationResponse validation = validateInternal(period, topic, committee, request, scheduleId);
         requireValid(validation);
+        if (!java.util.Objects.equals(schedule.getDefenseCommittees().getIdComittees(), committee.getIdComittees()))
+            defenseReportService.invalidateApproval(schedule);
         schedule.setTopic(topic);
         schedule.setDefenseCommittees(committee);
         apply(schedule, request);
+        // Keep the same record and its history. An edited cancelled/postponed
+        // schedule becomes a draft and must be activated again by the manager.
+        schedule.setStatus(DefenseScheduleStatusConstain.DRAFT);
+        schedule.setPublishedAt(null);
+        schedule.setPostponedAt(null);
+        schedule.setPostponedReason(null);
+        schedule.setCancelledAt(null);
+        schedule.setCancelledReason(null);
         DefenseSchedulesEntity saved = scheduleRepository.save(schedule);
         historyService.record(
                 saved,
@@ -209,7 +247,10 @@ public class DefenseScheduleService {
     // Hàm publish: Nhận mã bản ghi và thông tin thao tác của publish, kiểm tra trạng thái hiện tại cùng quyền thực
     // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse publish(Long scheduleId) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
+        defenseReportService.requireReviewApproved(schedule);
+        requireFutureReportDeadline(schedule);
         requireStatus(schedule, DefenseScheduleStatusConstain.DRAFT);
         Snapshot before = historyService.snapshot(schedule);
         DefensePeriodEntity period =
@@ -227,6 +268,7 @@ public class DefenseScheduleService {
                 historyService.snapshot(saved),
                 null,
                 currentUser());
+        notifySchedule(saved, NotificationTypeConstain.DEFENSE_SCHEDULED, "Lịch bảo vệ đã được công bố", null);
         return scheduleMapper.toResponse(saved);
     }
 
@@ -235,7 +277,9 @@ public class DefenseScheduleService {
     // Hàm postpone: Nhận mã bản ghi và thông tin thao tác của postpone, kiểm tra trạng thái hiện tại cùng quyền thực
     // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse postpone(Long scheduleId, ScheduleReasonRequest request) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
+        requireOpenPeriod(schedule);
         if (schedule.getStatus() != DefenseScheduleStatusConstain.PUBLISHED
                 && schedule.getStatus() != DefenseScheduleStatusConstain.SCHEDULED) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
@@ -253,6 +297,11 @@ public class DefenseScheduleService {
                 historyService.snapshot(saved),
                 reason,
                 currentUser());
+        notifySchedule(
+                saved,
+                NotificationTypeConstain.DEFENSE_SCHEDULE_POSTPONED,
+                "Lịch bảo vệ đã tạm hoãn",
+                reason);
         return scheduleMapper.toResponse(saved);
     }
 
@@ -261,7 +310,11 @@ public class DefenseScheduleService {
     // Hàm resume: Nhận mã bản ghi và thông tin thao tác của resume, kiểm tra trạng thái hiện tại cùng quyền thực hiện,
     // cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse resume(Long scheduleId) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
+        defenseReportService.requireReviewApproved(schedule);
+        requireFutureReportDeadline(schedule);
+        requireOpenPeriod(schedule);
         if (schedule.getStatus() != DefenseScheduleStatusConstain.POSTPONED) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
         }
@@ -276,6 +329,11 @@ public class DefenseScheduleService {
                 historyService.snapshot(saved),
                 null,
                 currentUser());
+        notifySchedule(
+                saved,
+                NotificationTypeConstain.DEFENSE_SCHEDULE_CHANGED,
+                "Lịch bảo vệ đã được mở lại",
+                null);
         return scheduleMapper.toResponse(saved);
     }
 
@@ -284,7 +342,8 @@ public class DefenseScheduleService {
     // Hàm reschedule: Nhận mã lịch POSTPONED và dữ liệu lịch mới; kiểm tra lý do, đợt bảo vệ, hội đồng cùng xung đột
     // thời gian, cập nhật lịch và chuyển về DRAFT để phát hành lại.
     public DefenseScheduleResponse reschedule(Long scheduleId, RescheduleDefenseRequest request) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
         requireStatus(schedule, DefenseScheduleStatusConstain.POSTPONED);
         Snapshot before = historyService.snapshot(schedule);
         if (request == null
@@ -307,8 +366,11 @@ public class DefenseScheduleService {
                 .note(schedule.getNote())
                 .build();
         requireValid(validateInternal(period, schedule.getTopic(), committee, candidate, scheduleId));
+        if (!java.util.Objects.equals(schedule.getDefenseCommittees().getIdComittees(), committee.getIdComittees()))
+            defenseReportService.invalidateApproval(schedule);
         schedule.setDefenseCommittees(committee);
         apply(schedule, candidate);
+        requireFutureReportDeadline(schedule);
         schedule.setStatus(DefenseScheduleStatusConstain.DRAFT);
         schedule.setPostponedReason(schedule.getPostponedReason() + " | Rescheduled: "
                 + request.getReason().trim());
@@ -320,6 +382,11 @@ public class DefenseScheduleService {
                 historyService.snapshot(saved),
                 request.getReason(),
                 currentUser());
+        notifySchedule(
+                saved,
+                NotificationTypeConstain.DEFENSE_SCHEDULE_CHANGED,
+                "Lịch bảo vệ đã được điều chỉnh",
+                request.getReason());
         return scheduleMapper.toResponse(saved);
     }
 
@@ -328,7 +395,9 @@ public class DefenseScheduleService {
     // Hàm complete: Nhận mã bản ghi và thông tin thao tác của complete, kiểm tra trạng thái hiện tại cùng quyền thực
     // hiện, cập nhật trạng thái/lý do và lưu thay đổi.
     public DefenseScheduleResponse complete(Long scheduleId) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireEligible(schedule);
+        requireOpenPeriod(schedule);
         if (schedule.getStatus() != DefenseScheduleStatusConstain.PUBLISHED
                 && schedule.getStatus() != DefenseScheduleStatusConstain.SCHEDULED) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
@@ -355,7 +424,9 @@ public class DefenseScheduleService {
     // Hàm cancel: Nhận mã bản ghi của cancel, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
     // ghi sang trạng thái tương ứng.
     public DefenseScheduleResponse cancel(Long scheduleId, ScheduleReasonRequest request) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
+        requireOpenPeriod(schedule);
         if (schedule.getStatus() == DefenseScheduleStatusConstain.COMPLETED
                 || schedule.getStatus() == DefenseScheduleStatusConstain.CANCELLED) {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OPERATION_NOT_ALLOWED);
@@ -373,6 +444,11 @@ public class DefenseScheduleService {
                 historyService.snapshot(saved),
                 reason,
                 currentUser());
+        notifySchedule(
+                saved,
+                NotificationTypeConstain.DEFENSE_SCHEDULE_CANCELLED,
+                "Lịch bảo vệ đã bị hủy",
+                reason);
         return scheduleMapper.toResponse(saved);
     }
 
@@ -381,7 +457,11 @@ public class DefenseScheduleService {
     // Hàm delete: Nhận mã bản ghi của delete, kiểm tra quyền và các quan hệ đang sử dụng, sau đó xóa hoặc chuyển bản
     // ghi sang trạng thái tương ứng.
     public void delete(Long scheduleId) {
-        DefenseSchedulesEntity schedule = findSchedule(scheduleId);
+        DefenseSchedulesEntity schedule = lockSchedule(scheduleId);
+        defenseReportService.requireScheduleEditable(schedule);
+        if (!defenseReportRepository.findBySchedule_IdDefenseScheduceOrderByRevisionDesc(scheduleId).isEmpty())
+            throw new AppException(ErrorCode.DEFENSE_REPORT_OPERATION_INVALID);
+        requireOpenPeriod(schedule);
         requireStatus(schedule, DefenseScheduleStatusConstain.DRAFT);
         // Lịch nháp có thể đã phát sinh bản ghi CREATED trong lịch sử; xóa lịch sử con trước
         // rồi mới xóa lịch, không đụng tới đề tài, nhóm hay các phân công liên quan.
@@ -453,6 +533,10 @@ public class DefenseScheduleService {
                     DefenseScheduleConflictTypeConstain.TOPIC_NOT_ELIGIBLE,
                     "Topic must have an active primary supervisor before defense scheduling");
         }
+        if (!defenseReportService.hasApprovedReview(topic.getIdTopic(), committee.getIdComittees())) {
+            add(conflicts, DefenseScheduleConflictTypeConstain.TOPIC_NOT_ELIGIBLE,
+                    "Topic report must be approved by the reviewer of this committee before scheduling");
+        }
         if (topic.getDefenseSchedule() != null
                 && (excludedScheduleId == null
                         || !excludedScheduleId.equals(topic.getDefenseSchedule().getIdDefenseScheduce()))) {
@@ -469,6 +553,7 @@ public class DefenseScheduleService {
         }
         if (request.getRoom() != null
                 && scheduleRepository.hasRoomConflict(
+                        periodId,
                         request.getDefenseDate(),
                         request.getRoom().trim(),
                         request.getStartTime(),
@@ -481,6 +566,7 @@ public class DefenseScheduleService {
                     "Another defense schedule uses this room during the selected time");
         }
         if (scheduleRepository.hasCommitteeConflict(
+                periodId,
                 request.getDefenseDate(),
                 committee.getIdComittees(),
                 request.getStartTime(),
@@ -493,6 +579,7 @@ public class DefenseScheduleService {
                     "Committee already has another defense during the selected time");
         }
         if (scheduleRepository.hasLecturerConflict(
+                periodId,
                 request.getDefenseDate(),
                 committee.getIdComittees(),
                 request.getStartTime(),
@@ -505,28 +592,7 @@ public class DefenseScheduleService {
                     DefenseScheduleConflictTypeConstain.LECTURER_CONFLICT,
                     "At least one active committee member has another defense during the selected time");
         }
-        if (hasSupervisorReviewerConflict(topic, committee)) {
-            add(
-                    conflicts,
-                    DefenseScheduleConflictTypeConstain.SUPERVISOR_REVIEWER_CONFLICT,
-                    "A topic supervisor cannot be a reviewer for the same topic");
-        }
         return response(conflicts);
-    }
-
-    // Hàm hasSupervisorReviewerConflict: Nhận đề tài, hội đồng và khoảng thời gian; đối chiếu giảng viên hướng dẫn với
-    // thành viên phản biện đang hoạt động để phát hiện trùng người trong cùng lịch.
-    private boolean hasSupervisorReviewerConflict(TopicEntity topic, DefenseCommitteesEntity committee) {
-        Set<String> supervisors = topic.getTopicSuperVisorEntities().stream()
-                .filter(item -> item.getStatus() == SupervisorAssignmentStatusConstain.ACTIVE)
-                .filter(item -> item.getLecture() != null)
-                .map(item -> item.getLecture().getLectureId())
-                .collect(Collectors.toSet());
-        return committee.getComitteesMember().stream()
-                .filter(item -> item.getStatus() == CommitteeMemberStatusConstain.ACTIVE)
-                .filter(item -> item.getRole() == CommitteeMemberRoleConstain.REVIEWER)
-                .anyMatch(item -> item.getLecture() != null
-                        && supervisors.contains(item.getLecture().getLectureId()));
     }
 
     // Hàm apply: Nhận entity lịch bảo vệ và request; chép ngày, giờ, phòng, địa điểm, buổi và ghi chú từ request vào
@@ -559,9 +625,18 @@ public class DefenseScheduleService {
 
     // Kiểm tra các điều kiện và quy tắc nghiệp vụ trước khi tiếp tục xử lý.
     private void requireValid(DefenseScheduleValidationResponse validation) {
-        if (!validation.isValid()) {
-            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_CONFLICT);
-        }
+        if (validation.isValid()) return;
+        Set<DefenseScheduleConflictTypeConstain> conflictTypes = validation.getConflicts().stream()
+                .map(DefenseScheduleValidationResponse.Conflict::getType)
+                .collect(Collectors.toSet());
+        if (conflictTypes.contains(DefenseScheduleConflictTypeConstain.INVALID_TIME))
+            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_INVALID_TIME);
+        if (conflictTypes.contains(DefenseScheduleConflictTypeConstain.PERIOD_MISMATCH))
+            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_OUTSIDE_PERIOD);
+        if (conflictTypes.contains(DefenseScheduleConflictTypeConstain.TOPIC_NOT_ELIGIBLE)
+                || conflictTypes.contains(DefenseScheduleConflictTypeConstain.TOPIC_ALREADY_SCHEDULED))
+            throw new AppException(ErrorCode.DEFENSE_SCHEDULE_TOPIC_NOT_ELIGIBLE);
+        throw new AppException(ErrorCode.DEFENSE_SCHEDULE_CONFLICT);
     }
 
     // Hàm response: Nhận danh sách Conflict phát hiện khi kiểm tra lịch; tạo DTO gồm valid, loại lỗi và thông báo để
@@ -593,6 +668,27 @@ public class DefenseScheduleService {
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_SCHEDULE_NOT_FOUND));
     }
 
+    private DefenseSchedulesEntity lockSchedule(Long id) {
+        return scheduleRepository.lockForReport(id).orElseThrow(() -> new AppException(ErrorCode.DEFENSE_SCHEDULE_NOT_FOUND));
+    }
+
+    private void requireFutureReportDeadline(DefenseSchedulesEntity s) {
+        if (Boolean.TRUE.equals(s.getReportRequired()) && (s.getStartTime() == null ||
+                !LocalDateTime.of(s.getDefenseDate(), s.getStartTime()).isAfter(LocalDateTime.now(DefenseReportService.ZONE))))
+            throw new AppException(ErrorCode.DEFENSE_REPORT_CLOSED);
+    }
+
+    private void requireOpenPeriod(DefenseSchedulesEntity schedule) {
+        if (schedule == null
+                || schedule.getTopic() == null
+                || schedule.getTopic().getDefensePeriod() == null) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND);
+        }
+        if (schedule.getTopic().getDefensePeriod().isFinished()) {
+            throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
+        }
+    }
+
     // Hàm findTopic: Nhận mã hoặc điều kiện tìm kiếm của findTopic, truy vấn bản ghi/quan hệ tương ứng, báo lỗi khi
     // không tồn tại và trả về dữ liệu đã ánh xạ.
     private TopicEntity findTopic(Long topicId) {
@@ -613,7 +709,7 @@ public class DefenseScheduleService {
         DefensePeriodEntity period = periodRepository
                 .findById(periodId)
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND));
-        if (period.getStatus() == DefensePeriodConstain.FINISHED) {
+        if (period.isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         return period;
@@ -634,6 +730,37 @@ public class DefenseScheduleService {
             throw new AppException(ErrorCode.DEFENSE_SCHEDULE_REASON_NOT_BLANK);
         }
         return request.getReason().trim();
+    }
+
+    private void notifySchedule(
+            DefenseSchedulesEntity schedule,
+            NotificationTypeConstain type,
+            String title,
+            String reason) {
+        if (schedule == null || schedule.getTopic() == null || schedule.getDefenseCommittees() == null) return;
+        StringBuilder content = new StringBuilder("Đề tài \"")
+                .append(schedule.getTopic().getTitle())
+                .append("\" - ")
+                .append(schedule.getDefenseDate().format(SCHEDULE_DATE))
+                .append(" từ ")
+                .append(schedule.getStartTime())
+                .append(" đến ")
+                .append(schedule.getEndTime())
+                .append(", phòng ")
+                .append(schedule.getRoom())
+                .append(" tại ")
+                .append(schedule.getLocation())
+                .append('.');
+        if (reason != null && !reason.isBlank()) content.append(" Lý do: ").append(reason).append('.');
+        notificationService.notifyUsers(
+                notificationRecipientService.defenseScheduleRecipients(
+                        schedule.getTopic().getIdTopic(),
+                        schedule.getDefenseCommittees().getIdComittees()),
+                title,
+                content.toString(),
+                type,
+                "DEFENSE_SCHEDULE",
+                schedule.getIdDefenseScheduce());
     }
 
     // Hàm currentUser: Lấy userId của tài khoản đang đăng nhập từ Authentication, truy vấn UserEntity tương ứng và trả

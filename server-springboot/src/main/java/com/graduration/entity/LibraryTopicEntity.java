@@ -33,4 +33,18 @@ public class LibraryTopicEntity {
     @Lob
     @Column(name = "technology", columnDefinition = "TEXT")
     String technology;
+
+    @Column(name = "file_name")
+    String fileName;
+
+    @Column(name = "content_type")
+    String contentType;
+
+    @Column(name = "file_size")
+    Long fileSize;
+
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    byte[] fileData;
 }

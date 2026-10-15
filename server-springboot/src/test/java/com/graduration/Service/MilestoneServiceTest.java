@@ -25,7 +25,10 @@ import com.graduration.Constain.MilesStoneTypeConstain;
 import com.graduration.DTO.Request.CreateMilestoneRequest;
 import com.graduration.Repository.DefensePeriodRepository;
 import com.graduration.Repository.MilestoneRepository;
+import com.graduration.Repository.TeamRepository;
 import com.graduration.Service.GradurationService.MilestoneService;
+import com.graduration.Service.NotificationService.NotificationRecipientService;
+import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefensePeriodEntity;
 import com.graduration.entity.MilesStoneEntity;
 import com.graduration.exception.AppException;
@@ -42,6 +45,15 @@ class MilestoneServiceTest {
 
     @Mock
     MilestoneMapper milestoneMapper;
+
+    @Mock
+    TeamRepository teamRepository;
+
+    @Mock
+    NotificationService notificationService;
+
+    @Mock
+    NotificationRecipientService notificationRecipientService;
 
     @InjectMocks
     MilestoneService milestoneService;

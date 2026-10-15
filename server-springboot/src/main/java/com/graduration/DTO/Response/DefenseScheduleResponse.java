@@ -46,6 +46,8 @@ public class DefenseScheduleResponse {
     String teamName;
     String teamDescription;
     Long submissionId;
+    Long reviewAssignmentId;
+    Long approvedReportId;
     List<StudentSummary> students;
     Long committeeId;
     String committeeName;

@@ -1,15 +1,22 @@
 package com.graduration.Service.LibraryService;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.graduration.Configuration.PaginationSupport;
 import com.graduration.DTO.Request.LibraryTopicRequest;
 import com.graduration.DTO.Response.LibraryTopicResponse;
 import com.graduration.Repository.LibraryTopicRepository;
+import com.graduration.Service.SystemSettingService;
 import com.graduration.entity.LibraryTopicEntity;
 import com.graduration.exception.AppException;
 import com.graduration.exception.ErrorCode;
@@ -23,20 +30,25 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class LibraryTopicService {
+    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "xls", "xlsx");
+
     LibraryTopicRepository libraryTopicRepository;
     LibraryTopicMapper libraryTopicMapper;
+    SystemSettingService systemSettingService;
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
     @Transactional
     // Hàm createLibraryTopic: Nhận dữ liệu đầu vào của createLibraryTopic, kiểm tra các trường bắt buộc và quan hệ liên
     // quan, tạo bản ghi nghiệp vụ rồi lưu repository để trả kết quả cho API.
-    public LibraryTopicResponse createLibraryTopic(LibraryTopicRequest request) {
+    public LibraryTopicResponse createLibraryTopic(LibraryTopicRequest request, MultipartFile file) {
         normalize(request);
         if (libraryTopicRepository.existsByTitleIgnoreCase(request.getTitle())) {
             throw new AppException(ErrorCode.LIBRARY_TOPIC_ALREADY_EXISTS);
         }
 
         LibraryTopicEntity libraryTopic = libraryTopicMapper.toLibraryTopicEntity(request);
+        storeFile(libraryTopic, file);
         return libraryTopicMapper.toLibraryTopicResponse(libraryTopicRepository.save(libraryTopic));
     }
 
@@ -45,6 +57,7 @@ public class LibraryTopicService {
     // Hàm getLibraryTopic: Nhận mã hoặc điều kiện tìm kiếm của getLibraryTopic, truy vấn bản ghi/quan hệ tương ứng, báo
     // lỗi khi không tồn tại và trả về dữ liệu đã ánh xạ.
     public LibraryTopicResponse getLibraryTopic(Long idLibraryTopic) {
+        systemSettingService.requireLibraryTopicsVisible();
         return libraryTopicMapper.toLibraryTopicResponse(findLibraryTopic(idLibraryTopic));
     }
 
@@ -61,6 +74,9 @@ public class LibraryTopicService {
     // Hàm getAllLibraryTopics: Nhận các tham số lọc/phân trang của getAllLibraryTopics, truy vấn dữ liệu phù hợp từ
     // repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public List<LibraryTopicResponse> getAllLibraryTopics(Integer page, Integer size) {
+        if (!systemSettingService.canViewLibraryTopics()) {
+            return List.of();
+        }
         return libraryTopicRepository.findAll(PaginationSupport.pageRequest(page, size)).stream()
                 .map(libraryTopicMapper::toLibraryTopicResponse)
                 .toList();
@@ -72,6 +88,9 @@ public class LibraryTopicService {
     // hợp từ repository, ánh xạ từng entity sang DTO và trả về cho giao diện.
     public com.graduration.DTO.Response.PageResponse<LibraryTopicResponse> getAllLibraryTopicsPage(
             Integer page, Integer size) {
+        if (!systemSettingService.canViewLibraryTopics()) {
+            return com.graduration.DTO.Response.PageResponse.of(List.of());
+        }
         return com.graduration.DTO.Response.PageResponse.from(
                 libraryTopicRepository.findAll(PaginationSupport.pageRequest(page, size)),
                 libraryTopicMapper::toLibraryTopicResponse);
@@ -81,7 +100,8 @@ public class LibraryTopicService {
     @Transactional
     // Hàm updateLibraryTopic: Nhận mã bản ghi cùng dữ liệu cập nhật của updateLibraryTopic, tải bản ghi hiện có, kiểm
     // tra trạng thái và ràng buộc rồi ghi các giá trị mới xuống repository.
-    public LibraryTopicResponse updateLibraryTopic(Long idLibraryTopic, LibraryTopicRequest request) {
+    public LibraryTopicResponse updateLibraryTopic(
+            Long idLibraryTopic, LibraryTopicRequest request, MultipartFile file) {
         LibraryTopicEntity libraryTopic = findLibraryTopic(idLibraryTopic);
         normalize(request);
         if (libraryTopicRepository.existsByTitleIgnoreCaseAndIdLibraryTopicNot(request.getTitle(), idLibraryTopic)) {
@@ -89,7 +109,25 @@ public class LibraryTopicService {
         }
 
         libraryTopicMapper.updateLibraryTopic(request, libraryTopic);
+        if (file != null && !file.isEmpty()) {
+            storeFile(libraryTopic, file);
+        }
         return libraryTopicMapper.toLibraryTopicResponse(libraryTopicRepository.save(libraryTopic));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public DownloadedLibraryTopic downloadFile(Long idLibraryTopic) {
+        systemSettingService.requireLibraryTopicsVisible();
+        LibraryTopicEntity libraryTopic = findLibraryTopic(idLibraryTopic);
+        byte[] content = libraryTopic.getFileData();
+        if (content == null || content.length == 0) {
+            throw new AppException(ErrorCode.LIBRARY_TOPIC_FILE_NOT_FOUND);
+        }
+        return new DownloadedLibraryTopic(
+                new ByteArrayResource(content),
+                safeFileName(libraryTopic.getFileName()),
+                libraryTopic.getContentType());
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY')")
@@ -128,4 +166,46 @@ public class LibraryTopicService {
     private String normalizeNullable(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
+
+    private void storeFile(LibraryTopicEntity libraryTopic, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return;
+        }
+        validateFile(file);
+        libraryTopic.setFileName(safeFileName(file.getOriginalFilename()));
+        libraryTopic.setContentType(file.getContentType());
+        libraryTopic.setFileSize(file.getSize());
+        try {
+            libraryTopic.setFileData(file.getBytes());
+        } catch (IOException exception) {
+            throw new AppException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+    }
+
+    private void validateFile(MultipartFile file) {
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new AppException(ErrorCode.LIBRARY_TOPIC_FILE_TOO_LARGE);
+        }
+        if (!ALLOWED_EXTENSIONS.contains(extension(file.getOriginalFilename()))) {
+            throw new AppException(ErrorCode.LIBRARY_TOPIC_FILE_TYPE_NOT_ALLOWED);
+        }
+    }
+
+    private String extension(String fileName) {
+        if (fileName == null) {
+            return "";
+        }
+        int dot = fileName.lastIndexOf('.');
+        return dot < 0 ? "" : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String safeFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return "tep-thu-vien-de-tai";
+        }
+        String normalized = fileName.replace('\\', '/');
+        return normalized.substring(normalized.lastIndexOf('/') + 1);
+    }
+
+    public record DownloadedLibraryTopic(Resource resource, String fileName, String contentType) {}
 }

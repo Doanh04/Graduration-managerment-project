@@ -38,6 +38,7 @@ public interface TeamMapper {
     @Mapping(source = "defensePeriod.ID_Defense", target = "defensePeriodId")
     @Mapping(source = "defensePeriod.periodName", target = "defensePeriodName")
     @Mapping(source = "defensePeriod.academicYear.academicYear", target = "academicYear")
+    @Mapping(source = "defensePeriod.projectType", target = "projectType")
     TeamResponse toTeamResponse(TeamEntity team);
 
     default List<TeamResponse.StudentSummary> toStudentSummaries(List<StudentEntity> students) {

@@ -14,7 +14,6 @@ import com.graduration.Configuration.PaginationSupport;
 import com.graduration.Constain.CommitteeMemberRoleConstain;
 import com.graduration.Constain.CommitteeMemberStatusConstain;
 import com.graduration.Constain.DefenseCommitteeStatusConstain;
-import com.graduration.Constain.DefensePeriodConstain;
 import com.graduration.Constain.DefenseScheduleStatusConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.DeactivateDefenseCommitteeRequest;
@@ -142,6 +141,7 @@ public class DefenseCommitteeService {
     // sửa và xóa thời điểm kích hoạt.
     public DefenseCommitteeResponse moveToDraft(Long committeeId) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
+        findOpenPeriod(committee.getDefensePeriod().getID_Defense());
         requireStatus(committee, DefenseCommitteeStatusConstain.ACTIVE);
         requireNoUsableSchedule(committee);
         committee.setStatus(DefenseCommitteeStatusConstain.DRAFT);
@@ -155,6 +155,7 @@ public class DefenseCommitteeService {
     // ghi lý do, đổi sang INACTIVE rồi lưu.
     public DefenseCommitteeResponse deactivate(Long committeeId, DeactivateDefenseCommitteeRequest request) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
+        findOpenPeriod(committee.getDefensePeriod().getID_Defense());
         if (committee.getStatus() == DefenseCommitteeStatusConstain.INACTIVE) {
             throw new AppException(ErrorCode.DEFENSE_COMMITTEE_OPERATION_NOT_ALLOWED);
         }
@@ -175,6 +176,7 @@ public class DefenseCommitteeService {
     // ghi sang trạng thái tương ứng.
     public void delete(Long committeeId) {
         DefenseCommitteesEntity committee = findCommittee(committeeId);
+        findOpenPeriod(committee.getDefensePeriod().getID_Defense());
         requireStatus(committee, DefenseCommitteeStatusConstain.DRAFT);
         if (!committee.getComitteesMember().isEmpty()
                 || !committee.getDefenseSchedules().isEmpty()) {
@@ -242,7 +244,7 @@ public class DefenseCommitteeService {
         DefensePeriodEntity period = defensePeriodRepository
                 .findById(defensePeriodId)
                 .orElseThrow(() -> new AppException(ErrorCode.DEFENSE_PERIOD_NOT_FOUND));
-        if (period.getStatus() == DefensePeriodConstain.FINISHED) {
+        if (period.isFinished()) {
             throw new AppException(ErrorCode.DEFENSE_PERIOD_FINISHED);
         }
         return period;

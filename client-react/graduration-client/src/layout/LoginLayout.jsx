@@ -23,10 +23,18 @@ import { useToast } from '../context/ToastContext.jsx';
 import '../style/LoginLayout.scss';
 
 const ACCOUNT_INACTIVE_ERROR_CODE = 1073;
+const UNAUTHENTICATED_ERROR_CODE = 1019;
+const INVALID_CREDENTIALS_ERROR_CODE = 1020;
 
 const getLoginErrorMessage = (errorResponse) => {
   if (errorResponse?.code === ACCOUNT_INACTIVE_ERROR_CODE) {
     return 'Tài khoản đã dừng hoạt động';
+  }
+  if (errorResponse?.code === UNAUTHENTICATED_ERROR_CODE) {
+    return 'Không thể tạo phiên đăng nhập. Vui lòng đăng nhập lại.';
+  }
+  if (errorResponse?.code === INVALID_CREDENTIALS_ERROR_CODE) {
+    return 'Tên đăng nhập hoặc mật khẩu không chính xác.';
   }
 
   return errorResponse?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.';
@@ -188,7 +196,7 @@ export default function LoginLayout() {
         </div>
 
         <div className="login-footer">
-          <p>© {new Date().getFullYear()} Trường Đại Học Công Nghiệp Việt - Hưng</p>
+          <p>© {new Date().getFullYear()} Trường Đại Học Công Nghiệp Việt - Hung</p>
           <p className="mt-1 text-slate-400">Phát triển phục vụ công tác Quản lý Đồ án & Khóa luận Tốt nghiệp</p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 package com.graduration.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import com.graduration.Constain.CommitteeMemberRoleConstain;
 import com.graduration.Constain.CommitteeMemberStatusConstain;
 import com.graduration.entity.ComitteesMemberEntity;
+import com.graduration.entity.DefenseCommitteesEntity;
 
 @Repository
 public interface CommitteeMemberRepository extends JpaRepository<ComitteesMemberEntity, Long> {
@@ -61,6 +63,38 @@ public interface CommitteeMemberRepository extends JpaRepository<ComitteesMember
 
     long countByDefenseCommittees_IdComitteesAndRoleAndStatus(
             Long committeeId, CommitteeMemberRoleConstain role, CommitteeMemberStatusConstain status);
+
+    @EntityGraph(attributePaths = {"lecture", "lecture.user"})
+    List<ComitteesMemberEntity> findByDefenseCommittees_IdComitteesAndRoleAndStatus(
+            Long committeeId, CommitteeMemberRoleConstain role, CommitteeMemberStatusConstain status);
+
+    @EntityGraph(attributePaths = {"lecture", "lecture.user", "defenseCommittees"})
+    List<ComitteesMemberEntity> findByDefenseCommittees_IdComitteesAndStatusOrderByRoleAsc(
+            Long committeeId, CommitteeMemberStatusConstain status);
+
+    @Query("""
+            select distinct member.defenseCommittees from ComitteesMemberEntity member
+            where member.lecture.user.userId = :userId
+            and member.role = :role
+            and member.status = :status
+            and member.defenseCommittees.status <> com.graduration.Constain.DefenseCommitteeStatusConstain.INACTIVE
+            """)
+    List<DefenseCommitteesEntity> findCommitteesForReviewerUser(
+            @Param("userId") String userId,
+            @Param("role") CommitteeMemberRoleConstain role,
+            @Param("status") CommitteeMemberStatusConstain status);
+
+    @Query("""
+            select distinct member.defenseCommittees from ComitteesMemberEntity member
+            where member.defenseCommittees.defensePeriod.ID_Defense in :periodIds
+            and member.role = :role
+            and member.status = :status
+            and member.defenseCommittees.status <> com.graduration.Constain.DefenseCommitteeStatusConstain.INACTIVE
+            """)
+    List<DefenseCommitteesEntity> findReviewerCommitteesByPeriods(
+            @Param("periodIds") java.util.Collection<Long> periodIds,
+            @Param("role") CommitteeMemberRoleConstain role,
+            @Param("status") CommitteeMemberStatusConstain status);
 
     @Query(
             """

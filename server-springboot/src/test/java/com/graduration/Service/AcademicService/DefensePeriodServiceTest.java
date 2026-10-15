@@ -63,7 +63,7 @@ class DefensePeriodServiceTest {
     }
 
     @Test
-    void createDefensePeriod_preservesRequestedStatusWhenEndDatePassed() {
+    void createDefensePeriod_derivesFinishedStatusWhenEndDatePassed() {
         DefensePeriodRequest request = validRequest();
         request.setStartDate(LocalDate.now().minusDays(10));
         request.setEndDate(LocalDate.now().minusDays(1));
@@ -76,7 +76,51 @@ class DefensePeriodServiceTest {
 
         defensePeriodService.createDefensePeriod(request);
 
+        assertEquals(DefensePeriodConstain.FINISHED, entity.getStatus());
+    }
+
+    @Test
+    void createDefensePeriod_derivesOngoingStatusWhenTodayIsWithinPeriod() {
+        DefensePeriodRequest request = validRequest();
+        request.setStartDate(LocalDate.now().minusDays(1));
+        request.setEndDate(LocalDate.now().plusDays(1));
+        request.setStatus(DefensePeriodConstain.PENDING);
+        AcademicYearEntity academicYear =
+                AcademicYearEntity.builder().academicId(1).build();
+        DefensePeriodEntity entity = DefensePeriodEntity.builder()
+                .ID_Defense(10L)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .status(DefensePeriodConstain.PENDING)
+                .build();
+        when(academicYearRepository.findById(1)).thenReturn(Optional.of(academicYear));
+        when(defensePeriodMapper.toDefensePeriodEntity(request)).thenReturn(entity);
+        when(defensePeriodRepository.save(entity)).thenReturn(entity);
+
+        defensePeriodService.createDefensePeriod(request);
+
         assertEquals(DefensePeriodConstain.ONGOING, entity.getStatus());
+    }
+
+    @Test
+    void createDefensePeriod_ignoresManualStatusAndDerivesPendingForFuturePeriod() {
+        DefensePeriodRequest request = validRequest();
+        request.setStatus(DefensePeriodConstain.FINISHED);
+        AcademicYearEntity academicYear =
+                AcademicYearEntity.builder().academicId(1).build();
+        DefensePeriodEntity entity = DefensePeriodEntity.builder()
+                .ID_Defense(10L)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .status(DefensePeriodConstain.FINISHED)
+                .build();
+        when(academicYearRepository.findById(1)).thenReturn(Optional.of(academicYear));
+        when(defensePeriodMapper.toDefensePeriodEntity(request)).thenReturn(entity);
+        when(defensePeriodRepository.save(entity)).thenReturn(entity);
+
+        defensePeriodService.createDefensePeriod(request);
+
+        assertEquals(DefensePeriodConstain.PENDING, entity.getStatus());
     }
 
     @Test
@@ -178,6 +222,22 @@ class DefensePeriodServiceTest {
         int updatedRows = defensePeriodService.finishExpiredPeriods();
 
         assertEquals(3, updatedRows);
+    }
+
+    @Test
+    void synchronizeStatuses_updatesAllThreeDateRanges() {
+        when(defensePeriodRepository.markUpcomingPeriodsPending(
+                        any(), org.mockito.ArgumentMatchers.eq(DefensePeriodConstain.PENDING)))
+                .thenReturn(1);
+        when(defensePeriodRepository.markCurrentPeriodsOngoing(
+                        any(), org.mockito.ArgumentMatchers.eq(DefensePeriodConstain.ONGOING)))
+                .thenReturn(2);
+        when(defensePeriodRepository.markExpiredPeriodsFinished(any(), eqFinished()))
+                .thenReturn(3);
+
+        int updatedRows = defensePeriodService.synchronizeStatuses();
+
+        assertEquals(6, updatedRows);
     }
 
     private DefensePeriodRequest validRequest() {

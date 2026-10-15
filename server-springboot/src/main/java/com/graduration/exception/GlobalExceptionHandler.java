@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -106,6 +107,13 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiResponse<?>> handlingMethodNotSupportedException(
             HttpRequestMethodNotSupportedException exception) {
         return errorResponse(ErrorCode.METHOD_NOT_ALLOWED);
+    }
+
+    @ExceptionHandler(value = HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiResponse<?>> handlingMediaTypeNotSupportedException(
+            HttpMediaTypeNotSupportedException exception) {
+        log.debug("Request content type is not supported: {}", exception.getContentType());
+        return errorResponse(ErrorCode.MEDIA_TYPE_NOT_SUPPORTED);
     }
 
     @ExceptionHandler(value = DataIntegrityViolationException.class)

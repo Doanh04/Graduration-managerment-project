@@ -15,11 +15,13 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import com.graduration.Constain.RoleConstain;
 import com.graduration.Constain.StatusConstain;
 import com.graduration.DTO.Request.AuthenticationRequest;
+import com.graduration.DTO.Request.ChangePasswordRequest;
 import com.graduration.DTO.Request.IntrospectRequest;
 import com.graduration.DTO.Request.LogoutRequest;
 import com.graduration.DTO.Request.RefreshRequest;
@@ -247,6 +249,35 @@ public class AuthenticationService {
                 .accountType(resolveAccountType(user))
                 .roles(resolveRoles(user))
                 .build();
+    }
+
+    /** Đổi mật khẩu cho chính tài khoản đang đăng nhập sau khi xác minh mật khẩu hiện tại. */
+    @Transactional
+    public void changePassword(String userId, ChangePasswordRequest request) {
+        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (request == null
+                || request.getCurrentPassword() == null
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.CURRENT_PASSWORD_INCORRECT);
+        }
+
+        String newPassword = request.getNewPassword();
+        if (newPassword == null
+                || newPassword.length() < 8
+                || newPassword.length() > 72
+                || !newPassword.matches(".*[A-Za-z].*")
+                || !newPassword.matches(".*\\d.*")) {
+            throw new AppException(ErrorCode.NEW_PASSWORD_INVALID);
+        }
+        if (!newPassword.equals(request.getConfirmPassword())) {
+            throw new AppException(ErrorCode.PASSWORD_CONFIRMATION_MISMATCH);
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new AppException(ErrorCode.NEW_PASSWORD_MUST_BE_DIFFERENT);
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 
     // Hàm logout: Nhận access token hiện tại; thu hồi token còn hiệu lực và xóa/đóng cookie phiên để người dùng không

@@ -18,6 +18,9 @@ public class AssignReviewRequest {
     @NotBlank(message = "LECTURER_NOT_BLANK")
     String lectureId;
 
+    @NotNull(message = "DEFENSE_COMMITTEE_NOT_FOUND")
+    Long committeeId;
+
     @NotNull(message = "REVIEW_DEADLINE_NOT_BLANK")
     LocalDateTime deadline;
 
