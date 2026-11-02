@@ -31,10 +31,10 @@ public class StudentEntity {
     @Column(name = "avt_student")
     String pathAvt;
 
-    @Column(name = "phone_student", length = 16, unique = true)
+    @Column(name = "phone_student", length = 16, unique = true, nullable = true)
     String phoneStudent;
 
-    @Column(name = "email_student", unique = true)
+    @Column(name = "email_student", unique = true, nullable = false)
     String email;
 
     @OneToOne

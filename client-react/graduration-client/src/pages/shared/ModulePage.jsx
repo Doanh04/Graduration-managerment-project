@@ -31,12 +31,14 @@ export default function ModulePage({ title, description, actionLabel = 'Thêm m�
   const openEdit = (row) => { if (crud?.lockWhen?.(row)) { toast.error('Đợt bảo vệ đã kết thúc nên không thể chỉnh sửa.'); return; } if (crud?.editLockWhen?.(row)) { toast.error(crud.editLockMessage || 'Trạng thái hiện tại không cho phép chỉnh sửa.'); return; } setActionError(''); const fields = crud.fields.filter((field) => fieldVisible(field, 'edit')); setForm(Object.fromEntries(fields.map((field) => [field.name, toInputValue(valueAt(row, field.source || field.name), field.type)]))); setModal({ mode: 'edit', row }); };
   const openPreview = async (row) => {
     const source = crud.previewEndpoint ? crud.previewEndpoint(getId(row, crud.idKey)) : valueAt(row, crud.previewField);
-    const previewUrl = toPreviewUrl(resolveUrl(source));
+    const previewUrl = resolveUrl(source);
     setPreview({ row, source: isPdfTemplate(row) ? null : previewUrl, error: null });
     if (!isPdfTemplate(row)) return;
     setPreviewLoading(true);
     try {
-      const file = await httpClient.get(previewUrl, { responseType: 'blob' });
+      // Truyền endpoint gốc cho Axios để baseURL chỉ được ghép đúng một lần.
+      // URL đã resolve chỉ dùng cho liên kết mở trực tiếp trên trình duyệt.
+      const file = await httpClient.get(source, { responseType: 'blob' });
       const blob = file instanceof Blob
         ? file
         : new Blob([file], { type: row.contentType || 'application/pdf' });
@@ -444,5 +446,4 @@ function resolveUrl(value) {
   const path = raw.replace(/^\/+/, '');
   return `${base}/${path}`;
 }
-function toPreviewUrl(value) { return resolveUrl(value); }
 function isPdfTemplate(row) { return String(row?.contentType || '').toLowerCase() === 'application/pdf' || /\.pdf$/i.test(String(row?.fileName || '')); }

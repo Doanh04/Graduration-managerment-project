@@ -78,10 +78,12 @@ class UserLecturerServiceTest {
     UserLecturerService userLecturerService;
 
     Roles supervisorRole;
+    Roles reviewerRole;
 
     @BeforeEach
     void setUp() {
         supervisorRole = Roles.builder().role(RoleConstain.SUPERVISOR).build();
+        reviewerRole = Roles.builder().role(RoleConstain.REVIEWER).build();
         org.mockito.Mockito.lenient()
                 .when(validator.validate(any(RegisterLectureRequest.class)))
                 .thenReturn(Collections.emptySet());
@@ -106,7 +108,7 @@ class UserLecturerServiceTest {
         assertSame(expectedResponse, actualResponse);
         assertEquals(StatusConstain.ACTIVE, user.getStatus());
         assertEquals("encoded-password", user.getPassword());
-        assertEquals(Set.of(supervisorRole), user.getRoles());
+        assertEquals(Set.of(supervisorRole, reviewerRole), user.getRoles());
         assertSame(user, lecturer.getUser());
         assertSame(lecturer, user.getLecture());
         verify(userRepository).save(user);
@@ -114,9 +116,8 @@ class UserLecturerServiceTest {
     }
 
     @Test
-    void registerLecturer_allowsMissingEmailAndPhone() {
+    void registerLecturer_allowsMissingPhone() {
         RegisterLectureRequest request = validRequest();
-        request.setEmail("  ");
         request.setPhone("");
 
         UserEntity user = new UserEntity();
@@ -125,9 +126,8 @@ class UserLecturerServiceTest {
 
         userLecturerService.registerLecturer(request);
 
-        assertNull(request.getEmail());
+        assertEquals("lecturer@example.com", request.getEmail());
         assertNull(request.getPhone());
-        verify(lectureRepository, never()).existsByEmaillecture(any());
         verify(lectureRepository, never()).existsByPhoneLecture(any());
     }
 
@@ -372,6 +372,7 @@ class UserLecturerServiceTest {
         when(userMaper.toLecturerEntity(any(RegisterLectureRequest.class))).thenReturn(new LectureEntity());
         when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
         when(roleRepository.findById(RoleConstain.SUPERVISOR)).thenReturn(Optional.of(supervisorRole));
+        when(roleRepository.findById(RoleConstain.REVIEWER)).thenReturn(Optional.of(reviewerRole));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(lectureRepository.save(any(LectureEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userMaper.toLectureResponse(any(UserEntity.class), any(LectureEntity.class)))
@@ -387,7 +388,8 @@ class UserLecturerServiceTest {
         ArgumentCaptor<RegisterLectureRequest> requestCaptor = ArgumentCaptor.forClass(RegisterLectureRequest.class);
         verify(userMaper).toUserEntity(requestCaptor.capture());
         assertEquals("GV001", requestCaptor.getValue().getLectureCode());
-        assertNull(requestCaptor.getValue().getEmail());
+        assertEquals("lecturer@example.com", requestCaptor.getValue().getEmail());
+        assertNull(requestCaptor.getValue().getPhone());
     }
 
     @Test
@@ -405,6 +407,7 @@ class UserLecturerServiceTest {
         when(userMaper.toLecturerEntity(request)).thenReturn(lecturer);
         when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
         when(roleRepository.findById(RoleConstain.SUPERVISOR)).thenReturn(Optional.of(supervisorRole));
+        when(roleRepository.findById(RoleConstain.REVIEWER)).thenReturn(Optional.of(reviewerRole));
         when(userRepository.save(user)).thenReturn(user);
         when(lectureRepository.save(lecturer)).thenReturn(lecturer);
         when(userMaper.toLectureResponse(user, lecturer)).thenReturn(response);
@@ -438,8 +441,8 @@ class UserLecturerServiceTest {
             data.createCell(2).setCellValue("GV001");
             data.createCell(3).setCellValue("Nguyen Van A");
             data.createCell(4).setCellValue("Master");
-            data.createCell(5).setCellValue("");
-            data.createCell(6).setCellValue("0901234567");
+            data.createCell(5).setCellValue("lecturer@example.com");
+            data.createCell(6).setCellValue("");
 
             workbook.write(output);
             return new MockMultipartFile(

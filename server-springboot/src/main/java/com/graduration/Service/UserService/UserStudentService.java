@@ -232,6 +232,7 @@ public class UserStudentService {
         if (userName == null || userName.isBlank()) throw new AppException(ErrorCode.USERNAME_NOT_BLANK);
         if (studentCode == null || studentCode.isBlank()) throw new AppException(ErrorCode.STUDENT_NOT_BLANK);
         if (fullName == null || fullName.isBlank()) throw new AppException(ErrorCode.FULLNAME_NOT_BLANK);
+        if (email == null) throw new AppException(ErrorCode.EMAIL_IS_REQUIRED);
         if ((request.getClassCode() == null || request.getClassCode().isBlank()) && request.getClassId() == null) {
             throw new AppException(ErrorCode.CLASS_CODE_NOT_BLANK);
         }
@@ -374,6 +375,9 @@ public class UserStudentService {
         }
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new AppException(ErrorCode.FULLNAME_NOT_BLANK);
+        }
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new AppException(ErrorCode.EMAIL_IS_REQUIRED);
         }
         if ((request.getClassCode() == null || request.getClassCode().isBlank()) && request.getClassId() == null) {
             throw new AppException(ErrorCode.CLASS_CODE_NOT_BLANK);

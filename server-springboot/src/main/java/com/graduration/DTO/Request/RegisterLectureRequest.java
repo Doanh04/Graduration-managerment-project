@@ -32,6 +32,7 @@ public class RegisterLectureRequest {
 
     String degree;
 
+    @NotBlank(message = "EMAIL_IS_REQUIRED")
     @Email(message = "INVALID_EMAIL")
     String email;
 

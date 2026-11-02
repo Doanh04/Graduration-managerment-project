@@ -2,6 +2,7 @@ package com.graduration.Service.UserService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -120,6 +122,31 @@ class UserStudentServiceTest {
         assertEquals(ErrorCode.USERNAME_IS_EXITED, exception.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(studentRepository, never()).save(any());
+    }
+
+    @Test
+    void registerStudent_allowsMissingPhone() {
+        RegisterStudentRequest request = validRequest();
+        request.setPhone("   ");
+        UserEntity user = new UserEntity();
+        StudentEntity student = new StudentEntity();
+        stubSuccessfulRegistration(request, user, student, new RegisterStudentResponse());
+
+        userStudentService.registerStudent(request);
+
+        assertNull(request.getPhone());
+        verify(studentRepository, never()).existsByPhoneStudent(any());
+    }
+
+    @Test
+    void registerStudent_rejectsMissingEmail() {
+        RegisterStudentRequest request = validRequest();
+        request.setEmail("   ");
+
+        AppException exception = assertThrows(AppException.class, () -> userStudentService.registerStudent(request));
+
+        assertEquals(ErrorCode.EMAIL_IS_REQUIRED, exception.getErrorCode());
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -248,6 +275,11 @@ class UserStudentServiceTest {
         assertEquals(1, result.successRows());
         assertEquals(0, result.failedRows());
         assertEquals("SV001", result.importedStudents().get(0).getStudentCode());
+
+        ArgumentCaptor<RegisterStudentRequest> requestCaptor = ArgumentCaptor.forClass(RegisterStudentRequest.class);
+        verify(userMaper).toUserEntity(requestCaptor.capture());
+        assertEquals("student@example.com", requestCaptor.getValue().getEmail());
+        assertNull(requestCaptor.getValue().getPhone());
     }
 
     @Test
@@ -301,8 +333,8 @@ class UserStudentServiceTest {
             data.createCell(1).setCellValue("password123");
             data.createCell(2).setCellValue("SV001");
             data.createCell(3).setCellValue("Nguyen Van A");
-            data.createCell(4).setCellValue("");
-            data.createCell(5).setCellValue("0901234567");
+            data.createCell(4).setCellValue("student@example.com");
+            data.createCell(5).setCellValue("");
             data.createCell(6).setCellValue(10);
 
             workbook.write(output);

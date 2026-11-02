@@ -30,6 +30,7 @@ public class RegisterStudentRequest {
     @Size(max = 255, message = "FULLNAME_NOT_BLANK")
     String fullName;
 
+    @NotBlank(message = "EMAIL_IS_REQUIRED")
     @Email(message = "INVALID_EMAIL")
     String email;
 

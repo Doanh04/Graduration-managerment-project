@@ -11,7 +11,7 @@ class FacultyAuthorityTest {
     private boolean grants(String scope, String authority) {
         Jwt jwt = Jwt.withTokenValue("test").header("alg", "HS512")
                 .claim("sub", "test-user").claim("scope", scope).build();
-        return new SercurityConfig(null).jwtAuthenticationConverter().convert(jwt)
+        return new SercurityConfig(null, "").jwtAuthenticationConverter().convert(jwt)
                 .getAuthorities().contains(new SimpleGrantedAuthority(authority));
     }
 
