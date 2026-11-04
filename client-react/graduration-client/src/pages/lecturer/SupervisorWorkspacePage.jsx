@@ -424,8 +424,8 @@ function SupervisorProposalModal({ proposal, setProposal, students, periods, cla
           <label>Công nghệ<input value={proposal.technology} onChange={(event) => setProposal({ ...proposal, technology: event.target.value })} placeholder="Ví dụ: Spring Boot, React" /></label>
           <label className="full-width">Mô tả<textarea value={proposal.description} onChange={(event) => setProposal({ ...proposal, description: event.target.value })} /></label>
           <label className="full-width">Mục tiêu<textarea value={proposal.objective} onChange={(event) => setProposal({ ...proposal, objective: event.target.value })} /></label>
-          <label className="full-width proposal-file-field">Tệp mô tả đề tài
-            <span className="proposal-file-input"><Upload size={15} /><span>{proposal.file ? proposal.file.name : proposal.existingFileName ? `Giữ tệp hiện tại: ${proposal.existingFileName}` : 'Chọn tệp PDF, DOC hoặc DOCX (tối đa 10 MB)'}</span><input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setProposal({ ...proposal, file: event.target.files?.[0] || null })} /></span>
+          <label className="full-width proposal-file-field">Tệp mô tả đề tài<b>*</b>
+            <span className="proposal-file-input"><Upload size={15} /><span>{proposal.file ? proposal.file.name : proposal.existingFileName ? `Giữ tệp hiện tại: ${proposal.existingFileName}` : 'Chọn tệp PDF, DOC hoặc DOCX (tối đa 10 MB)'}</span><input type="file" required={!proposal.existingFileName} accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setProposal({ ...proposal, file: event.target.files?.[0] || null })} /></span>
             {proposal.file && <small className="proposal-file-selected">{formatFileSize(proposal.file.size)} · Nhấn để thay tệp</small>}
           </label>
         </div>
