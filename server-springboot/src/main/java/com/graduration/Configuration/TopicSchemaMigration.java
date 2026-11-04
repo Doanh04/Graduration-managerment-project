@@ -65,14 +65,15 @@ public class TopicSchemaMigration implements ApplicationRunner {
             }
 
             // Dữ liệu cũ đã tạo enrollment ELIGIBLE ngay lúc giảng viên gửi đề
-            // xuất. Bỏ liên kết này để đề xuất đang chờ duyệt không còn xuất hiện
-            // trong danh sách ghi danh; enrollment thật sẽ được tạo khi Admin duyệt.
+            // xuất. Gỡ liên kết của cả đề xuất đang chờ và đã bị từ chối;
+            // enrollment thật chỉ được tạo sau khi Admin duyệt.
             jdbcTemplate.update(
                     "update topic_registration tr "
                             + "join topic t on t.id_topic = tr.id_topic "
                             + "set tr.enrollment_id = null "
                             + "where t.category_topic = 'LECTURER' "
-                            + "and t.status = 'PENDING_APPROVAL' and tr.status = 'PENDING'");
+                            + "and t.status in ('PENDING_APPROVAL', 'REJECTED') "
+                            + "and tr.status in ('PENDING', 'REJECTED')");
             jdbcTemplate.update(
                     "delete ge from graduation_enrollment ge "
                             + "left join topic_registration tr on tr.enrollment_id = ge.enrollment_id "
