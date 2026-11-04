@@ -209,6 +209,10 @@ export default function SupervisorWorkspacePage() {
         : 'Vui lòng nhập tên đề tài, chọn đợt bảo vệ và ít nhất một sinh viên.');
       return;
     }
+    if (!proposal.file && !proposal.existingFileName) {
+      setProposalError('Vui lòng chọn tệp mô tả đề tài.');
+      return;
+    }
     if (proposal.file) {
       const extension = proposal.file.name.split('.').pop()?.toLowerCase();
       if (!['pdf', 'doc', 'docx'].includes(extension)) {
