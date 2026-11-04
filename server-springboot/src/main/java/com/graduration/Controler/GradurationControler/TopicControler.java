@@ -88,6 +88,35 @@ public class TopicControler {
                 .build();
     }
 
+    /** Cập nhật đề xuất của giảng viên trong thời gian đề xuất còn chờ duyệt. */
+    @PatchMapping(
+            value = "/supervisor-proposals/{topicId}",
+            consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE + ";charset=UTF-8"})
+    public ApiResponse<TopicResponse> updateSupervisorProposalMultipart(
+            @PathVariable Long topicId,
+            @RequestParam(name = "title") String title,
+            @RequestParam(name = "description", required = false) String description,
+            @RequestParam(name = "objective", required = false) String objective,
+            @RequestParam(name = "technology", required = false) String technology,
+            @RequestParam(name = "defensePeriodId") Long defensePeriodId,
+            @RequestParam(name = "teamName", required = false) String teamName,
+            @RequestParam(name = "studentCodes") List<String> studentCodes,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+        CreateSupervisorTopicProposalRequest request = CreateSupervisorTopicProposalRequest.builder()
+                .title(title)
+                .description(description)
+                .objective(objective)
+                .technology(technology)
+                .defensePeriodId(defensePeriodId)
+                .teamName(teamName)
+                .studentCodes(studentCodes)
+                .build();
+        return ApiResponse.<TopicResponse>builder()
+                .message("Supervisor topic proposal updated successfully")
+                .result(topicService.updateSupervisorProposal(topicId, request, file))
+                .build();
+    }
+
     @PostMapping(
             consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE + ";charset=UTF-8"})
     public ApiResponse<TopicResponse> createTopicMultipart(

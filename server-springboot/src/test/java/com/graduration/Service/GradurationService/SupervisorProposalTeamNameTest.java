@@ -49,7 +49,6 @@ class SupervisorProposalTeamNameTest {
         when(teams.save(any())).thenAnswer(inv -> { TeamEntity team = inv.getArgument(0); team.setIdTeam(20L); return team; });
         when(topics.save(any())).thenAnswer(inv -> { TopicEntity topic = inv.getArgument(0); topic.setIdTopic(30L); return topic; });
         when(mapper.toResponse(any())).thenReturn(TopicResponse.builder().topicId(30L).build());
-        when(enrollments.ensureEligible(any(), eq(period), anyString())).thenReturn(new GraduationEnrollmentEntity());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "lecturer-user", "", List.of(new SimpleGrantedAuthority("ROLE_SUPERVISOR"))));
     }
@@ -112,6 +111,65 @@ class SupervisorProposalTeamNameTest {
                 eq(NotificationTypeConstain.TOPIC_PROPOSED),
                 eq("TOPIC"),
                 eq(30L));
+    }
+
+    @Test void pendingProposalDoesNotCreateGraduationEnrollment() {
+        when(students.findAllByStudentCodeIn(any())).thenReturn(List.of(student("SV001", "Nguyễn Văn An")));
+
+        service.createSupervisorProposal(request(null, List.of("SV001")));
+
+        ArgumentCaptor<TopicRegistrationEntity> registration =
+                ArgumentCaptor.forClass(TopicRegistrationEntity.class);
+        verify(registrations).save(registration.capture());
+        assertNull(registration.getValue().getEnrollment());
+        assertEquals(TopicRegistrationStatusConstain.PENDING, registration.getValue().getStatus());
+        verify(enrollments, never()).ensureEligible(any(), any(), anyString());
+        verify(enrollments, never()).autoEnrollStudents(any(), any(), anyString());
+    }
+
+    @Test void approvalCreatesEnrollmentForAllProposedStudents() {
+        StudentEntity first = student("SV001", "Nguyễn Văn An");
+        StudentEntity second = student("SV002", "Trần Thị Bình");
+        TeamEntity team = TeamEntity.builder()
+                .idTeam(20L)
+                .nameTeam("Nhóm AI")
+                .defensePeriod(period)
+                .studentEntities(new ArrayList<>(List.of(first, second)))
+                .build();
+        TopicEntity topic = TopicEntity.builder()
+                .idTopic(30L)
+                .title("Đề tài AI")
+                .categoryTopic(CategoryTopicConstain.LECTURER)
+                .status(TopicStatusConstain.PENDING_APPROVAL)
+                .createdBy("lecturer-user")
+                .defensePeriod(period)
+                .build();
+        TopicRegistrationEntity registration = TopicRegistrationEntity.builder()
+                .registrationId(40L)
+                .topic(topic)
+                .team(team)
+                .status(TopicRegistrationStatusConstain.PENDING)
+                .build();
+        UserEntity lecturerUser = UserEntity.builder().userId("lecturer-user").status(StatusConstain.ACTIVE).build();
+        LectureEntity lecturer = LectureEntity.builder()
+                .lectureId("lecture-1")
+                .user(lecturerUser)
+                .build();
+        when(topics.findById(30L)).thenReturn(Optional.of(topic));
+        when(registrations.findFirstByTopic_IdTopicAndStatusOrderBySubmittedAtDesc(
+                        30L, TopicRegistrationStatusConstain.PENDING))
+                .thenReturn(Optional.of(registration));
+        when(registrations.findByTopic_IdTopicAndStatus(30L, TopicRegistrationStatusConstain.PENDING))
+                .thenReturn(List.of(registration));
+        when(lectures.findByUser_UserId("lecturer-user")).thenReturn(Optional.of(lecturer));
+        when(users.findById("lecturer-user")).thenReturn(Optional.of(lecturerUser));
+
+        service.approveTopic(30L);
+
+        verify(enrollments).autoEnrollStudents(
+                eq(team.getStudentEntities()), eq(period), contains("Admin phê duyệt đề tài"));
+        assertEquals(TopicStatusConstain.APPROVED, topic.getStatus());
+        assertSame(topic, team.getTopic());
     }
 
     private StudentEntity student(String code, String name) {

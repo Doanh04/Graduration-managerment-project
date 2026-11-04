@@ -57,7 +57,6 @@ import com.graduration.Service.SystemSettingService;
 import com.graduration.Service.NotificationService.NotificationRecipientService;
 import com.graduration.Service.NotificationService.NotificationService;
 import com.graduration.entity.DefensePeriodEntity;
-import com.graduration.entity.GraduationEnrollmentEntity;
 import com.graduration.entity.LectureEntity;
 import com.graduration.entity.StudentEntity;
 import com.graduration.entity.TeamEntity;
@@ -195,7 +194,7 @@ public class TopicService {
             topic.setFileData(encodeTopicFile(file));
         }
         TopicEntity savedTopic = topicRepository.save(topic);
-        createProposalRegistration(savedTopic, team, students, period);
+        createProposalRegistration(savedTopic, team);
         LectureEntity proposer = null;
         try {
             proposer = lectureRepository.findByUser_UserId(currentUserId()).orElse(null);
@@ -222,17 +221,131 @@ public class TopicService {
     }
 
     /**
+     * Cho phép chính giảng viên đã gửi cập nhật đề xuất trong lúc còn chờ duyệt,
+     * bao gồm cả nội dung đề tài, nhóm tạm và danh sách sinh viên.
+     */
+    @PreAuthorize("hasAuthority('ROLE_SUPERVISOR')")
+    @Transactional
+    public TopicResponse updateSupervisorProposal(
+            Long topicId, CreateSupervisorTopicProposalRequest request, MultipartFile file) {
+        validateTopicFile(file);
+        TopicEntity topic = findTopic(topicId);
+        if (!Objects.equals(topic.getCreatedBy(), currentUserId())) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+        if (topic.getCategoryTopic() != CategoryTopicConstain.LECTURER
+                || topic.getStatus() != TopicStatusConstain.PENDING_APPROVAL) {
+            throw new AppException(ErrorCode.TOPIC_OPERATION_NOT_ALLOWED);
+        }
+        requireActiveDefensePeriod(topic.getDefensePeriod());
+        if (request == null) {
+            throw new AppException(ErrorCode.INVALID_KEY);
+        }
+        validateRequest(request.getTitle(), CategoryTopicConstain.LECTURER);
+        if (request.getStudentCodes() == null || request.getStudentCodes().isEmpty()) {
+            throw new AppException(ErrorCode.STUDENT_NOT_BLANK);
+        }
+
+        TopicRegistrationEntity registration = topicRegistrationRepository
+                .findFirstByTopic_IdTopicAndStatusOrderBySubmittedAtDesc(
+                        topicId, TopicRegistrationStatusConstain.PENDING)
+                .orElseThrow(() -> new AppException(ErrorCode.TOPIC_REGISTRATION_NOT_FOUND));
+        TeamEntity team = registration.getTeam();
+        if (team == null) {
+            throw new AppException(ErrorCode.STUDENT_TEAM_REQUIRED);
+        }
+
+        DefensePeriodEntity period = findActiveDefensePeriod(request.getDefensePeriodId());
+        String title = request.getTitle().trim();
+        if (topicRepository.existsDuplicateTitle(title, period.getID_Defense(), topicId)) {
+            throw new AppException(ErrorCode.TOPIC_ALREADY_EXISTS);
+        }
+        Set<String> codes = new LinkedHashSet<>();
+        request.getStudentCodes().forEach(code -> {
+            if (code != null && !code.isBlank()) codes.add(code.trim());
+        });
+        if (codes.isEmpty()) {
+            throw new AppException(ErrorCode.STUDENT_NOT_BLANK);
+        }
+        List<StudentEntity> students = studentRepository.findAllByStudentCodeIn(codes);
+        if (students.size() != codes.size()) {
+            throw new AppException(ErrorCode.STUDENT_PROFILE_NOT_FOUND);
+        }
+        if (students.stream().anyMatch(student -> teamRepository.existsStudentInAnotherTeamOfDefensePeriod(
+                student.getIdStudent(), period.getID_Defense(), team.getIdTeam()))) {
+            throw new AppException(ErrorCode.STUDENT_ALREADY_IN_TEAM);
+        }
+
+        String teamName = supervisorProposalTeamName(request, students, period, team.getIdTeam());
+        List<StudentEntity> previousStudents = new ArrayList<>(team.getStudentEntities());
+        previousStudents.forEach(student -> student.getTeamMemberships()
+                .removeIf(membership -> Objects.equals(membership.getIdTeam(), team.getIdTeam())));
+        team.getStudentEntities().clear();
+        students.forEach(student -> {
+            team.getStudentEntities().add(student);
+            if (student.getTeamMemberships().stream()
+                    .noneMatch(membership -> Objects.equals(membership.getIdTeam(), team.getIdTeam()))) {
+                student.getTeamMemberships().add(team);
+            }
+        });
+        team.setNameTeam(teamName);
+        team.setDefensePeriod(period);
+        teamRepository.save(team);
+        Set<StudentEntity> changedStudents = new LinkedHashSet<>(previousStudents);
+        changedStudents.addAll(students);
+        studentRepository.saveAll(changedStudents);
+
+        topic.setTitle(title);
+        topic.setDescription(normalize(request.getDescription()));
+        topic.setObjective(normalize(request.getObjective()));
+        topic.setTechnology(normalize(request.getTechnology()));
+        topic.setDefensePeriod(period);
+        topic.setRejectionReason(null);
+        if (file != null && !file.isEmpty()) {
+            topic.setFileData(encodeTopicFile(file));
+        }
+        // Bản ghi chờ duyệt không được tạo hoặc giữ liên kết ghi danh.
+        registration.setEnrollment(null);
+        registration.setTeam(team);
+        topicRegistrationRepository.save(registration);
+        return toResponse(topicRepository.save(topic));
+    }
+
+    private String supervisorProposalTeamName(
+            CreateSupervisorTopicProposalRequest request,
+            List<StudentEntity> students,
+            DefensePeriodEntity period,
+            Long currentTeamId) {
+        String teamName;
+        if (students.size() == 1) {
+            StudentEntity onlyStudent = students.get(0);
+            String studentName = normalize(onlyStudent.getFullNameStudent());
+            if (studentName == null) studentName = onlyStudent.getStudentCode();
+            teamName = "Nhóm " + studentName;
+            if (teamRepository.existsByNameAndDefensePeriodAndIdNot(
+                    teamName, period.getID_Defense(), currentTeamId)) {
+                teamName = teamName + " - " + onlyStudent.getStudentCode();
+            }
+        } else {
+            if (request.getTeamName() == null || request.getTeamName().isBlank()) {
+                throw new AppException(ErrorCode.TEAM_NAME_NOT_BLANK);
+            }
+            teamName = request.getTeamName().trim();
+        }
+        if (teamRepository.existsByNameAndDefensePeriodAndIdNot(
+                teamName, period.getID_Defense(), currentTeamId)) {
+            throw new AppException(ErrorCode.TEAM_ALREADY_EXISTS);
+        }
+        return teamName;
+    }
+
+    /**
      * Lưu một bản ghi đăng ký nội bộ đại diện cho cả nhóm đề xuất.  Đề xuất của
      * giảng viên là một yêu cầu ở cấp nhóm, không phải mỗi sinh viên gửi một
      * yêu cầu riêng; tạo nhiều bản ghi sẽ làm hàng đợi duyệt bị trùng.
      */
-    private void createProposalRegistration(
-            TopicEntity topic, TeamEntity team, List<StudentEntity> students, DefensePeriodEntity period) {
-        StudentEntity representative = students.get(0);
-        GraduationEnrollmentEntity enrollment = graduationEnrollmentService.ensureEligible(
-                representative, period, "Chờ duyệt đề xuất đề tài của giảng viên");
+    private void createProposalRegistration(TopicEntity topic, TeamEntity team) {
         topicRegistrationRepository.save(TopicRegistrationEntity.builder()
-                .enrollment(enrollment)
                 .topic(topic)
                 .team(team)
                 .priority(1)
@@ -578,6 +691,12 @@ public class TopicService {
         requireActiveDefensePeriod(topic.getDefensePeriod());
         requireOwnerOrManager(topic);
         requireStudentParticipation(topic);
+        if (topic.getCategoryTopic() == CategoryTopicConstain.LECTURER
+                && topic.getStatus() == TopicStatusConstain.PENDING_APPROVAL
+                && topic.getTeam() == null) {
+            deletePendingSupervisorProposal(topic);
+            return;
+        }
         if (topic.getTeam() != null
                 || !topic.getTopicSuperVisorEntities().isEmpty()
                 || !topic.getReviewAssignment().isEmpty()
@@ -587,6 +706,27 @@ public class TopicService {
         requireEditable(topic);
         topicRepository.delete(topic);
         topicRepository.flush();
+    }
+
+    private void deletePendingSupervisorProposal(TopicEntity topic) {
+        TeamEntity proposedTeam = topicRegistrationRepository
+                .findFirstByTopic_IdTopicAndStatusOrderBySubmittedAtDesc(
+                        topic.getIdTopic(), TopicRegistrationStatusConstain.PENDING)
+                .map(TopicRegistrationEntity::getTeam)
+                .orElse(null);
+        if (proposedTeam != null) {
+            List<StudentEntity> students = new ArrayList<>(proposedTeam.getStudentEntities());
+            students.forEach(student -> student.getTeamMemberships()
+                    .removeIf(team -> Objects.equals(team.getIdTeam(), proposedTeam.getIdTeam())));
+            proposedTeam.getStudentEntities().clear();
+            teamRepository.saveAndFlush(proposedTeam);
+            studentRepository.saveAll(students);
+        }
+        topicRepository.delete(topic);
+        topicRepository.flush();
+        if (proposedTeam != null) {
+            teamRepository.delete(proposedTeam);
+        }
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY', 'ROLE_SUPERVISOR', 'ROLE_STUDENT')")

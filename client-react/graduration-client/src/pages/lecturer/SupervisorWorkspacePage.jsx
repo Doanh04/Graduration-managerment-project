@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, ClipboardCheck, Eye, FileText, Inbox, LoaderCircle, Plus, Search, Upload, Users, X } from 'lucide-react';
+import { AlertCircle, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, ClipboardCheck, Edit3, Eye, FileText, Inbox, LoaderCircle, Plus, Search, Trash2, Upload, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import API_ENDPOINTS from '../../config/endpoints.js';
 import httpClient from '../../config/HttpClient.jsx';
@@ -30,6 +30,7 @@ export default function SupervisorWorkspacePage() {
   const [proposalClasses, setProposalClasses] = useState([]);
   const [proposalLoading, setProposalLoading] = useState(false);
   const [proposalSaving, setProposalSaving] = useState(false);
+  const [proposalDeletingId, setProposalDeletingId] = useState(null);
   const [proposalError, setProposalError] = useState('');
 
   const load = async () => {
@@ -107,6 +108,30 @@ export default function SupervisorWorkspacePage() {
     setProposalModal(true);
   };
 
+  const openEditProposal = (item) => {
+    const topic = item.topic || {};
+    const students = Array.isArray(topic.proposedStudents) ? topic.proposedStudents : [];
+    setProposal({
+      ...emptySupervisorProposal,
+      editingId: topic.topicId,
+      teamId: topic.teamId,
+      title: topic.title || '',
+      description: topic.description || '',
+      objective: topic.objective || '',
+      technology: topic.technology || '',
+      defensePeriodId: topic.defensePeriodId || '',
+      classCode: students[0]?.classCode || '',
+      teamName: topic.teamName || '',
+      teamNameAuto: students.length === 1,
+      selectedStudentNames: Object.fromEntries(students.map((student) => [student.studentCode, student.fullName || student.studentCode])),
+      studentCodes: students.map((student) => student.studentCode).filter(Boolean),
+      existingFileName: topic.fileName || '',
+    });
+    setProposalStudents([]);
+    setProposalError('');
+    setProposalModal(true);
+  };
+
   // Danh sách vẫn lọc theo lớp/khóa. Khi đã chọn đợt bảo vệ, đối chiếu thêm
   // các nhóm trong chính đợt đó để khóa sinh viên đã có nhóm; nhóm ở đợt khác không ảnh hưởng.
   useEffect(() => {
@@ -135,6 +160,7 @@ export default function SupervisorWorkspacePage() {
 
         const assignedTeamsByStudent = new Map();
         (Array.isArray(teams) ? teams : []).forEach((team) => {
+          if (proposal.teamId && String(team.idTeam) === String(proposal.teamId)) return;
           (Array.isArray(team.students) ? team.students : []).forEach((student) => {
             assignedTeamsByStudent.set(
               String(student.studentCode || '').trim().toUpperCase(),
@@ -206,8 +232,14 @@ export default function SupervisorWorkspacePage() {
       });
       proposal.studentCodes.forEach((studentCode) => data.append('studentCodes', studentCode));
       if (proposal.file) data.append('file', proposal.file);
-      await ResourceService.create(API_ENDPOINTS.topics.supervisorProposal, data);
-      toast.success('Đã gửi đề xuất đề tài và nhóm chờ admin duyệt.');
+      if (proposal.editingId) {
+        await ResourceService.update(API_ENDPOINTS.topics.updateSupervisorProposal(proposal.editingId), data, 'patch');
+      } else {
+        await ResourceService.create(API_ENDPOINTS.topics.supervisorProposal, data);
+      }
+      toast.success(proposal.editingId
+        ? 'Đã cập nhật đề xuất đang chờ duyệt.'
+        : 'Đã gửi đề xuất đề tài và nhóm chờ admin duyệt.');
       setProposalModal(false);
       setProposal(emptySupervisorProposal);
       await load();
@@ -215,6 +247,22 @@ export default function SupervisorWorkspacePage() {
       setProposalError(getApiErrorMessage(requestError, 'Không thể gửi đề xuất đề tài.'));
     } finally {
       setProposalSaving(false);
+    }
+  };
+
+  const deleteProposal = async (item) => {
+    const topic = item.topic || {};
+    if (!window.confirm(`Xóa đề xuất “${topic.title || `#${item.topicId}`}”? Nhóm tạm sẽ được giải phóng.`)) return;
+    setProposalDeletingId(item.topicId);
+    try {
+      await ResourceService.remove(API_ENDPOINTS.topics.remove(item.topicId));
+      toast.success('Đã xóa đề xuất và giải phóng nhóm sinh viên tạm.');
+      if (detail?.item?.topicId === item.topicId) setDetail(null);
+      await load();
+    } catch (requestError) {
+      toast.error(getApiErrorMessage(requestError, 'Không thể xóa đề xuất đề tài.'));
+    } finally {
+      setProposalDeletingId(null);
     }
   };
 
@@ -326,7 +374,7 @@ export default function SupervisorWorkspacePage() {
                     <td data-label="Đợt bảo vệ"><strong>{topic.defensePeriodName || '—'}</strong><small>{topic.academicYear || ''}</small></td>
                     <td data-label={item.isProposal ? 'Ngày gửi' : 'Phân công'}>{formatDateDisplay(item.assignedAt)}</td>
                     <td data-label="Trạng thái"><span className={`status-badge ${item.isProposal ? topicStatusClass(topic.status) : completed ? 'muted' : 'success'}`}>{item.isProposal ? topicStatusLabel(topic.status) : completed ? 'Đã hoàn thành' : 'Đang hoạt động'}</span></td>
-                    <td className="table-actions"><div className="inline-actions"><button className="view" onClick={() => openDetail(item)} title="Xem đề tài, nhóm và sinh viên"><Eye size={15} /></button><button className="view" onClick={() => showSubmissions(item)} title="Xem bài nộp và nhận xét"><FileText size={15} /></button></div></td>
+                    <td className="table-actions"><div className="inline-actions"><button className="view" onClick={() => openDetail(item)} title="Xem đề tài, nhóm và sinh viên"><Eye size={15} /></button>{item.isProposal && String(topic.status || '').toUpperCase() === 'PENDING_APPROVAL' && <><button onClick={() => openEditProposal(item)} title="Chỉnh sửa đề xuất đang chờ duyệt"><Edit3 size={15} /></button><button className="danger" disabled={proposalDeletingId === item.topicId} onClick={() => deleteProposal(item)} title="Xóa đề xuất đang chờ duyệt"><Trash2 size={15} /></button></>}{!item.isProposal && <button className="view" onClick={() => showSubmissions(item)} title="Xem bài nộp và nhận xét"><FileText size={15} /></button>}</div></td>
                   </tr>;
                 })}
               </tbody></table></div>
@@ -338,7 +386,7 @@ export default function SupervisorWorkspacePage() {
   </div>;
 }
 
-const emptySupervisorProposal = { title: '', description: '', objective: '', technology: '', defensePeriodId: '', classCode: '', teamName: '', teamNameAuto: false, selectedStudentNames: {}, studentCodes: [], file: null };
+const emptySupervisorProposal = { editingId: null, teamId: null, title: '', description: '', objective: '', technology: '', defensePeriodId: '', classCode: '', teamName: '', teamNameAuto: false, selectedStudentNames: {}, studentCodes: [], file: null, existingFileName: '' };
 
 function SupervisorProposalModal({ proposal, setProposal, students, periods, classes, loading, saving, error, onSubmit, onClose }) {
   const [studentQuery, setStudentQuery] = useState('');
@@ -366,7 +414,7 @@ function SupervisorProposalModal({ proposal, setProposal, students, periods, cla
   };
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !saving && onClose()}>
     <section className="supervisor-proposal-modal" role="dialog" aria-modal="true">
-      <header><div><span>ĐỀ XUẤT ĐỀ TÀI</span><h3>Đề xuất đề tài kèm nhóm</h3></div><button type="button" onClick={onClose} aria-label="Đóng"><X size={20} /></button></header>
+      <header><div><span>ĐỀ XUẤT ĐỀ TÀI</span><h3>{proposal.editingId ? 'Chỉnh sửa đề xuất đang chờ duyệt' : 'Đề xuất đề tài kèm nhóm'}</h3></div><button type="button" onClick={onClose} aria-label="Đóng"><X size={20} /></button></header>
       <form onSubmit={onSubmit}>
         <div className="supervisor-proposal-grid">
           <label>Tên đề tài<b>*</b><input required value={proposal.title} onChange={(event) => setProposal({ ...proposal, title: event.target.value })} placeholder="Nhập tên đề tài" /></label>
@@ -377,13 +425,13 @@ function SupervisorProposalModal({ proposal, setProposal, students, periods, cla
           <label className="full-width">Mô tả<textarea value={proposal.description} onChange={(event) => setProposal({ ...proposal, description: event.target.value })} /></label>
           <label className="full-width">Mục tiêu<textarea value={proposal.objective} onChange={(event) => setProposal({ ...proposal, objective: event.target.value })} /></label>
           <label className="full-width proposal-file-field">Tệp mô tả đề tài
-            <span className="proposal-file-input"><Upload size={15} /><span>{proposal.file ? proposal.file.name : 'Chọn tệp PDF, DOC hoặc DOCX (tối đa 10 MB)'}</span><input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setProposal({ ...proposal, file: event.target.files?.[0] || null })} /></span>
+            <span className="proposal-file-input"><Upload size={15} /><span>{proposal.file ? proposal.file.name : proposal.existingFileName ? `Giữ tệp hiện tại: ${proposal.existingFileName}` : 'Chọn tệp PDF, DOC hoặc DOCX (tối đa 10 MB)'}</span><input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setProposal({ ...proposal, file: event.target.files?.[0] || null })} /></span>
             {proposal.file && <small className="proposal-file-selected">{formatFileSize(proposal.file.size)} · Nhấn để thay tệp</small>}
           </label>
         </div>
         <div className="supervisor-student-picker"><div className="picker-heading"><span>Chọn sinh viên vào nhóm<b>*</b></span><strong>Đã chọn {proposal.studentCodes.length}</strong></div>{!proposal.classCode ? <div className="proposal-option-state">Chọn lớp/khóa để tải danh sách sinh viên. Bạn có thể đổi lớp để chọn thêm sinh viên khác.</div> : loading ? <div className="proposal-option-state">Đang tải danh sách sinh viên...</div> : students.length ? <><label className="proposal-student-search"><Search size={15} /><input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Tìm theo họ tên hoặc MSSV..." /></label><div className="proposal-student-list">{filteredStudents.map((student) => { const selected = proposal.studentCodes.includes(student.studentCode); const unavailable = Boolean(student.assignedTeamInPeriod); return <label key={student.studentCode} className={`${selected ? 'selected' : ''} ${unavailable ? 'unavailable' : ''}`.trim()} title={unavailable ? `Sinh viên đã thuộc ${student.assignedTeamInPeriod} trong đợt bảo vệ này` : undefined}><input type="checkbox" checked={selected} disabled={unavailable} onChange={() => toggleStudent(student)} /><span><strong>{student.fullName || 'Chưa cập nhật họ tên'}</strong><small>{student.studentCode} · {student.classCode || 'Chưa cập nhật lớp'}</small>{unavailable && <small className="student-team-warning">Đã có nhóm trong đợt này · {student.assignedTeamInPeriod}</small>}</span></label>; })}{filteredStudents.length === 0 && <div className="proposal-option-state">Không tìm thấy sinh viên phù hợp.</div>}</div></> : <div className="proposal-option-state">Lớp/khóa này chưa có sinh viên.</div>}</div>
         {error && <div className="workflow-error"><AlertCircle size={16} />{error}</div>}
-        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={saving}>Hủy</button><button type="submit" className="primary-button" disabled={saving || loading}>{saving ? 'Đang gửi...' : 'Gửi đề xuất'}</button></footer>
+        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={saving}>Hủy</button><button type="submit" className="primary-button" disabled={saving || loading}>{saving ? 'Đang lưu...' : proposal.editingId ? 'Lưu thay đổi' : 'Gửi đề xuất'}</button></footer>
       </form>
     </section>
   </div>;

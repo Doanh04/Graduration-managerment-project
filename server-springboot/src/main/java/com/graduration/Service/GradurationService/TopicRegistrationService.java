@@ -207,6 +207,9 @@ public class TopicRegistrationService {
     public TopicRegistrationResponse cancel(Long registrationId) {
         TopicRegistrationEntity registration = findRegistration(registrationId);
         requireOpenPeriod(registration.getTopic());
+        if (registration.getEnrollment() == null) {
+            throw new AppException(ErrorCode.TOPIC_REGISTRATION_OPERATION_NOT_ALLOWED);
+        }
         if (!registration
                 .getEnrollment()
                 .getStudent()
@@ -288,7 +291,15 @@ public class TopicRegistrationService {
     // Hàm toResponse: Nhận TopicRegistrationEntity; lấy đề tài, nhóm, sinh viên, đợt bảo vệ và giảng viên ưu tiên rồi
     // ánh xạ đầy đủ sang DTO duyệt đăng ký.
     private TopicRegistrationResponse toResponse(TopicRegistrationEntity item) {
-        StudentEntity student = item.getEnrollment().getStudent();
+        GraduationEnrollmentEntity enrollment = item.getEnrollment();
+        StudentEntity student = enrollment == null
+                ? (item.getTeam() == null || item.getTeam().getStudentEntities().isEmpty()
+                        ? null
+                        : item.getTeam().getStudentEntities().get(0))
+                : enrollment.getStudent();
+        var defensePeriod = enrollment == null
+                ? item.getTopic().getDefensePeriod()
+                : enrollment.getDefensePeriod();
         LectureEntity lecturer = item.getPreferredSupervisor();
         return TopicRegistrationResponse.builder()
                 .registrationId(item.getRegistrationId())
@@ -297,10 +308,10 @@ public class TopicRegistrationService {
                 .technology(item.getTopic().getTechnology())
                 .teamId(item.getTeam() == null ? null : item.getTeam().getIdTeam())
                 .teamName(item.getTeam() == null ? null : item.getTeam().getNameTeam())
-                .studentCode(student.getStudentCode())
-                .studentName(student.getFullNameStudent())
-                .defensePeriodId(item.getEnrollment().getDefensePeriod().getID_Defense())
-                .defensePeriodName(item.getEnrollment().getDefensePeriod().getPeriodName())
+                .studentCode(student == null ? null : student.getStudentCode())
+                .studentName(student == null ? null : student.getFullNameStudent())
+                .defensePeriodId(defensePeriod == null ? null : defensePeriod.getID_Defense())
+                .defensePeriodName(defensePeriod == null ? null : defensePeriod.getPeriodName())
                 .priority(item.getPriority())
                 .status(item.getStatus())
                 .preferredSupervisorId(lecturer == null ? null : lecturer.getLectureId())

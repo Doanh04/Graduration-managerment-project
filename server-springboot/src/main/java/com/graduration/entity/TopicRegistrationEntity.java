@@ -32,8 +32,10 @@ public class TopicRegistrationEntity {
     @Column(name = "registration_id")
     Long registrationId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "enrollment_id", nullable = false)
+    // Đề xuất của giảng viên tồn tại trước khi sinh viên được ghi danh. Vì vậy
+    // bản ghi chờ duyệt liên kết trực tiếp với topic/team và chưa có enrollment.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "enrollment_id")
     GraduationEnrollmentEntity enrollment;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
